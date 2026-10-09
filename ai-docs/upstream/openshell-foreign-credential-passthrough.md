@@ -77,7 +77,6 @@ For endpoints that a provider credential is bound to (on by default, opt-out per
 
 - **External reverse proxy / LLM gateway per API** (strip client auth, inject ours): works, but duplicates OpenShell's provider/placeholder model and moves the secret outside OpenShell.
 - **Query allowlists only:** closes `?api_key=`, not headers.
-- **Provider-side org restrictions:** do not help; the attacker's key belongs to the attacker's org.
 - **Deny all endpoints that accept arbitrary keys:** removes the LLM/SaaS endpoints agents need.
 
 ### Agent Investigation
