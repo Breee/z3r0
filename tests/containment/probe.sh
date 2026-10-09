@@ -29,4 +29,18 @@ done
 blocked "proc:sh-c"      sh -c "ls '$H/.ssh'"
 blocked "proc:bg"        sh -c "(ls '$H/.ssh' > /tmp/bg.out 2>&1 &); sleep 1; test -s /tmp/bg.out && ! grep -q 'No such' /tmp/bg.out"
 blocked "proc:python"    sh -c "command -v python3 && python3 -c 'import os;os.listdir(\"$H/.ssh\")'"
+
+# --- privilege (step 3) ---
+blocked "priv:uid-0"        test "$(id -u)" = 0
+blocked "priv:gid-0"        test "$(id -g)" = 0
+blocked "priv:sudo"         sudo -n true
+blocked "priv:su"           sh -c "echo | su -c true root"
+# setuid bins (su, passwd) exist in image; neutralised by NoNewPrivs=1 + CapBnd=0 (cases below)
+blocked "priv:cap-eff"      sh -c "grep '^CapEff' /proc/self/status | grep -vq '0000000000000000'"
+blocked "priv:cap-bnd"      sh -c "grep '^CapBnd' /proc/self/status | grep -vq '0000000000000000'"
+blocked "priv:no-new-privs-0" sh -c "grep -q '^NoNewPrivs:[[:space:]]*0' /proc/self/status"
+blocked "priv:write-etc"    sh -c "echo x > /etc/z3r0-probe"
+blocked "priv:write-passwd" sh -c "echo x >> /etc/passwd"
+blocked "priv:unshare-user" unshare -r true
+blocked "priv:mount"        mount -t tmpfs none /tmp
 exit $rc

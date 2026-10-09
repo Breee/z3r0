@@ -12,3 +12,5 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C08 — Host — Image policy allowlists registries but does not verify signatures. Add sigstore/GPG verification later.
 - C09 — OpenShell — `sandbox exec` uses login shell; image `ENV PATH` is lost (golang image: pass `--env PATH=/usr/local/go/bin:...`). Fix via custom image/profile.
 - C10 — OpenShell — `sandbox upload <dir> <dest>` creates `<dest>/<basename>`; respects .gitignore. Copy, not sync (confirms C03).
+- C11 — OpenShell — `/proc/mounts` in sandbox leaks host paths (`/home/<user>/.local/share/containers/...`) → username leak. Low risk; no content access.
+- C12 — Image — setuid binaries (`su`, `passwd`) present in golang image; neutralised by NoNewPrivs=1 + empty CapBnd + Seccomp=2. Prefer minimal images.
