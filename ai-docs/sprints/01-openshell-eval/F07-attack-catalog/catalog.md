@@ -23,7 +23,7 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | A15 | §12.6 injection in pod logs → read k8s Secrets | Z | k8s.secret.read absent | later | later |
 | A16 | §12.6 agent obtains kubeconfig | S | no kubeconfig in workspace | F02 fs:kube | pass |
 | A17 | §12.6 other namespace / prod exec | Z | capability + RBAC | later | later |
-| A18 | §14.14 compromised workstation | H | no long-lived secrets, dedicated user | F09 blast-radius | todo |
+| A18 | §14.14 compromised workstation | H | no long-lived secrets, dedicated user | F09 blast-radius | pass |
 
 ## C — common
 | ID | Attack | Layer | Expected control | Test | Status |
@@ -40,12 +40,12 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | C10 | reach gateway API from sandbox | S | not routable / mTLS | F02 net:host-gateway, F08 gw:* | pass |
 | C11 | secret in /proc/*/environ, core dump, ps | S | placeholders only | F08 sup:read-environ, PoC03 secret-not-in-sandbox | pass |
 | C12 | fork bomb / memory / disk fill | S/H | cgroup limits | F08 res:* | gap(C22,C23) |
-| C13 | kernel exploit / container escape CVE | H | patching, VM driver | F09 VM driver eval | todo |
+| C13 | kernel exploit / container escape CVE | H | patching, VM driver | F09 VM driver eval | later |
 | C14 | info leak: host paths/username in /proc/mounts | S | none | F02 evidence | gap (C11) |
 | C15 | setuid binaries in image | S | NoNewPrivs neutralises | F02 priv:su | pass |
 | C16 | pulling untrusted image | H | policy.json reject unknown registries | scripts/podman-policy.sh | pass |
 | C17 | unsigned image accepted from allowed registry | H | signature policy | none | gap (C08) |
-| C18 | gateway state theft after breakout (db + KEK) | H | dedicated user / KMS | F09 blast-radius | todo |
+| C18 | gateway state theft after breakout (db + KEK) | H | dedicated user / KMS | F09 blast-radius | pass |
 | C19 | non-HTTP / tls:skip credential use | S | none | — | gap (C15) |
 | C20 | telemetry leaks metadata | H | telemetry disabled | scripts/openshell-gateway-config.sh | pass |
 

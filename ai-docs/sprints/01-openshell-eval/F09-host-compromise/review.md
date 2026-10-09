@@ -24,3 +24,10 @@ tests/breakout/blast-radius.sh openshell
 tests/breakout/blast-radius.sh
 ```
 Expected: as openshell only gateway-db, gateway-kek (+ its podman socket); as bree no gateway-db/kek, still openshell-client-key (C26), ssh/tokens, docker group (C25).
+## Step 4: VM driver available? (docs + binary)
+```
+ls /usr/libexec/openshell/openshell-driver-vm
+ls -l /dev/kvm
+grep -n -A22 "## MicroVM Driver" /tmp/opencode/OpenShell/docs/how-it-works/sandboxes/runtimes.mdx
+```
+Expected: binary exists; /dev/kvm group kvm; doc lists `compute_driver = "vm"`, `overlay_disk_mib`, "VM sandboxes have no network interface".
