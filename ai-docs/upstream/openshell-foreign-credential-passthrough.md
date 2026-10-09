@@ -72,6 +72,11 @@ For endpoints that a provider credential is bound to (on by default, opt-out per
 
 Out of scope: endpoints without a bound credential.
 
+Limitations (not addressed here):
+- Credentials in the query (e.g. GitLab `?private_token=`): restrict with existing `query` deny rules.
+- Credentials in the body (e.g. GitLab form field `private_token`): not covered.
+- Exfiltration through the operator's own account (e.g. public snippet with the bound token): needs path rules, not this feature.
+
 ### Acceptance Criteria
 
 - [ ] On a credential-bound endpoint, a request with a non-placeholder value in the bound auth header is denied; the upstream receives nothing.
