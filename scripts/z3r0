@@ -57,7 +57,9 @@ case "${1:-}" in
         openshell policy update "$NAME" --rule-name copilot --binary '/sandbox/.vscode-server/**' \
           --add-endpoint "$h:443:read-write:rest:enforce" --wait >/dev/null 2>&1
       done; touch "$ST/copilot"; fi
-    openshell sandbox connect "$NAME" --editor vscode
+    # Same entry `sandbox connect --editor vscode` writes; connect itself opens a 2nd window that races (startup lock).
+    C="$HOME/.config/openshell/ssh_config"
+    grep -qx "Host $HOST" "$C" 2>/dev/null || cat "$ST/ssh.conf" >> "$C"
     code --folder-uri "vscode-remote://ssh-remote+$HOST$DIR" ;;
   stop) stop ;;
   rm) stop || true; openshell sandbox delete "$NAME" >/dev/null 2>&1 || true; rm -rf "$ST"; echo "removed $NAME" ;;
