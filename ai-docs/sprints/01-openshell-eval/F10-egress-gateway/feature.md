@@ -3,7 +3,7 @@ Status: deferred (noted, not deployed this sprint)
 Description: Sandbox may only reach our gateway for LLM/API traffic; gateway strips client auth and injects ours. Closes C18 until OpenShell supports it (ai-docs/upstream/openshell-foreign-credential-passthrough.md).
 Goal: Attacker key sent from sandbox never reaches upstream.
 Options (both valid, pick in F06):
-- A: query allowlist in OpenShell policy (closes `?api_key=` now; headers stay open).
+- A: per-service `deny_rules` on known auth query params (Google `key`, GitLab `private_token`, `access_token`); test whether allow rules reject unlisted params. Headers stay open.
 - B: own egress proxy or own LLM proxy (e.g. LiteLLM) on host as non-bree user; strips client auth, injects ours (closes headers too).
 Plan:
 1. Pick gateway (LiteLLM or minimal reverse proxy); run on host as non-bree user → verify: health check.

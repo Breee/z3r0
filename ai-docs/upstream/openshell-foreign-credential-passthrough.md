@@ -1,6 +1,6 @@
 # Feature request (NVIDIA/OpenShell, template: .github/ISSUE_TEMPLATE/feature_request.yml)
 
-**Title:** Bind the credential principal, not only the destination: reject client-supplied credentials on credential-bound endpoints
+**Title:** Reject client-supplied auth headers on credential-bound endpoints
 
 ---
 
@@ -12,7 +12,7 @@ so that a prompt-injected agent cannot use an allowed endpoint to send data to a
 
 ### Problem Statement
 
-Placeholders protect the operator's secret, and endpoint binding restricts where it may be sent. Nothing restricts **which** credential is used at an allowed endpoint. A request with a plain-text, non-placeholder credential is forwarded unchanged (verified for `Authorization` and `X-Api-Key`) to a credential-bound endpoint. Rules can restrict query parameters, but there is no header matcher, so credential headers cannot be controlled.
+Placeholders protect the operator's secret, and endpoint binding restricts where it may be sent. Nothing restricts **which** credential is used at an allowed endpoint. A request with a plain-text, non-placeholder credential is forwarded unchanged (verified for `Authorization` and `X-Api-Key`) to a credential-bound endpoint. Policy rules have no header matcher, so operators cannot block this.
 
 Tested with OpenShell 0.1.2, rootless Podman driver, Linux.
 
@@ -66,12 +66,11 @@ Without this feature, users must put their own reverse proxy / LLM gateway in fr
 ### Proposed Design
 
 For endpoints that a provider credential is bound to (on by default, opt-out per endpoint):
-- A request whose bound auth header (`header_name` in the profile) contains a value that is not a resolvable placeholder is denied with a distinct error (e.g. `foreign_credential`), similar to the existing `credential_unavailable` denial for unresolvable placeholders.
-- The profile/policy can list additional credential-bearing headers (e.g. `x-api-key`, `cookie`) that get the same treatment.
-- Endpoints without a bound credential are unchanged; operators cover them with the header matchers below.
-- Optional per-endpoint mode "always inject": whatever the client sends in the bound header is replaced by the bound credential.
-- Optional general primitive: header matchers in `rules` / `deny_rules` (name + glob), so operators can deny e.g. any `authorization` not matching the placeholder format.
+- If the bound auth header (`header_name` in the profile) contains anything other than a resolvable placeholder, the request is denied with a distinct error (e.g. `foreign_credential`), like the existing `credential_unavailable` denial.
+- The profile can list additional auth headers (e.g. `x-api-key`, `cookie`) that get the same check.
 - Denials emit an OCSF event with endpoint and header name, never the value.
+
+Out of scope: endpoints without a bound credential.
 
 ### Acceptance Criteria
 
@@ -86,6 +85,7 @@ For endpoints that a provider credential is bound to (on by default, opt-out per
 
 - **External reverse proxy / LLM gateway per API** (strip client auth, inject ours): works, but duplicates OpenShell's provider/placeholder model and moves the secret outside OpenShell.
 - **Allow only read paths on SaaS APIs:** blocks the write paths agents need (LLM calls are POST).
+- **Generic header matchers in `rules`/`deny_rules`:** more flexible, also covers endpoints without a credential, but every operator must know and write the auth headers of every service; the default-deny above protects without extra policy.
 
 ### Agent Investigation
 
