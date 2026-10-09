@@ -1,5 +1,5 @@
 # F08 — Common + creative attack suite
-Status: todo
+Status: doing
 Description: Extend the hostile-agent harness beyond F02 with common and creative attacks against OpenShell (sandbox layer only).
 Goal: `tests/attacks/run.sh` one command, table of PASS(=blocked)/FAIL/GAP per catalog ID.
 Plan (seeds, refine from F07):
@@ -14,3 +14,4 @@ DONE: every F07 sandbox-layer row has a case; all blocked or logged as GAP in ca
 GOOD: each case ≤3 lines in probe; creative cases have 1-line rationale.
 Proof: `tests/attacks/run.sh` → table, exit 0 iff no unexpected FAIL.
 Log:
+- 2026-10-09: step 1 egress: tests/attacks/{run,egress}.sh; deny-all + httpbin read-only allowlist; 10/10 PASS (POST, other host/port, plain http, connect-to, plaintext-over-443, copied curl, wget blocked).
