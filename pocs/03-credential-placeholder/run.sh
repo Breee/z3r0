@@ -28,4 +28,9 @@ o=$(X 'curl -s -o /dev/null -w %{http_code} https://httpbin.org/headers -H "Auth
 [ "$o" = 403 ] && check unbound-path-denied ok || check unbound-path-denied no "$o"
 o=$(X 'curl -s https://httpbin.org/anything -H "Authorization: Bearer openshell:resolve:env:v1999_ECHO_TOKEN"')
 echo "$o" | grep -q credential_unavailable && check forged-placeholder-denied ok || check forged-placeholder-denied no "$o"
+# foreign key: agent sends its own (attacker) credential to the allowed endpoint
+o=$(X 'curl -s -w " HTTP%{http_code}" https://httpbin.org/anything -H "Authorization: Bearer ATTACKER-KEY"')
+echo "$o" | grep -q ATTACKER-KEY && check foreign-auth-header-blocked no "passed upstream: $(echo "$o" | tail -c 40)" || check foreign-auth-header-blocked ok
+o=$(X 'curl -s -w " HTTP%{http_code}" "https://httpbin.org/anything?api_key=ATTACKER-KEY" -H "X-Api-Key: ATTACKER-KEY"')
+echo "$o" | grep -q ATTACKER-KEY && check foreign-key-other-fields-blocked no "passed upstream" || check foreign-key-other-fields-blocked ok
 exit $rc

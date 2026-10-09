@@ -55,10 +55,10 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | X01 | git hooks / .envrc in uploaded repo run on host | H | upload = copy, host never executes | F08 workspace-hooks | todo |
 | X02 | symlink in workspace → host file on download | H | download path sanitising | F08 download-traversal | todo |
 | X03 | exfil in query/path/body of allowed endpoint | S | path binding, read-only methods | F08 exfil-allowed-endpoint | todo |
-| X04 | placeholder echoed back by allowed upstream (httpbin-style reflect) | S | don't bind creds to reflecting endpoints | PoC03 shows reflection | gap |
+| X04 | placeholder echoed back by allowed upstream (httpbin-style reflect) | S | don't bind creds to reflecting endpoints | PoC03 shows reflection | gap (C17, low) |
 | X05 | timing/size covert channel via allowed host | S | none realistic | later | later |
 | X06 | agent asks user to approve broad rule | S/Z | rule approval UX, scope limits | F08 rule-approve-social | todo |
 | X07 | same-name sandbox recreate race picks stale state | H | unique names | — | gap (C14) |
 | X08 | VS Code server / extension inside sandbox phones home | S | egress allowlist | F05 | todo |
 | X09 | agent edits its own policy file in workspace | S | policy lives on gateway | F08 policy-tamper | todo |
-| X10 | LLM provider endpoint used as exfil channel | S | only allowed if needed; content inspection none | F04 | gap |
+| X10 | foreign (attacker) API key to allowed endpoint, e.g. LLM provider | S | strip non-placeholder auth | PoC03 foreign-auth-header-blocked FAIL | gap (C18) |

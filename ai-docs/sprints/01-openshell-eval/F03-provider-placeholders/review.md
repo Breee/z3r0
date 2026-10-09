@@ -14,3 +14,9 @@ ps -o user= -p "$(systemctl --user show openshell-gateway -p MainPID --value)"
 ls -l ~/.local/state/openshell/gateway/ ~/.local/state/openshell/gateway/credentials/
 ```
 Expected: gateway runs as you; `key-encryption-key.bin` owned by you next to `openshell.db` → C13/D06.
+
+## Foreign-key exfil (C18)
+```bash
+sh pocs/03-credential-placeholder/run.sh | grep foreign
+```
+Expected (current, known gap): both `FAIL foreign-*` — OpenShell forwards attacker-supplied Authorization / X-Api-Key / ?api_key. PoC exits 1 until mitigated.
