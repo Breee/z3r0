@@ -12,12 +12,12 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | A04 | §14.3 destructive prod action | Z | least privilege + approval | later: server-side auth | later |
 | A05 | §14.4 malicious commit pushed | Z | branch protection + CI + review | later: GitLab config | later |
 | A06 | §14.5 GitOps poisoning | Z | MR + admission + GitOps | later | later |
-| A07 | §14.6 malicious MCP/tool output drives agent | S | sandbox + tool policy | F08 prompt-injection (with F04 agent) | todo |
+| A07 | §14.6 malicious MCP/tool output drives agent | S | sandbox + tool policy | F04 prompt-injection (needs agent) | todo |
 | A08 | §14.7 malicious test/build script | S | sandbox inherited by children | F02 proc:sh-c/bg/python | pass |
 | A09 | §14.8 malicious Dockerfile / build | S/H | no host podman; isolated builder | F02 podman:* (build path later) | pass |
-| A10 | §14.9 malicious dependency (go/npm install hook) | S | sandbox + egress allowlist | F08 supply-chain hook | todo |
-| A11 | §14.10 source/arch exfil via allowed endpoint | S | path-bound endpoints, read-only | F08 exfil-allowed-endpoint | todo |
-| A12 | §14.11 agent disables controls (policy, supervisor) | S | external enforcement, read-only supervisor | F02 mount:*, F08 gateway-api | todo |
+| A10 | §14.9 malicious dependency (go/npm install hook) | S | sandbox + egress allowlist | F08 egress:* (install hosts not allowlisted; hooks run inside sandbox) | pass |
+| A11 | §14.10 source/arch exfil via allowed endpoint | S | path-bound endpoints, read-only | F08 exfil:data-in-query | gap(C19) |
+| A12 | §14.11 agent disables controls (policy, supervisor) | S | external enforcement, read-only supervisor | F02 mount:*, F08 sup:*, gw:* | pass |
 | A13 | §14.12 credential laundering (placeholder to other host/path) | S | endpoint binding | PoC03 unbound-path-denied, forged-placeholder-denied | pass |
 | A14 | §14.13 confused deputy across systems | Z | info-flow policy (future) | later | later |
 | A15 | §12.6 injection in pod logs → read k8s Secrets | Z | k8s.secret.read absent | later | later |
@@ -37,9 +37,9 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | C07 | proxy bypass (--noproxy, raw IP, /dev/tcp) | S | netns + proxy only | F02 net:noproxy, http-ip, tcp-raw | pass |
 | C08 | IPv6 egress | S | deny | F02 net:ipv6 | pass |
 | C09 | DNS exfil | S | synthetic resolver | F02 net:dns-real-answer | pass |
-| C10 | reach gateway API from sandbox | S | not routable / mTLS | F02 net:host-gateway, F08 gateway-mtls | todo |
-| C11 | secret in /proc/*/environ, core dump, ps | S | placeholders only | F08 proc-environ | todo |
-| C12 | fork bomb / memory / disk fill | S/H | cgroup limits | F08 resource-abuse | todo |
+| C10 | reach gateway API from sandbox | S | not routable / mTLS | F02 net:host-gateway, F08 gw:* | pass |
+| C11 | secret in /proc/*/environ, core dump, ps | S | placeholders only | F08 sup:read-environ, PoC03 secret-not-in-sandbox | pass |
+| C12 | fork bomb / memory / disk fill | S/H | cgroup limits | F08 res:* | gap(C22,C23) |
 | C13 | kernel exploit / container escape CVE | H | patching, VM driver | F09 VM driver eval | todo |
 | C14 | info leak: host paths/username in /proc/mounts | S | none | F02 evidence | gap (C11) |
 | C15 | setuid binaries in image | S | NoNewPrivs neutralises | F02 priv:su | pass |
@@ -52,13 +52,13 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 ## X — creative
 | ID | Attack | Layer | Expected control | Test | Status |
 |---|---|---|---|---|---|
-| X01 | git hooks / .envrc in uploaded repo run on host | H | upload = copy, host never executes | F08 workspace-hooks | todo |
-| X02 | symlink in workspace → host file on download | H | download path sanitising | F08 download-traversal | todo |
-| X03 | exfil in query/path/body of allowed endpoint | S | path binding, read-only methods | F08 exfil-allowed-endpoint | todo |
+| X01 | git hooks / .envrc in uploaded repo run on host | H | upload = copy, host never executes | F08 dl:git-fsmonitor-host-exec | gap(C20) |
+| X02 | symlink in workspace → host file on download | H | download path sanitising | F08 dl:* | gap(C21) |
+| X03 | exfil in query/path/body of allowed endpoint | S | path binding, read-only methods | F08 exfil:*, launder:* | gap(C17,C19) |
 | X04 | placeholder echoed back by allowed upstream (httpbin-style reflect) | S | don't bind creds to reflecting endpoints | PoC03 shows reflection | gap (C17, low) |
 | X05 | timing/size covert channel via allowed host | S | none realistic | later | later |
-| X06 | agent asks user to approve broad rule | S/Z | rule approval UX, scope limits | F08 rule-approve-social | todo |
+| X06 | agent asks user to approve broad rule | S/Z | rule approval UX, scope limits | F04 rule-approve-social (needs agent) | todo |
 | X07 | same-name sandbox recreate race picks stale state | H | unique names | — | gap (C14) |
 | X08 | VS Code server / extension inside sandbox phones home | S | egress allowlist | F05 | todo |
-| X09 | agent edits its own policy file in workspace | S | policy lives on gateway | F08 policy-tamper | todo |
+| X09 | agent edits its own policy file in workspace | S | policy lives on gateway | F08 sup:list-state-dir, gw:* (policy only on gateway) | pass |
 | X10 | foreign (attacker) API key to allowed endpoint, e.g. LLM provider | S | strip non-placeholder auth | PoC03 foreign-auth-header-blocked FAIL | gap (C18) |

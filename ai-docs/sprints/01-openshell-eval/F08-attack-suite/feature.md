@@ -1,5 +1,5 @@
 # F08 — Common + creative attack suite
-Status: doing
+Status: done
 Description: Extend the hostile-agent harness beyond F02 with common and creative attacks against OpenShell (sandbox layer only).
 Goal: `tests/attacks/run.sh` one command, table of PASS(=blocked)/FAIL/GAP per catalog ID.
 Plan (seeds, refine from F07):
@@ -20,3 +20,4 @@ Log:
 - 2026-10-09: step 4 malicious workspace: tests/attacks/download.sh (host). Write-through-symlink + relative traversal blocked; GAP C20 git fsmonitor host exec after download, GAP C21 abs symlinks kept. In-sandbox hooks/go test = same containment as F02.
 - 2026-10-09: step 5 resources: tests/attacks/resources.sh (host, cgroup evidence). 4GiB/2048 pids/2 CPU; fork capped, host survives OOM; GAP C22 no disk quota, C23 OOM kills sandbox.
 - 2026-10-09: step 6 info leaks: tests/attacks/info.sh; /sys, /dev, cgroup path, env blocked; GAP host user (mountinfo), host name + LAN IP (/etc/hosts) C11, kernel version C24. Full suite: 41 PASS, 12 GAP, rc=0.
+- 2026-10-09: DONE. Step 7 (prompt injection A07, rule-approve social X06) moved to F04 (needs real agent). F07 catalog updated: 23 pass, 11 gap, 6 todo (F04/F05/F09), 8 later.
