@@ -26,3 +26,4 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C22 (medium): no disk quota; sandbox writes to host disk (overlay + workspace volume). Agent can fill host disk. Mitigation: dedicated partition/XFS project quota for podman storage of the gateway user (F09).
 - C23 (low): memory exhaustion OOM-kills the sandbox (exit 137, phase Error, no restart). Host safe (4 GiB cgroup), but work in sandbox is lost. Push work early.
 - C24 (inherent, containers): shared host kernel, version visible → exploit hints. Mitigation: patch kernel; VM driver (F09/C13).
+- C25 (high): login user `bree` is in group `docker` (rootful Docker 29.5.2) → any breakout as bree = host root. Mitigation: gateway as dedicated user not in docker group (F09); consider removing bree from docker group.

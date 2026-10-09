@@ -1,5 +1,5 @@
 # F09 — Host compromise blast radius + hardening
-Status: todo
+Status: doing
 Description: Assume a container breakout (arch §14.14 "compromised workstation"). Measure what the agent gets on the host and harden (D06, C13).
 Goal: Breakout lands in a dedicated low-value host user; real secrets not reachable from it.
 Plan:
@@ -12,3 +12,4 @@ DONE: step-1 list before/after documented; gateway runs as `openshell`; F01–F0
 GOOD: setup scripted in `scripts/`, reversible; residual risk in caveats.md.
 Proof: `tests/breakout/blast-radius.sh <user>` → before: secrets listed; after: none.
 Log:
+- 2026-10-09: step 1 `tests/breakout/blast-radius.sh` as bree → 14 findings: gateway db+KEK, openshell client key, ssh key+agent, gh/glab/docker tokens, gnupg, podman socket, docker socket + docker group (= host root), 5 repos, browser cookies. Breakout as bree = root (C25).
