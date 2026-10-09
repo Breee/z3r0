@@ -25,4 +25,5 @@ run egress.sh allow
 pol postman  postman-echo.com:443:read-only:rest:enforce
 run exfil.sh "$SECRET"                     # step 2
 run gateway.sh -                           # step 3
+tests/attacks/download.sh "$NAME" || rc=1      # step 4 (host side)
 exit $rc

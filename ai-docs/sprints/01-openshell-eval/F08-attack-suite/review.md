@@ -19,3 +19,10 @@ cat tests/attacks/gateway.sh
 tests/attacks/run.sh; echo rc=$?
 ```
 Expected: `PASS control:pid1-is-supervisor`, 16 `PASS sup:*`/`gw:*`, no FAIL, `rc=0`.
+## Step 4: Malicious workspace → host via download
+```sh
+cat tests/attacks/download.sh
+tests/attacks/run.sh; echo rc=$?
+grep -n "C20\|C21" ai-docs/caveats.md
+```
+Expected: `GAP dl:abs-symlink-kept (C21)`, `GAP dl:git-fsmonitor-host-exec (C20)`, `PASS dl:write-through-symlink`, `PASS dl:relative-traversal`, `rc=0`.
