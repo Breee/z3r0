@@ -1,0 +1,55 @@
+#!/bin/sh
+# z3r0: per-repo OpenShell sandbox with `opencode serve` inside; host opencode attaches (F17).
+# Usage (inside a git repo): z3r0 up | attach | status | stop | rm
+#   up     create-or-reuse sandbox, clone repo in (first time only), start serve + forward
+#   attach up + opencode TUI attached to the sandbox
+#   stop   end the host port forward (sandbox keeps running)
+#   rm     stop + delete sandbox (work not pushed is lost)
+set -eu
+IMAGE="${Z3R0_IMAGE:-localhost/z3r0-dev:latest}"
+TOP="$(git rev-parse --show-toplevel)"; REPO="$(basename "$TOP")"
+NAME="z3r0-$(printf %s "$REPO" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' '-')"
+ST="${XDG_STATE_HOME:-$HOME/.local/state}/z3r0/$NAME"; mkdir -p "$ST"; chmod 700 "$ST"
+HOST="openshell-$NAME.default"; DIR="/sandbox/$REPO"
+
+exists() { openshell sandbox get "$NAME" >/dev/null 2>&1; }
+fwd_pid() { cat "$ST/fwd.pid" 2>/dev/null; }
+fwd_alive() { p="$(fwd_pid)"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
+s() { ssh -F "$ST/ssh.conf" "$HOST" "$@"; }
+
+up() {
+  if ! exists; then
+    openshell sandbox create --name "$NAME" --from "$IMAGE" --detach >/dev/null
+    openshell policy update "$NAME" --rule-name zen --binary /usr/local/bin/opencode \
+      --add-endpoint opencode.ai:443:read-write:rest:enforce --wait >/dev/null 2>&1
+    git -C "$TOP" bundle create "$ST/repo.bundle" --all >/dev/null 2>&1
+    openshell sandbox upload "$NAME" "$ST/repo.bundle" /sandbox/.z3r0.bundle >/dev/null 2>&1
+    rm -f "$ST/repo.bundle" "$ST/fwd.pid"
+    head -c 24 /dev/urandom | base64 | tr -d '/+=' > "$ST/password"; chmod 600 "$ST/password"
+  fi
+  openshell sandbox ssh-config "$NAME" > "$ST/ssh.conf"
+  s "test -d '$DIR' || { git clone -q /sandbox/.z3r0.bundle '$DIR' 2>/dev/null && rm -f /sandbox/.z3r0.bundle; }"
+  [ -f "$ST/port" ] || shuf -i 20000-29999 -n 1 > "$ST/port"
+  if ! fwd_alive; then
+    ssh -F "$ST/ssh.conf" -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$(cat "$ST/port"):127.0.0.1:4096" "$HOST" </dev/null >/dev/null 2>&1 &
+    echo $! > "$ST/fwd.pid"; sleep 2
+  fi
+  if ! s 'pgrep -x opencode >/dev/null'; then
+    s "cd '$DIR' && OPENCODE_SERVER_PASSWORD='$(cat "$ST/password")' nohup opencode serve --hostname 127.0.0.1 --port 4096 >/tmp/serve.log 2>&1 &" 2>/dev/null || true
+    i=0; until curl -sf -u "opencode:$(cat "$ST/password")" "$(url)/config" >/dev/null; do
+      i=$((i+1)); [ $i -lt 30 ] || { echo "serve not reachable" >&2; exit 1; }; sleep 1; done
+  fi
+  echo "$NAME ready: $(url) dir $DIR"
+}
+url() { echo "http://127.0.0.1:$(cat "$ST/port")"; }
+stop() { fwd_alive && kill "$(fwd_pid)"; rm -f "$ST/fwd.pid"; }
+
+case "${1:-}" in
+  up) up ;;
+  attach) up; exec opencode attach "$(url)" -p "$(cat "$ST/password")" --dir "$DIR" ;;
+  run) shift; up >/dev/null; exec opencode run --attach "$(url)" -p "$(cat "$ST/password")" --dir "$DIR" "$@" ;;
+  status) exists && echo "sandbox $NAME: up" || echo "sandbox $NAME: none"; fwd_alive && echo "forward: $(url)" || echo "forward: off" ;;
+  stop) stop ;;
+  rm) stop || true; openshell sandbox delete "$NAME" >/dev/null 2>&1 || true; rm -rf "$ST"; echo "removed $NAME" ;;
+  *) sed -n '2,8p' "$0"; exit 2 ;;
+esac
