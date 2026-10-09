@@ -19,3 +19,24 @@ Sorted by severity. "Proof" = how to reproduce.
 | P12 | low | Same-name sandbox recreate right after delete | Stale state / failed run | observed in F02 | C14, X07 | Unique names |
 
 Open (not tested yet): prompt injection via tool output (A07, F04), social-engineered rule approval (X06, F04), VS Code server phoning home (X08, F05), VM driver (C13, F09).
+
+## Mitigable with OpenShell 0.1.2 alone?
+
+yes = OpenShell policy/config closes it · partial = narrows it · no = needs host setup, workflow, or upstream change.
+
+| # | OpenShell today | How / why not |
+|---|---|---|
+| P01 | no | `sandbox download` copies `.git` as-is. Workflow fix: push from sandbox, never download repos. |
+| P02 | partial | Query deny rules block `?api_key=`-style keys. No header matchers → foreign Authorization/X-Api-Key pass (upstream request / F10). |
+| P03 | no | Gateway runs as login user; KEK next to db. Host fix: dedicated user (F09 step 2). VM driver unknown (F09 step 4). |
+| P04 | partial | Tight method/path/query rules on bound endpoints shrink it; placeholder still resolved in any header/basic auth, responses not redacted. |
+| P05 | no | Download keeps absolute symlinks. Workflow fix: don't download. |
+| P06 | no | No disk limit found in sandbox settings. Host fix: quota on podman storage (F09). |
+| P07 | partial | Few endpoints, read-only, path/query rules. Never fully closable. |
+| P08 | partial | cgroup limits protect host (default 4 GiB/2048 pids/2 CPU); sandbox still dies. |
+| P09 | no | Mount/hosts info comes from podman; kernel shared. |
+| P10 | yes | Don't allow `tls: skip` or non-HTTP endpoints in policy. |
+| P11 | no | Image trust is podman `policy.json` (C08), not OpenShell. |
+| P12 | no | Use unique sandbox names (workflow). |
+
+Unverified: "no" for P06/P09 means not found in 0.1.2 docs/CLI, not proven impossible.
