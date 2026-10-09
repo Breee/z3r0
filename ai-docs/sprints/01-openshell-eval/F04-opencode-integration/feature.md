@@ -12,3 +12,4 @@ GOOD: no host-side file/shell tool path remains usable by the agent; LLM endpoin
 Proof: F02 harness triggered via OpenCode prompt → all blocked; host marker file `~/z3r0-canary` unreadable by agent.
 Log:
 - 2026-10-09: step 1 Option A works: host opencode binary (glibc) uploaded into golang:1.25 sandbox; policy allows only opencode.ai:443 for that binary; Zen free model needs no key; agent edit+go test+commit inside sandbox (PoC04 5 PASS). Official image ghcr.io/anomalyco/opencode is Alpine without git/go → needs own dev image later.
+- 2026-10-09: step 2 Option B: plugin can override built-in tools by name; `bash` override → sandbox works (PoC04b), but every other host tool (read/edit/write/grep/glob/webfetch, MCP, LSP, formatters) still runs on host → must override all and still not a boundary (D02). Option A preferred.
