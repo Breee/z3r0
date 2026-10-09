@@ -30,3 +30,18 @@ $Z stop; $Z status; $Z attach     # TUI, sandbox kept; quit with ctrl+c
 $Z rm
 ```
 Expected: both `up` print `ready`; curl `401`; agent reports `1000`, `sandbox-z3r0-demo`, `/sandbox/z3r0-demo`, tests ok; host `ls` fails; sandbox cat `ok`; status after stop `forward: off`; attach opens TUI on same session.
+
+## Step 3
+```sh
+cd /tmp/z3r0-demo            # repo from step 2 (recreate if removed)
+Z=~/repos/github.com/Breee/z3r0/scripts/z3r0
+$Z rm; sleep 15; $Z up       # new sandbox now created with pty policy (F05)
+$Z code                      # VS Code opens /sandbox/z3r0-demo over Remote-SSH
+```
+In VS Code: Copilot Chat agent: "add func Goodbye() returning \"bye\" with a test, run go test". Then:
+```sh
+$Z run -m opencode/nemotron-3.5-lightning-free "show git diff --stat and run go test ./..."
+ls /tmp/z3r0-demo            # host unchanged
+$Z rm
+```
+Expected: VS Code terminal works (pty); Copilot edit visible to OpenCode in same sandbox; tests ok; host has no Goodbye.

@@ -12,3 +12,4 @@ Proof: review.md runs up → prompt edits file → down; host-untouched check.
 Log:
 - 2026-10-09: step 1 spike works: ssh -L to serve inside; bash+write ran in sandbox (uid 1000, hostname sandbox-s17), host untouched; serve outlives ssh session. Risk: forwarded port open to all local users → step 2 sets OPENCODE_SERVER_PASSWORD (attach -p supports it).
 - 2026-10-09: step 2 scripts/z3r0 up|attach|run|status|stop|rm; repo via git bundle → clone in sandbox; random password (state 0600), port 127.0.0.1 random; re-up reuses; unauth 401; agent ran in sandbox, host untouched. Note: ssh-started serve ends with "exec output could not be delivered intact" (ignored).
+- 2026-10-09: step 3 z3r0 code: adds copilot rule (binaries /sandbox/.vscode-server/**), sandbox connect --editor vscode, opens /sandbox/<repo>; sandbox now created with pty policy. pty verified via ssh; VS Code+Copilot shared-edit check pending user.

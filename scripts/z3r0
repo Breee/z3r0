@@ -1,15 +1,17 @@
 #!/bin/sh
 # z3r0: per-repo OpenShell sandbox with `opencode serve` inside; host opencode attaches (F17).
-# Usage (inside a git repo): z3r0 up | attach | status | stop | rm
+# Usage (inside a git repo): z3r0 up | attach | run <prompt> | code | status | stop | rm
 #   up     create-or-reuse sandbox, clone repo in (first time only), start serve + forward
 #   attach up + opencode TUI attached to the sandbox
 #   stop   end the host port forward (sandbox keeps running)
+#   code   up + VS Code Remote-SSH on the same sandbox (Copilot runs inside)
 #   rm     stop + delete sandbox (work not pushed is lost)
 set -eu
 IMAGE="${Z3R0_IMAGE:-localhost/z3r0-dev:latest}"
 TOP="$(git rev-parse --show-toplevel)"; REPO="$(basename "$TOP")"
 NAME="z3r0-$(printf %s "$REPO" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' '-')"
 ST="${XDG_STATE_HOME:-$HOME/.local/state}/z3r0/$NAME"; mkdir -p "$ST"; chmod 700 "$ST"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOST="openshell-$NAME.default"; DIR="/sandbox/$REPO"
 
 exists() { openshell sandbox get "$NAME" >/dev/null 2>&1; }
@@ -19,7 +21,7 @@ s() { ssh -F "$ST/ssh.conf" "$HOST" "$@"; }
 
 up() {
   if ! exists; then
-    openshell sandbox create --name "$NAME" --from "$IMAGE" --detach >/dev/null
+    openshell sandbox create --name "$NAME" --from "$IMAGE" --policy "$ROOT/pocs/05-vscode-remote/policy.yaml" --detach >/dev/null
     openshell policy update "$NAME" --rule-name zen --binary /usr/local/bin/opencode \
       --add-endpoint opencode.ai:443:read-write:rest:enforce --wait >/dev/null 2>&1
     git -C "$TOP" bundle create "$ST/repo.bundle" --all >/dev/null 2>&1
@@ -49,7 +51,15 @@ case "${1:-}" in
   attach) up; exec opencode attach "$(url)" -p "$(cat "$ST/password")" --dir "$DIR" ;;
   run) shift; up >/dev/null; exec opencode run --attach "$(url)" -p "$(cat "$ST/password")" --dir "$DIR" "$@" ;;
   status) exists && echo "sandbox $NAME: up" || echo "sandbox $NAME: none"; fwd_alive && echo "forward: $(url)" || echo "forward: off" ;;
+  code) up
+    if [ ! -f "$ST/copilot" ]; then  # Copilot endpoints only for binaries under the VS Code server dir (F05)
+      for h in '*.githubcopilot.com' api.enterprise.githubcopilot.com api.github.com copilot-proxy.githubusercontent.com; do
+        openshell policy update "$NAME" --rule-name copilot --binary '/sandbox/.vscode-server/**' \
+          --add-endpoint "$h:443:read-write:rest:enforce" --wait >/dev/null 2>&1
+      done; touch "$ST/copilot"; fi
+    openshell sandbox connect "$NAME" --editor vscode
+    code --folder-uri "vscode-remote://ssh-remote+$HOST$DIR" ;;
   stop) stop ;;
   rm) stop || true; openshell sandbox delete "$NAME" >/dev/null 2>&1 || true; rm -rf "$ST"; echo "removed $NAME" ;;
-  *) sed -n '2,8p' "$0"; exit 2 ;;
+  *) sed -n '2,9p' "$0"; exit 2 ;;
 esac
