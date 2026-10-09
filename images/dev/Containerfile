@@ -7,3 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && rm -
  && echo "${OPENCODE_SHA256}  /tmp/oc.tgz" | sha256sum -c - \
  && tar -xzf /tmp/oc.tgz -C /usr/local/bin opencode && rm /tmp/oc.tgz \
  && opencode --version
+# C09: `sandbox exec` login shell resets PATH; re-add go. GOPATH under writable HOME (/sandbox).
+RUN printf 'export PATH=/usr/local/go/bin:$PATH\nexport GOPATH=$HOME/go\n' > /etc/profile.d/z3r0-go.sh
+# C12: no setuid/setgid binaries.
+RUN find / -xdev -perm /6000 -type f -exec chmod ug-s {} + ; test -z "$(find / -xdev -perm /6000 -type f)"

@@ -11,3 +11,4 @@ GOOD: rebuild reproducible from one script; image < 1.5 GB.
 Proof: pocs/01, pocs/04, tests/containment/run.sh with new default image.
 Log:
 - 2026-10-09: step 1 Containerfile + build script; test build as bree ok (opencode 1.18.21, go 1.25.14, git, rg; 1.06 GB). Gateway build pending user sudo.
+- 2026-10-09: step 2+3 profile.d PATH/GOPATH, setuid stripped, sandbox-up default = localhost/z3r0-dev:latest, pocs/11-dev-image; local build: login PATH has go, 0 setuid. Old PoCs keep golang:1.25 for replay.
