@@ -12,7 +12,7 @@ so that a prompt-injected agent cannot use an allowed endpoint to send data to a
 
 ### Problem Statement
 
-Placeholders protect the operator's secret, and endpoint binding restricts where it may be sent. Nothing restricts **which** credential is used at an allowed endpoint. A request with a plain-text, non-placeholder credential is forwarded unchanged (verified for `Authorization`, `X-Api-Key`, `?api_key=`) to a credential-bound endpoint. Query parameters can be restricted with rule `query` matchers; there is no header matcher.
+Placeholders protect the operator's secret, and endpoint binding restricts where it may be sent. Nothing restricts **which** credential is used at an allowed endpoint. A request with a plain-text, non-placeholder credential is forwarded unchanged (verified for `Authorization` and `X-Api-Key`) to a credential-bound endpoint. Rules can restrict query parameters, but there is no header matcher, so credential headers cannot be controlled.
 
 Tested with OpenShell 0.1.2, rootless Podman driver, Linux.
 
@@ -49,9 +49,8 @@ openshell sandbox exec -n repro -- sh -c 'curl -s https://httpbin.org/anything -
 openshell sandbox exec -n repro -- curl -s https://httpbin.org/anything -H 'Authorization: Bearer openshell:resolve:env:v1999_ECHO_TOKEN'
 # gap: foreign key in the bound header → forwarded, upstream sees "Bearer ATTACKER-KEY"
 openshell sandbox exec -n repro -- curl -s https://httpbin.org/anything -H 'Authorization: Bearer ATTACKER-KEY'
-# gap: foreign key in other places → forwarded
+# gap: foreign key in another header → forwarded
 openshell sandbox exec -n repro -- curl -s https://httpbin.org/anything -H 'X-Api-Key: ATTACKER-KEY'
-openshell sandbox exec -n repro -- curl -s 'https://httpbin.org/anything?api_key=ATTACKER-KEY'
 ```
 
 ### Impact / Why This Matters
@@ -62,31 +61,30 @@ Attack path:
 3. Egress check passes (host/path/method allowed); no placeholder present, so there is nothing to resolve or deny.
 4. The request is authenticated as the attacker's account. Where the service stores request content (stored completions, files, snippets, issues), the attacker reads it later. Narrow path rules (e.g. only our project ID) reduce this but are often impractical for LLM APIs.
 
-Without this feature, users must put their own reverse proxy / LLM gateway in front of every credentialed API to strip and re-inject auth, or accept that allowed SaaS endpoints with write paths are an exfiltration channel. Query parameters can be restricted today; headers cannot. "Allowed host" is not "allowed principal".
+Without this feature, users must put their own reverse proxy / LLM gateway in front of every credentialed API to strip and re-inject auth, or accept that allowed SaaS endpoints with write paths are an exfiltration channel. "Allowed host" is not "allowed principal".
 
 ### Proposed Design
 
 For endpoints that a provider credential is bound to (on by default, opt-out per endpoint):
 - A request whose bound auth header (`header_name` in the profile) contains a value that is not a resolvable placeholder is denied with a distinct error (e.g. `foreign_credential`), similar to the existing `credential_unavailable` denial for unresolvable placeholders.
-- The profile/policy can list additional credential-bearing headers and query parameters (e.g. `x-api-key`, `cookie`, `api_key`) that get the same treatment.
+- The profile/policy can list additional credential-bearing headers (e.g. `x-api-key`, `cookie`) that get the same treatment.
 - Endpoints without a bound credential are unchanged; operators cover them with the header matchers below.
 - Optional per-endpoint mode "always inject": whatever the client sends in the bound header is replaced by the bound credential.
 - Optional general primitive: header matchers in `rules` / `deny_rules` (name + glob), so operators can deny e.g. any `authorization` not matching the placeholder format.
-- Denials emit an OCSF event with endpoint and header/parameter name, never the value.
+- Denials emit an OCSF event with endpoint and header name, never the value.
 
 ### Acceptance Criteria
 
 - [ ] On a credential-bound endpoint, a request with a non-placeholder value in the bound auth header is denied; the upstream receives nothing.
 - [ ] Placeholder requests keep working unchanged.
-- [ ] Operators can declare extra credential headers and query parameters that are enforced the same way.
+- [ ] Operators can declare extra credential headers that are enforced the same way.
 - [ ] Opt-out per endpoint exists and is visible in the profile/policy.
-- [ ] Denials are logged with endpoint + header/parameter name, without the credential value.
-- [ ] Reproduction: the `Authorization` foreign-key request is denied by default; the `X-Api-Key` and `?api_key=` requests are denied once those are declared.
+- [ ] Denials are logged with endpoint + header name, without the credential value.
+- [ ] Reproduction: the `Authorization` foreign-key request is denied by default; the `X-Api-Key` request is denied once `x-api-key` is declared.
 
 ### Alternatives Considered
 
 - **External reverse proxy / LLM gateway per API** (strip client auth, inject ours): works, but duplicates OpenShell's provider/placeholder model and moves the secret outside OpenShell.
-- **Query allowlists only:** closes `?api_key=`, not headers.
 - **Allow only read paths on SaaS APIs:** blocks the write paths agents need (LLM calls are POST).
 
 ### Agent Investigation
