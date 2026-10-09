@@ -8,7 +8,7 @@ Order: F02 → F07 → F08 → F03 → F09 → F04 → F05 → F06 (security fir
 | ID | Feature | Status |
 |---|---|---|
 | F01 | OpenShell local install + baseline sandbox | done |
-| F02 | Containment proof (fs, process, egress) | doing (steps 1–4) |
+| F02 | Containment proof (fs, process, egress) | done |
 | F03 | Provider placeholder credentials | doing (PoC) |
 | F04 | OpenCode ↔ OpenShell integration | todo |
 | F05 | VS Code Copilot Chat ↔ OpenShell integration | todo |
