@@ -18,7 +18,7 @@ Tested with OpenShell 0.1.2, rootless Podman driver, Linux.
 
 Minimal reproduction:
 ```yaml
-# profile.yaml (exact file used in our test)
+# profile.yaml (verified with the commands below)
 id: repro-echo
 display_name: Repro echo
 description: Echo service to show foreign credential passthrough
@@ -47,9 +47,11 @@ openshell sandbox create --name repro --from docker.io/library/golang:1.25 --pro
 openshell sandbox exec -n repro -- sh -c 'curl -s https://httpbin.org/anything -H "Authorization: Bearer $ECHO_TOKEN"'
 # expected: forged placeholder → credential_unavailable (works today)
 openshell sandbox exec -n repro -- curl -s https://httpbin.org/anything -H 'Authorization: Bearer openshell:resolve:env:v1999_ECHO_TOKEN'
-# gap: foreign key → HTTP 200, upstream sees "Bearer ATTACKER-KEY"
+# gap: foreign key in the bound header → forwarded, upstream sees "Bearer ATTACKER-KEY"
 openshell sandbox exec -n repro -- curl -s https://httpbin.org/anything -H 'Authorization: Bearer ATTACKER-KEY'
-openshell sandbox exec -n repro -- curl -s 'https://httpbin.org/anything?api_key=ATTACKER-KEY' -H 'X-Api-Key: ATTACKER-KEY'
+# gap: foreign key in other places → forwarded
+openshell sandbox exec -n repro -- curl -s https://httpbin.org/anything -H 'X-Api-Key: ATTACKER-KEY'
+openshell sandbox exec -n repro -- curl -s 'https://httpbin.org/anything?api_key=ATTACKER-KEY'
 ```
 
 ### Impact / Why This Matters
@@ -57,34 +59,35 @@ openshell sandbox exec -n repro -- curl -s 'https://httpbin.org/anything?api_key
 Attack path:
 1. Policy allows an LLM or SaaS API with a bound provider credential and the write paths the agent legitimately needs (e.g. `POST /v1/chat/completions`, or GitLab `POST /api/v4/**`).
 2. Prompt injection (repo file, issue, tool/MCP output) instructs the agent to send source code on an allowed path with `Authorization: Bearer <attacker key>`.
-3. Egress check passes (host/path/method allowed); credential check passes (no placeholder present, nothing to resolve or deny).
-4. The request is accounted to the attacker's account. Where the service stores request content (stored completions, files, snippets, issues), the attacker reads it later. Narrow path rules (e.g. only our project ID) reduce this but are often impractical for LLM APIs.
+3. Egress check passes (host/path/method allowed); no placeholder present, so there is nothing to resolve or deny.
+4. The request is authenticated as the attacker's account. Where the service stores request content (stored completions, files, snippets, issues), the attacker reads it later. Narrow path rules (e.g. only our project ID) reduce this but are often impractical for LLM APIs.
 
 Without this feature, users must put their own reverse proxy / LLM gateway in front of every credentialed API to strip and re-inject auth, or accept that allowed SaaS endpoints with write paths are an exfiltration channel. Query parameters can be restricted today; headers cannot. "Allowed host" is not "allowed principal".
 
 ### Proposed Design
 
 For endpoints that a provider credential is bound to (on by default, opt-out per endpoint):
-- A request carrying a credential in the slot the profile defines (header / query / basic auth) that is not a resolvable placeholder is denied with a distinct error (e.g. `foreign_credential`), similar to the existing `credential_unavailable` denial for unresolvable placeholders.
-- The profile/policy can list additional credential-bearing slots (e.g. `x-api-key`, `cookie`, `api_key` query) that get the same treatment.
-- Optional per-endpoint mode "always inject": whatever the client sends in the slot is replaced by the bound credential.
+- A request whose bound auth header (`header_name` in the profile) contains a value that is not a resolvable placeholder is denied with a distinct error (e.g. `foreign_credential`), similar to the existing `credential_unavailable` denial for unresolvable placeholders.
+- The profile/policy can list additional credential-bearing headers and query parameters (e.g. `x-api-key`, `cookie`, `api_key`) that get the same treatment.
+- Endpoints without a bound credential are unchanged; operators cover them with the header matchers below.
+- Optional per-endpoint mode "always inject": whatever the client sends in the bound header is replaced by the bound credential.
 - Optional general primitive: header matchers in `rules` / `deny_rules` (name + glob), so operators can deny e.g. any `authorization` not matching the placeholder format.
-- Denials emit an OCSF event with endpoint and slot name, never the value.
+- Denials emit an OCSF event with endpoint and header/parameter name, never the value.
 
 ### Acceptance Criteria
 
-- [ ] On a credential-bound endpoint, a request with a non-placeholder value in the bound auth slot is denied; the upstream receives nothing.
+- [ ] On a credential-bound endpoint, a request with a non-placeholder value in the bound auth header is denied; the upstream receives nothing.
 - [ ] Placeholder requests keep working unchanged.
-- [ ] Operators can declare extra credential slots (header and query) that are enforced the same way.
+- [ ] Operators can declare extra credential headers and query parameters that are enforced the same way.
 - [ ] Opt-out per endpoint exists and is visible in the profile/policy.
-- [ ] Denials are logged with endpoint + slot, without the credential value.
-- [ ] The reproduction above returns a denial for both foreign-key requests.
+- [ ] Denials are logged with endpoint + header/parameter name, without the credential value.
+- [ ] Reproduction: the `Authorization` foreign-key request is denied by default; the `X-Api-Key` and `?api_key=` requests are denied once those are declared.
 
 ### Alternatives Considered
 
 - **External reverse proxy / LLM gateway per API** (strip client auth, inject ours): works, but duplicates OpenShell's provider/placeholder model and moves the secret outside OpenShell.
 - **Query allowlists only:** closes `?api_key=`, not headers.
-- **Deny all endpoints that accept arbitrary keys:** removes the LLM/SaaS endpoints agents need.
+- **Allow only read paths on SaaS APIs:** blocks the write paths agents need (LLM calls are POST).
 
 ### Agent Investigation
 
