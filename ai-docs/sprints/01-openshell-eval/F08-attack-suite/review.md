@@ -26,3 +26,9 @@ tests/attacks/run.sh; echo rc=$?
 grep -n "C20\|C21" ai-docs/caveats.md
 ```
 Expected: `GAP dl:abs-symlink-kept (C21)`, `GAP dl:git-fsmonitor-host-exec (C20)`, `PASS dl:write-through-symlink`, `PASS dl:relative-traversal`, `rc=0`.
+## Step 5: Resource abuse
+```sh
+cat tests/attacks/resources.sh
+tests/attacks/run.sh; echo rc=$?
+```
+Expected: `PASS res:limits-set`, `PASS res:fork-capped`, `GAP res:no-disk-quota (C22)`, `PASS res:host-survives-oom`, `GAP res:oom-kills-sandbox (C23)`, `rc=0`. Takes ~2 min; the sandbox dies at the end (by design).

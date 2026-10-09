@@ -26,4 +26,6 @@ pol postman  postman-echo.com:443:read-only:rest:enforce
 run exfil.sh "$SECRET"                     # step 2
 run gateway.sh -                           # step 3
 tests/attacks/download.sh "$NAME" || rc=1      # step 4 (host side)
+openshell sandbox exec -n "$NAME" -- sh /sandbox/attacks/info.sh "$(id -un)" "$(hostname)" || rc=1   # step 6
+tests/attacks/resources.sh "$NAME" || rc=1      # step 5 (host side, LAST: OOM kills sandbox)
 exit $rc

@@ -23,3 +23,6 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C19 (inherent): every allowed endpoint is an exfil channel (data in query/path/body). Only mitigation: few endpoints, read-only, tight path/query rules, Z3R0 audit.
 - C20 (high): `sandbox download` of a git repo copies `.git/config` + hooks. `git status` on host then runs agent code (core.fsmonitor proven, F08 dl:git-fsmonitor-host-exec). Rule: never download repos to host; agent output reaches host only via git push → GitLab MR review (fetch, don't copy .git).
 - C21 (medium): `sandbox download` keeps absolute symlinks to host paths (e.g. ~/.ssh). Later tools on host may follow them. Write-through on re-download and relative traversal are blocked.
+- C22 (medium): no disk quota; sandbox writes to host disk (overlay + workspace volume). Agent can fill host disk. Mitigation: dedicated partition/XFS project quota for podman storage of the gateway user (F09).
+- C23 (low): memory exhaustion OOM-kills the sandbox (exit 137, phase Error, no restart). Host safe (4 GiB cgroup), but work in sandbox is lost. Push work early.
+- C24 (inherent, containers): shared host kernel, version visible → exploit hints. Mitigation: patch kernel; VM driver (F09/C13).
