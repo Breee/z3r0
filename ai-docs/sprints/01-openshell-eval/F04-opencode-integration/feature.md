@@ -1,5 +1,5 @@
 # F04 — OpenCode ↔ OpenShell integration
-Status: doing
+Status: done
 Description: Make OpenCode's tools (bash, edit, read, etc.) execute inside OpenShell, not on the host.
 Goal: Pick and prototype the integration path; know if a plugin is needed.
 Plan:

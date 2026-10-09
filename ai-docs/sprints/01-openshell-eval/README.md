@@ -10,7 +10,7 @@ Order: F02 → F07 → F08 → F03 → F09 → F10 → F04 → F05 → F06 (secu
 | F01 | OpenShell local install + baseline sandbox | done |
 | F02 | Containment proof (fs, process, egress) | done |
 | F03 | Provider placeholder credentials | doing (PoC) |
-| F04 | OpenCode ↔ OpenShell integration | todo |
+| F04 | OpenCode ↔ OpenShell integration | done |
 | F05 | VS Code Copilot Chat ↔ OpenShell integration | todo |
 | F06 | Integration decision + plugin plan | todo |
 | F07 | Attack-vector catalog (arch + common + creative) | done |
