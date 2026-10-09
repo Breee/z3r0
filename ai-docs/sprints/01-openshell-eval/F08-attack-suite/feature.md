@@ -15,3 +15,4 @@ GOOD: each case ≤3 lines in probe; creative cases have 1-line rationale.
 Proof: `tests/attacks/run.sh` → table, exit 0 iff no unexpected FAIL.
 Log:
 - 2026-10-09: step 1 egress: tests/attacks/{run,egress}.sh; deny-all + httpbin read-only allowlist; 10/10 PASS (POST, other host/port, plain http, connect-to, plaintext-over-443, copied curl, wget blocked).
+- 2026-10-09: step 2 exfil/laundering: tests/attacks/exfil.sh; other-host/body/path blocked; query, any header, basic-auth launder secret (C17 → medium); data-in-query exfil (C19). run.sh now one sandbox with provider echo08.
