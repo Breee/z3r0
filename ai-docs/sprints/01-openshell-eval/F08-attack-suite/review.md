@@ -32,3 +32,10 @@ cat tests/attacks/resources.sh
 tests/attacks/run.sh; echo rc=$?
 ```
 Expected: `PASS res:limits-set`, `PASS res:fork-capped`, `GAP res:no-disk-quota (C22)`, `PASS res:host-survives-oom`, `GAP res:oom-kills-sandbox (C23)`, `rc=0`. Takes ~2 min; the sandbox dies at the end (by design).
+## Step 6: Info leaks + full run
+```sh
+cat tests/attacks/info.sh
+tests/attacks/run.sh > /tmp/f08.out 2>&1; echo rc=$?
+grep -c PASS /tmp/f08.out; grep -v PASS /tmp/f08.out
+```
+Expected: `rc=0`, `41`, 12 `GAP` lines (C11 x3, C17 x3, C19, C20, C21, C22, C23, C24), no FAIL.

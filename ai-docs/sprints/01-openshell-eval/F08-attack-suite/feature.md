@@ -19,3 +19,4 @@ Log:
 - 2026-10-09: step 3 gateway/supervisor: tests/attacks/gateway.sh 17/17 PASS. Supervisor PID1 same uid but not killable/ptraceable (no caps, seccomp, undumpable); no CA key in sandbox; netns has no routes.
 - 2026-10-09: step 4 malicious workspace: tests/attacks/download.sh (host). Write-through-symlink + relative traversal blocked; GAP C20 git fsmonitor host exec after download, GAP C21 abs symlinks kept. In-sandbox hooks/go test = same containment as F02.
 - 2026-10-09: step 5 resources: tests/attacks/resources.sh (host, cgroup evidence). 4GiB/2048 pids/2 CPU; fork capped, host survives OOM; GAP C22 no disk quota, C23 OOM kills sandbox.
+- 2026-10-09: step 6 info leaks: tests/attacks/info.sh; /sys, /dev, cgroup path, env blocked; GAP host user (mountinfo), host name + LAN IP (/etc/hosts) C11, kernel version C24. Full suite: 41 PASS, 12 GAP, rc=0.
