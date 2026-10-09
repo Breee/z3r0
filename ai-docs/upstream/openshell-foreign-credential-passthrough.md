@@ -67,7 +67,7 @@ Without this feature, users must put their own reverse proxy / LLM gateway in fr
 
 For endpoints that a provider credential is bound to (on by default, opt-out per endpoint):
 - If the bound auth header (`header_name` in the profile) contains anything other than a resolvable placeholder, the request is denied with a distinct error (e.g. `foreign_credential`), like the existing `credential_unavailable` denial.
-- The profile can list additional auth headers (e.g. `x-api-key`, `cookie`) that get the same check.
+- The profile lists every auth header the service accepts (e.g. GitLab: `authorization`, `private-token`, `job-token`), and all of them get the same check. Otherwise the attacker just switches header. Built-in profiles ship this list.
 - Denials emit an OCSF event with endpoint and header name, never the value.
 
 Out of scope: endpoints without a bound credential.
@@ -76,7 +76,7 @@ Out of scope: endpoints without a bound credential.
 
 - [ ] On a credential-bound endpoint, a request with a non-placeholder value in the bound auth header is denied; the upstream receives nothing.
 - [ ] Placeholder requests keep working unchanged.
-- [ ] Operators can declare extra credential headers that are enforced the same way.
+- [ ] All auth headers listed in the profile are enforced the same way.
 - [ ] Opt-out per endpoint exists and is visible in the profile/policy.
 - [ ] Denials are logged with endpoint + header name, without the credential value.
 - [ ] Reproduction: the `Authorization` foreign-key request is denied by default; the `X-Api-Key` request is denied once `x-api-key` is declared.
@@ -85,7 +85,7 @@ Out of scope: endpoints without a bound credential.
 
 - **External reverse proxy / LLM gateway per API** (strip client auth, inject ours): works, but duplicates OpenShell's provider/placeholder model and moves the secret outside OpenShell.
 - **Allow only read paths on SaaS APIs:** blocks the write paths agents need (LLM calls are POST).
-- **Generic header matchers in `rules`/`deny_rules`:** more flexible, also covers endpoints without a credential, but every operator must know and write the auth headers of every service; the default-deny above protects without extra policy.
+- **Generic header matchers in `rules`/`deny_rules`:** more flexible, also covers endpoints without a credential, but every operator must know and maintain the auth headers of every service in every policy. With the design above, the list lives once per service in the profile.
 
 ### Agent Investigation
 
