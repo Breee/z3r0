@@ -1,5 +1,5 @@
 # F17 — z3r0 up / attach / down
-Status: doing
+Status: done
 Description: One command per repo: create-or-reuse sandbox, push repo in, run `opencode serve` inside, host TUI attaches. VS Code uses same sandbox.
 Goal: `z3r0 up` in a repo → working OpenCode session whose tools all run in the sandbox.
 Plan:
@@ -14,3 +14,4 @@ Log:
 - 2026-10-09: step 2 scripts/z3r0 up|attach|run|status|stop|rm; repo via git bundle → clone in sandbox; random password (state 0600), port 127.0.0.1 random; re-up reuses; unauth 401; agent ran in sandbox, host untouched. Note: ssh-started serve ends with "exec output could not be delivered intact" (ignored).
 - 2026-10-09: step 3 z3r0 code: adds copilot rule (binaries /sandbox/.vscode-server/**), sandbox connect --editor vscode, opens /sandbox/<repo>; sandbox now created with pty policy. pty verified via ssh; VS Code+Copilot shared-edit check pending user.
 - 2026-10-09: step 3 fix: connect --editor + code --folder-uri opened 2 windows → "Timed out waiting for local startup lock"; now write ssh entry to ~/.config/openshell/ssh_config (included by ~/.ssh/config) and open one window.
+- 2026-10-09: step 3 verified by user: one VS Code window on /sandbox/<repo>, Copilot + OpenCode share sandbox. DONE.
