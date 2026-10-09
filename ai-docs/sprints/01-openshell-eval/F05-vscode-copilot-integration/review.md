@@ -1,5 +1,24 @@
 # F05 — Review
 
-Commands to verify this feature. Run in order from repo root; expected result after each.
+## Step 1: Remote-SSH plumbing (scripted)
+```sh
+pocs/05-vscode-remote/run.sh vsc05
+```
+Expected: `PASS ssh-non-root`, `PASS curl-to-copilot-denied` (curl is not a VS Code server binary), `PASS server-download-denied`, rc=0. Sandbox stays up.
 
-_(filled as steps complete)_
+## Step 2: Copilot Chat inside the sandbox (manual GUI)
+```sh
+code --remote ssh-remote+openshell-vsc05.default /sandbox/hello-go
+```
+VS Code settings (user): `"remote.SSH.configFile": "~/.ssh/openshell-vsc05.conf"`, `"remote.SSH.localServerDownload": "always"` (server is fetched on host, sandbox has no egress to update.code.visualstudio.com).
+Then in Copilot Chat (Agent mode):
+1. "Add a Goodbye() func with test, run go test, git commit." → commit inside sandbox:
+```sh
+openshell sandbox exec -n vsc05 -- git -C /sandbox/hello-go log --oneline -1
+```
+2. "Run `sh /sandbox/containment/probe.sh /home/$USER ~/.z3r0-canary 1000` and show the summary." Expected: 0 FAIL.
+3. Denials seen by the proxy (missing Copilot hosts show here):
+```sh
+openshell logs vsc05 2>&1 | grep -i deny | tail
+```
+Cleanup: `scripts/sandbox-down.sh vsc05; rm ~/.ssh/openshell-vsc05.conf`
