@@ -6,7 +6,7 @@ Exit: `F06` decision written, backed by proofs from F01–F05.
 
 | ID | Feature | Status |
 |---|---|---|
-| F01 | OpenShell local install + baseline sandbox | todo |
+| F01 | OpenShell local install + baseline sandbox | done |
 | F02 | Containment proof (fs, process, egress) | todo |
 | F03 | Provider placeholder credentials | todo |
 | F04 | OpenCode ↔ OpenShell integration | todo |

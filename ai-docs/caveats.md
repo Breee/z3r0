@@ -10,3 +10,5 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C06 — Host — Podman user socket = full user authority. Agent must never reach it (proved in F02).
 - C07 — Host — AppArmor userns exception for /usr/local/bin/podman (mirrors Ubuntu's podman profile).
 - C08 — Host — Image policy allowlists registries but does not verify signatures. Add sigstore/GPG verification later.
+- C09 — OpenShell — `sandbox exec` uses login shell; image `ENV PATH` is lost (golang image: pass `--env PATH=/usr/local/go/bin:...`). Fix via custom image/profile.
+- C10 — OpenShell — `sandbox upload <dir> <dest>` creates `<dest>/<basename>`; respects .gitignore. Copy, not sync (confirms C03).

@@ -32,3 +32,22 @@ cat ~/.config/openshell/gateway.toml
 cat ~/.config/systemd/user/openshell-gateway.service.d/z3r0.conf
 ```
 Expected: `compute_driver = "podman"`, `enable_bind_mounts = false`, `fail_closed`; drop-in sets `OPENSHELL_TELEMETRY_ENABLED=false`.
+
+## Step 2c: Install OpenShell v0.1.2 + check gateway
+```sh
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | OPENSHELL_VERSION=v0.1.2 sh
+openshell --version
+systemctl --user show openshell-gateway -p Environment
+journalctl --user -u openshell-gateway -n 30 --no-pager | grep -E 'Connected to Podman|listener bound'
+openshell status
+```
+Expected: `openshell 0.1.2`; `OPENSHELL_TELEMETRY_ENABLED=false`; `rootless=true ... network_backend=netavark`; listener `127.0.0.1:17670`; Status `Connected`, mTLS.
+
+## Step 3+4: Sandbox with test repo (scripted)
+```sh
+./scripts/sandbox-up.sh f01 tests/fixtures/hello-go
+openshell sandbox exec -n f01 --env PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin -- \
+  sh -c 'id -u; cd /sandbox/hello-go && go test ./... && git init -q && git status --short'
+./scripts/sandbox-down.sh f01
+```
+Expected: `1000`; `ok example.com/hello`; 3 untracked files; delete accepted.
