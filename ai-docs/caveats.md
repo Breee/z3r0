@@ -18,3 +18,5 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C14 — OpenShell — `sandbox delete` is async; re-creating the same name immediately can fail (harness printed 0 results once). Wait or use unique names.
 - C15 — OpenShell — Credential rewrite only for HTTP the proxy inspects; `tls: skip`/non-HTTP endpoints get no rewrite (and no L7 check).
 - C16: sandbox DNS is synthetic (198.18.0.0/15); tools that validate resolved IPs or need real DNS (SRV, TXT) may break.
+- C17: no control against reflection: an allowed upstream that echoes requests (httpbin-like) returns the real secret into the sandbox (catalog X04). Never bind creds to reflecting endpoints.
+- C18: allowed LLM provider endpoint is an unrestricted exfil channel for source/data (catalog X10); no content inspection.
