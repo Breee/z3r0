@@ -12,25 +12,32 @@ so that a prompt-injected agent cannot use an allowed endpoint to send data to a
 
 ### Problem Statement
 
-Placeholders protect the operator's secret, and endpoint binding restricts where it may be sent. Nothing restricts **which** credential is used at an allowed endpoint. A request with a plain-text, non-placeholder credential (in `Authorization`, `X-Api-Key`, `?api_key=`, basic auth, cookie) is forwarded unchanged to a credential-bound endpoint. Network rules match method, path, and query only; there is no header matcher.
+Placeholders protect the operator's secret, and endpoint binding restricts where it may be sent. Nothing restricts **which** credential is used at an allowed endpoint. A request with a plain-text, non-placeholder credential is forwarded unchanged (verified for `Authorization`, `X-Api-Key`, `?api_key=`) to a credential-bound endpoint. Query parameters can be restricted with rule `query` matchers; there is no header matcher.
 
 Tested with OpenShell 0.1.2, rootless Podman driver, Linux.
 
 Minimal reproduction:
 ```yaml
-# profile.yaml
+# profile.yaml (exact file used in our test)
 id: repro-echo
+display_name: Repro echo
+description: Echo service to show foreign credential passthrough
+category: other
 credentials:
   - name: token
-    env: ECHO_TOKEN
-    auth: { type: bearer }
+    description: fake secret
+    env_vars: [ECHO_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: authorization
 endpoints:
   - host: httpbin.org
     port: 443
+    path: /anything
     protocol: rest
     access: read-only
-    rules: [ { allow: { method: GET, path: /anything } } ]
-binaries: [ /usr/bin/curl ]
+    enforcement: enforce
+binaries: [/usr/bin/curl]
 ```
 ```bash
 openshell profile import -f profile.yaml
@@ -48,17 +55,17 @@ openshell sandbox exec -n repro -- curl -s 'https://httpbin.org/anything?api_key
 ### Impact / Why This Matters
 
 Attack path:
-1. Policy allows `api.llm-provider.example:443` with a bound provider credential.
-2. Prompt injection (repo file, issue, tool/MCP output) instructs the agent to upload source to `/v1/files` with `Authorization: Bearer <attacker key>`.
+1. Policy allows an LLM or SaaS API with a bound provider credential and the write paths the agent legitimately needs (e.g. `POST /v1/chat/completions`, or GitLab `POST /api/v4/**`).
+2. Prompt injection (repo file, issue, tool/MCP output) instructs the agent to send source code on an allowed path with `Authorization: Bearer <attacker key>`.
 3. Egress check passes (host/path/method allowed); credential check passes (no placeholder present, nothing to resolve or deny).
-4. The data is stored in the attacker's account at a legitimate SaaS; the attacker retrieves it later.
+4. The request is accounted to the attacker's account. Where the service stores request content (stored completions, files, snippets, issues), the attacker reads it later. Narrow path rules (e.g. only our project ID) reduce this but are often impractical for LLM APIs.
 
-Without this feature, users must put their own reverse proxy / LLM gateway in front of every credentialed API to strip and re-inject auth, or accept that every allowed SaaS endpoint is an exfiltration channel. Query parameters can be allowlisted today; headers cannot. "Allowed host" is not "allowed principal", which defeats the egress control for exactly the endpoints agents need most.
+Without this feature, users must put their own reverse proxy / LLM gateway in front of every credentialed API to strip and re-inject auth, or accept that allowed SaaS endpoints with write paths are an exfiltration channel. Query parameters can be restricted today; headers cannot. "Allowed host" is not "allowed principal".
 
 ### Proposed Design
 
 For endpoints that a provider credential is bound to (on by default, opt-out per endpoint):
-- A request carrying a credential in the slot the profile defines (header / query / basic auth) that is not a resolvable placeholder is denied with a clear error (e.g. `403 foreign_credential`), consistent with the existing `credential_unavailable` behaviour.
+- A request carrying a credential in the slot the profile defines (header / query / basic auth) that is not a resolvable placeholder is denied with a distinct error (e.g. `foreign_credential`), similar to the existing `credential_unavailable` denial for unresolvable placeholders.
 - The profile/policy can list additional credential-bearing slots (e.g. `x-api-key`, `cookie`, `api_key` query) that get the same treatment.
 - Optional per-endpoint mode "always inject": whatever the client sends in the slot is replaced by the bound credential.
 - Optional general primitive: header matchers in `rules` / `deny_rules` (name + glob), so operators can deny e.g. any `authorization` not matching the placeholder format.
@@ -69,7 +76,7 @@ For endpoints that a provider credential is bound to (on by default, opt-out per
 - [ ] On a credential-bound endpoint, a request with a non-placeholder value in the bound auth slot is denied; the upstream receives nothing.
 - [ ] Placeholder requests keep working unchanged.
 - [ ] Operators can declare extra credential slots (header and query) that are enforced the same way.
-- [ ] Opt-out per endpoint exists and is visible in `openshell policy`/profile output.
+- [ ] Opt-out per endpoint exists and is visible in the profile/policy.
 - [ ] Denials are logged with endpoint + slot, without the credential value.
 - [ ] The reproduction above returns a denial for both foreign-key requests.
 
@@ -81,8 +88,8 @@ For endpoints that a provider credential is bound to (on by default, opt-out per
 
 ### Agent Investigation
 
-- Placeholder resolution and the `credential_unavailable` denial live in `crates/openshell-supervisor-network/src/l7/relay.rs` (also `l7/rest.rs`, `l7/websocket.rs`, `proxy.rs`). The proxy already parses the auth slots to rewrite placeholders, so detecting a non-placeholder value in the same slot looks like a small extension of the existing path.
-- Policy schema (`docs/how-it-works/policies/schema.mdx`, REST rules) supports `method`, `path`, `query`; no header matcher.
+- The `credential_unavailable` denial is in `crates/openshell-supervisor-network/src/l7/relay.rs`; placeholder handling also appears in `l7/rest.rs`, `l7/websocket.rs`, `proxy.rs`. We did not analyse feasibility further.
+- Policy schema (`docs/how-it-works/policies/schema.mdx`, REST rules): `method`, `path`, `query`; no header matcher.
 
 ### Checklist
 
