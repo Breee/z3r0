@@ -7,7 +7,7 @@ Sorted by severity. "Proof" = how to reproduce.
 |---|---|---|---|---|---|---|
 | P01 | high | Sandbox writes `.git/config` (core.fsmonitor, hooksPath, sshCommand, pager…) → user runs `sandbox download` → `git status` on host | Code exec as host user → ~/.ssh, podman, gateway secrets | `tests/attacks/run.sh` dl:git-fsmonitor-host-exec | C20, X01 | Never copy raw `.git` back; return work via git push/MR or patch |
 | P02 | high | Agent sends its own/attacker API key (Authorization, X-Api-Key, ?api_key) to an allowed endpoint | Data exfil into attacker account on a legit service (e.g. LLM provider) | `pocs/03-credential-placeholder/run.sh` foreign-* FAIL | C18, X10 | Query deny rules; upstream request (`upstream/`); own egress gateway (F10) |
-| P03 | high | Sandbox breakout (kernel/container CVE) → host user `bree` | gateway db + KEK = all provider secrets; ssh key+agent, gh/glab/docker tokens, podman socket; docker group = host root | `tests/breakout/blast-radius.sh` (14 findings) | C13, C25, A18, C24 | Gateway + podman as dedicated user (D06, F09); VM driver; short-lived creds |
+| P03 | high | Sandbox breakout (kernel/container CVE) → host user `openshell` (since F09; before: `bree`) | as openshell: gateway db + KEK = all provider secrets, its podman. Before F09 also: ssh key+agent, gh/glab/docker tokens, podman socket; docker group = host root | `tests/breakout/blast-radius.sh` (14 findings) | C13, C25, A18, C24 | Gateway + podman as dedicated user (D06, F09); VM driver; short-lived creds |
 | P04 | medium | Placeholder laundering: agent puts placeholder in query / any other header / basic auth on the bound endpoint; upstream echoes or stores it | Real secret returned to agent | `tests/attacks/run.sh` launder:* GAP | C17, X04 | Never bind creds to reflecting endpoints; tight path/query rules |
 | P05 | medium | Absolute symlink in workspace (e.g. → ~/.ssh) survives `sandbox download` | Host tools following the link read/write host files | dl:abs-symlink-kept GAP | C21, X02 | Don't download; or strip symlinks after download |
 | P06 | medium | Disk fill: no quota on sandbox overlay/workspace | Host disk full (DoS) | res:no-disk-quota GAP | C22, C12(cat) | Quota on podman storage of gateway user (F09) |
@@ -28,7 +28,7 @@ yes = OpenShell policy/config closes it · partial = narrows it · no = needs ho
 |---|---|---|
 | P01 | no | `sandbox download` copies `.git` as-is. Workflow fix: push from sandbox, never download repos. |
 | P02 | partial | Query deny rules block `?api_key=`-style keys. No header matchers → foreign Authorization/X-Api-Key pass (upstream request / F10). |
-| P03 | no | Gateway runs as login user; KEK next to db. Host fix: dedicated user (F09 step 2). VM driver unknown (F09 step 4). |
+| P03 | no | Host fix done: dedicated user `openshell` (F09). Residual: KEK next to db (C13), client key in login user (C26). VM driver unknown (F09 step 4). |
 | P04 | partial | Tight method/path/query rules on bound endpoints shrink it; placeholder still resolved in any header/basic auth, responses not redacted. |
 | P05 | no | Download keeps absolute symlinks. Workflow fix: don't download. |
 | P06 | no | No disk limit found in sandbox settings. Host fix: quota on podman storage (F09). |

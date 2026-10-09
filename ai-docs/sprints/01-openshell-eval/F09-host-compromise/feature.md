@@ -14,3 +14,4 @@ Proof: `tests/breakout/blast-radius.sh <user>` → before: secrets listed; after
 Log:
 - 2026-10-09: step 1 `tests/breakout/blast-radius.sh` as bree → 14 findings: gateway db+KEK, openshell client key, ssh key+agent, gh/glab/docker tokens, gnupg, podman socket, docker socket + docker group (= host root), 5 repos, browser cookies. Breakout as bree = root (C25).
 - 2026-10-09: step 2 `scripts/gateway-dedicated-user.sh` → gateway runs as openshell, CLI via mTLS client cert; PoC01 PASS, PoC03 5/5 (+2 known C18 FAIL), containment 45 in-sandbox PASS. Test host-side podman checks now via `scripts/podman-gw.sh` (sudo).
+- 2026-10-09: step 3 as bree after cleanup → 12 findings, gateway db/KEK gone; left: mTLS client key (C26), stale podman.sock file (service inactive), ssh/tokens/docker group (C25). Run as openshell: user ran (results not pasted).
