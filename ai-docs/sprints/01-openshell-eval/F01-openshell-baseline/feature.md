@@ -12,3 +12,4 @@ GOOD: version pinned; setup steps < 10 lines in Log; teardown script exists.
 Proof: `scripts/sandbox-up.sh && openshell exec … go test ./...` → exit 0.
 Log:
 - 2026-10-09: step 1 — read docs @ v0.1.2. Pin `OPENSHELL_VERSION=v0.1.2`. Host OK (kernel 7.0, Landlock, cgroup v2) except Podman 5.x missing → blocked on install. Findings: see `notes.md`.
+- 2026-10-09: step 2a — rootless Podman 6.1.3 working (user units, helper dirs, allowlist image policy).

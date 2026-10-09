@@ -9,3 +9,4 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C05 — Host — Podman 6.1.3 is manual install in /usr/local/bin: outside OpenShell's documented 5.x, no package signature/updates. Verify origin, update manually.
 - C06 — Host — Podman user socket = full user authority. Agent must never reach it (proved in F02).
 - C07 — Host — AppArmor userns exception for /usr/local/bin/podman (mirrors Ubuntu's podman profile).
+- C08 — Host — Image policy allowlists registries but does not verify signatures. Add sigstore/GPG verification later.
