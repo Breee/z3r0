@@ -24,3 +24,11 @@ podman run --rm docker.io/library/alpine:3 true; echo $?
 podman pull quay.io/podman/hello
 ```
 Expected: `active`; `rootless=true cgroup=v2 ver=6.1.3`; `0`; last pull `rejected by policy`.
+
+## Step 2b: Pin gateway config (before install)
+```sh
+./scripts/openshell-gateway-config.sh
+cat ~/.config/openshell/gateway.toml
+cat ~/.config/systemd/user/openshell-gateway.service.d/z3r0.conf
+```
+Expected: `compute_driver = "podman"`, `enable_bind_mounts = false`, `fail_closed`; drop-in sets `OPENSHELL_TELEMETRY_ENABLED=false`.
