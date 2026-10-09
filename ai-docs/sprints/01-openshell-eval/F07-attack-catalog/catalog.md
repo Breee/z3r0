@@ -23,7 +23,7 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | A15 | §12.6 injection in pod logs → read k8s Secrets | Z | k8s.secret.read absent | later | later |
 | A16 | §12.6 agent obtains kubeconfig | S | no kubeconfig in workspace | F02 fs:kube | pass |
 | A17 | §12.6 other namespace / prod exec | Z | capability + RBAC | later | later |
-| A18 | §14.14 compromised workstation | H | no long-lived secrets, dedicated user | F09 blast-radius | pass |
+| A18 | §14.14 compromised workstation | H | no long-lived secrets, dedicated user | F09 blast-radius | gap(C25,C26) |
 
 ## C — common
 | ID | Attack | Layer | Expected control | Test | Status |
