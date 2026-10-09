@@ -11,19 +11,21 @@ ai-docs/
 ├── caveats.md                # known gaps, risks, gotchas
 └── sprints/NN-<slug>/
     ├── README.md             # sprint goal, feature list, status table
-    └── FNN-<slug>.md         # one file per feature
+    └── FNN-<slug>/
+        ├── feature.md        # plan, DONE/GOOD, status, log
+        └── review.md         # copy-paste commands for the user to verify
 ```
 
 ## Rules
 
-- Work in sprints. One sprint = one directory. One feature = one file.
+- Work in sprints. One sprint = one directory. One feature = one directory.
 - Keep everything short. No fluff. Bullets over prose.
 - Update feature `Status` + `Log` on every meaningful change.
 - New decision → append to `decisions.md`. New gap/risk → append to `caveats.md`.
 - Feature is DONE only when every `Proof` step passed and its result is logged.
 - Do not rebuild OpenShell/GitLab/K8s. Evaluate and compose.
 - Work step by step: one Plan step at a time, then stop for user review.
-- Replayable: every step logs exact commands (copy-pasteable), key output, and result in the feature `Log`. Reusable commands go into `scripts/`.
+- Replayable: every step appends to `review.md` the exact commands (copy-pasteable, in order) + expected output. `feature.md` Log gets a 1-line summary. Reusable commands go into `scripts/`.
 - One commit per step; message `FNN step N: <what>`.
 
 ## Feature template
@@ -45,3 +47,12 @@ Log:
 ## Status values
 
 `todo` → `doing` → `done`; `blocked` needs a reason in Log.
+
+## review.md template
+
+```
+# FNN — Review
+## Step N: <title>
+<command block>
+Expected: <output / exit code>
+```
