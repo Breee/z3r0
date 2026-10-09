@@ -67,7 +67,7 @@ Without this feature, users must put their own reverse proxy / LLM gateway in fr
 
 For endpoints that a provider credential is bound to (on by default, opt-out per endpoint):
 - If the bound auth header (`header_name` in the profile) contains anything other than a resolvable placeholder, the request is denied with a distinct error (e.g. `foreign_credential`), like the existing `credential_unavailable` denial.
-- The profile lists every auth header the service accepts (e.g. GitLab: `authorization`, `private-token`, `job-token`), and all of them get the same check. Otherwise the attacker just switches header. Built-in profiles ship this list.
+- The operator lists the auth headers to check in the profile (e.g. GitLab: `authorization`, `private-token`); all get the same check. The operator must list every auth header the service accepts, otherwise the attacker switches header.
 - Denials emit an OCSF event with endpoint and header name, never the value.
 
 Out of scope: endpoints without a bound credential.
@@ -85,7 +85,7 @@ Out of scope: endpoints without a bound credential.
 
 - **External reverse proxy / LLM gateway per API** (strip client auth, inject ours): works, but duplicates OpenShell's provider/placeholder model and moves the secret outside OpenShell.
 - **Allow only read paths on SaaS APIs:** blocks the write paths agents need (LLM calls are POST).
-- **Generic header matchers in `rules`/`deny_rules`:** more flexible, also covers endpoints without a credential, but every operator must know and maintain the auth headers of every service in every policy. With the design above, the list lives once per service in the profile.
+- **Generic header matchers in `rules`/`deny_rules`:** more flexible, also covers endpoints without a credential, but needs a placeholder-aware match ("deny unless placeholder") that plain globs don't express well. The design above is that case as one setting.
 
 ### Agent Investigation
 
