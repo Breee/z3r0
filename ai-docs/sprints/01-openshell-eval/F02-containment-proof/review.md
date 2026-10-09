@@ -19,3 +19,9 @@ openshell sandbox exec -n chk -- sh -c 'id; grep -E "Cap|NoNew|Seccomp:" /proc/s
 scripts/sandbox-down.sh chk
 ```
 Expected: 11 `PASS priv:*`, no `FAIL`. Manual: uid=1000, all Cap* = 0, `NoNewPrivs: 1`, `Seccomp: 2`, `/bin/su` is setuid (C12) but unusable.
+
+## Step 4: host container engine + mounts
+```sh
+tests/containment/run.sh | grep -E 'podman|mount:|host:|FAIL'
+```
+Expected: 10 `PASS podman:*`, 2 `PASS mount:*`, `PASS host:no-extra-bind-mounts`, no `FAIL`. Whole harness: 38 PASS, exit 0.

@@ -1,5 +1,5 @@
 # F03 — Provider placeholder credentials
-Status: todo
+Status: doing
 Description: Check that OpenShell providers inject placeholder creds and substitute real ones only at the supervisor (arch §8, Phase 0 item 4).
 Goal: Agent can call a test API (e.g. GitLab) without ever seeing the real token.
 Plan:
@@ -10,3 +10,4 @@ DONE: API call succeeds; real token never visible in sandbox; placeholder useles
 GOOD: test automated in `tests/providers/`.
 Proof: `tests/providers/run.sh` → call OK, grep for real token in sandbox = 0 hits, off-endpoint call denied.
 Log:
+- 2026-10-09: PoC `pocs/03-credential-placeholder/run.sh` 5/5 PASS with httpbin echo profile (env=placeholder, secret absent, upstream gets real, unbound path 403, forged 500). Remaining: real GitLab token, `glab`. Finding → D06, C13.

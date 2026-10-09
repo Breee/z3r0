@@ -10,4 +10,12 @@ echo "$CANARY" > "$CFILE"
 trap 'rm -f "$CFILE"; scripts/sandbox-down.sh "$NAME" >/dev/null 2>&1 || true' EXIT
 
 scripts/sandbox-up.sh "$NAME" tests/containment >/dev/null
-openshell sandbox exec -n "$NAME" -- sh /sandbox/containment/probe.sh "$HOME" "$CANARY"
+rc=0
+openshell sandbox exec -n "$NAME" -- sh /sandbox/containment/probe.sh "$HOME" "$CANARY" "$(id -u)" || rc=1
+
+# host side: sandbox container may only bind-mount the openshell-sandbox binary (gateway enable_bind_mounts=false)
+id=$(podman ps --format '{{.Names}}' | grep "^openshell-default--$NAME-")
+bad=$(podman inspect "$id" --format '{{range .Mounts}}{{.Type}}:{{.Destination}}{{"\n"}}{{end}}' \
+  | grep '^bind:' | grep -v '^bind:/opt/openshell/bin/openshell-sandbox$' || true)
+if [ -z "$bad" ]; then echo "PASS host:no-extra-bind-mounts"; else echo "FAIL host:extra-bind-mounts $bad"; rc=1; fi
+exit $rc

@@ -1,0 +1,20 @@
+# PoC profile: credential bound to httpbin.org/anything (echoes request back).
+id: z3r0-echo
+display_name: Z3R0 echo probe
+description: Echo service to prove placeholder rewrite
+category: other
+credentials:
+  - name: token
+    description: fake secret
+    env_vars: [ECHO_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+endpoints:
+  - host: httpbin.org
+    port: 443
+    path: /anything
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries: [/usr/bin/curl]

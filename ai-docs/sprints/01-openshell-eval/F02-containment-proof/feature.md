@@ -14,3 +14,4 @@ Proof: `tests/containment/run.sh` → all PASS (= blocked).
 Log:
 - 2026-10-09: step 1+2 — harness (run.sh host, probe.sh in sandbox, canary + control); 13/13 fs/proc cases blocked. Egress/DNS cases moved to step 5.
 - 2026-10-09: step 3 — 11 privilege cases blocked (uid/gid≠0, sudo/su, caps 0, NNP=1, /etc ro, unshare, mount). Caveats C11, C12.
+- 2026-10-09: step 4 — 13 podman/mount cases blocked (no engine sockets, no CLI, no API, host storage unreachable, supervisor bin + channel read-only, host-side: only openshell-sandbox bind mount). Harness 38/38.

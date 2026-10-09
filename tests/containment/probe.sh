@@ -43,4 +43,17 @@ blocked "priv:write-etc"    sh -c "echo x > /etc/z3r0-probe"
 blocked "priv:write-passwd" sh -c "echo x >> /etc/passwd"
 blocked "priv:unshare-user" unshare -r true
 blocked "priv:mount"        mount -t tmpfs none /tmp
+
+# --- host container engine (step 4) ---  arg 3 = host uid
+U="${3:-1000}"
+for s in /run/user/$U/podman/podman.sock /run/podman/podman.sock /var/run/docker.sock /run/docker.sock /run/user/$U/docker.sock; do
+  blocked "podman:sock-$s" test -e "$s"
+done
+blocked "podman:any-sock"   sh -c "find / -xdev -type s 2>/dev/null | grep -Eq 'podman|docker|containerd'"
+blocked "podman:cli"        sh -c "command -v podman || command -v docker"
+blocked "podman:api-curl"   curl -sf --max-time 3 --unix-socket /run/user/$U/podman/podman.sock http://d/_ping
+blocked "podman:api-tcp"    curl -sf --max-time 3 http://host.containers.internal:2375/_ping
+blocked "podman:host-storage" ls "$H/.local/share/containers"
+blocked "mount:write-supervisor-bin" sh -c "echo x >> /opt/openshell/bin/openshell-sandbox"
+blocked "mount:write-channel" sh -c "echo x > /.openshell/channel/z3r0-probe"
 exit $rc
