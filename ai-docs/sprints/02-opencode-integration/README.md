@@ -5,7 +5,7 @@ Exit: daily usable loop, proven by review.md; no host-side tool execution.
 
 | ID | Feature | Ref | Status |
 |---|---|---|---|
-| F11 | Dev image: golang + git + opencode, pinned digest | D08, C08, C09, C12 | todo |
+| F11 | Dev image: golang + git + opencode, pinned digest | D08, C08, C09, C12 | doing |
 | F17 | `z3r0 up/attach/down`: host TUI attaches to `opencode serve` inside | D08, D09 | todo |
 
 Order: F11 → F17.

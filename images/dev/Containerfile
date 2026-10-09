@@ -1,0 +1,9 @@
+# Z3R0 dev image (F11): golang + git + opencode. Base and opencode pinned by digest/sha256.
+FROM docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80
+ARG OPENCODE_VERSION=1.18.21
+ARG OPENCODE_SHA256=d910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a
+RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL -o /tmp/oc.tgz "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz" \
+ && echo "${OPENCODE_SHA256}  /tmp/oc.tgz" | sha256sum -c - \
+ && tar -xzf /tmp/oc.tgz -C /usr/local/bin opencode && rm /tmp/oc.tgz \
+ && opencode --version
