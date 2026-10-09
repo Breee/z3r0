@@ -17,3 +17,4 @@ Format: `CNN — <area> — <issue>` + impact/mitigation.
 - C13 — OpenShell — Gateway runs as the login user; provider secrets in `~/.local/state/openshell/gateway/openshell.db` are encrypted, but `credentials/key-encryption-key.bin` is next to it, same owner. Breakout → all secrets. Fix: F09.
 - C14 — OpenShell — `sandbox delete` is async; re-creating the same name immediately can fail (harness printed 0 results once). Wait or use unique names.
 - C15 — OpenShell — Credential rewrite only for HTTP the proxy inspects; `tls: skip`/non-HTTP endpoints get no rewrite (and no L7 check).
+- C16: sandbox DNS is synthetic (198.18.0.0/15); tools that validate resolved IPs or need real DNS (SRV, TXT) may break.

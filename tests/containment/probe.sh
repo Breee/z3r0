@@ -56,4 +56,15 @@ blocked "podman:api-tcp"    curl -sf --max-time 3 http://host.containers.interna
 blocked "podman:host-storage" ls "$H/.local/share/containers"
 blocked "mount:write-supervisor-bin" sh -c "echo x >> /opt/openshell/bin/openshell-sandbox"
 blocked "mount:write-channel" sh -c "echo x > /.openshell/channel/z3r0-probe"
+
+# --- egress, default policy (step 5) ---
+blocked "net:https-example"  curl -sf --max-time 5 https://example.com
+blocked "net:http-ip"        curl -sf --max-time 5 http://1.1.1.1
+blocked "net:noproxy"        curl -sf --max-time 5 --noproxy '*' https://example.com
+blocked "net:ipv6"           curl -sf --max-time 5 -6 https://example.com
+# resolver is synthetic (198.18.0.0/15, even for .invalid) -> no upstream DNS query
+blocked "net:dns-real-answer" sh -c "getent hosts example.com | grep -vq '^198\.1[89]\.'"
+allowed "net:dns-synthetic"  sh -c "getent hosts x.z3r0test.invalid | grep -q '^198\.1[89]\.'"
+blocked "net:tcp-raw"        sh -c "timeout 5 bash -c 'exec 3<>/dev/tcp/1.1.1.1/53'"
+blocked "net:host-gateway"   curl -sf --max-time 5 -k https://host.containers.internal:17670
 exit $rc

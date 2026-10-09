@@ -25,3 +25,12 @@ Expected: 11 `PASS priv:*`, no `FAIL`. Manual: uid=1000, all Cap* = 0, `NoNewPri
 tests/containment/run.sh | grep -E 'podman|mount:|host:|FAIL'
 ```
 Expected: 10 `PASS podman:*`, 2 `PASS mount:*`, `PASS host:no-extra-bind-mounts`, no `FAIL`. Whole harness: 38 PASS, exit 0.
+
+## Step 5 — egress (default policy = deny-all)
+```bash
+openshell sandbox delete f02; sleep 8
+tests/containment/run.sh | grep -E 'net:|FAIL'
+openshell sandbox exec -n f02 -- sh -c 'cat /etc/resolv.conf; getent hosts x.z3r0test.invalid'
+bash pocs/03-credential-placeholder/run.sh   # allowlist case: httpbin reachable only via policy
+```
+Expected: all `net:*` PASS, total 46/46, exit 0. DNS answers are synthetic 198.18.x.x (even for .invalid) → no upstream DNS query, no DNS exfil.
