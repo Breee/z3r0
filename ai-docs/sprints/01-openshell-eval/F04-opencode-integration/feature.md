@@ -1,5 +1,5 @@
 # F04 — OpenCode ↔ OpenShell integration
-Status: todo
+Status: doing
 Description: Make OpenCode's tools (bash, edit, read, etc.) execute inside OpenShell, not on the host.
 Goal: Pick and prototype the integration path; know if a plugin is needed.
 Plan:
@@ -11,3 +11,4 @@ DONE: a full loop (edit → `go test` → commit) runs from OpenCode with all ex
 GOOD: no host-side file/shell tool path remains usable by the agent; LLM endpoint configurable.
 Proof: F02 harness triggered via OpenCode prompt → all blocked; host marker file `~/z3r0-canary` unreadable by agent.
 Log:
+- 2026-10-09: step 1 Option A works: host opencode binary (glibc) uploaded into golang:1.25 sandbox; policy allows only opencode.ai:443 for that binary; Zen free model needs no key; agent edit+go test+commit inside sandbox (PoC04 5 PASS). Official image ghcr.io/anomalyco/opencode is Alpine without git/go → needs own dev image later.
