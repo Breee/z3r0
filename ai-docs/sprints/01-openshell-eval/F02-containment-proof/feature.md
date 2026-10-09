@@ -1,5 +1,5 @@
 # F02 — Containment proof (fs, process, egress)
-Status: todo
+Status: doing
 Description: Verify OpenShell contains a corrupted agent (arch §25 Phase 0 items 1–3).
 Goal: Automated test harness acting as a hostile agent inside the sandbox.
 Plan:
@@ -12,3 +12,4 @@ DONE: all hostile cases fail (incl. root + host podman access); allowlisted dest
 GOOD: harness is one command, outputs pass/fail table; gaps logged in caveats.md.
 Proof: `tests/containment/run.sh` → all PASS (= blocked).
 Log:
+- 2026-10-09: step 1+2 — harness (run.sh host, probe.sh in sandbox, canary + control); 13/13 fs/proc cases blocked. Egress/DNS cases moved to step 5.
