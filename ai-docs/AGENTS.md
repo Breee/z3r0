@@ -22,6 +22,9 @@ ai-docs/
 - New decision → append to `decisions.md`. New gap/risk → append to `caveats.md`.
 - Feature is DONE only when every `Proof` step passed and its result is logged.
 - Do not rebuild OpenShell/GitLab/K8s. Evaluate and compose.
+- Work step by step: one Plan step at a time, then stop for user review.
+- Replayable: every step logs exact commands (copy-pasteable), key output, and result in the feature `Log`. Reusable commands go into `scripts/`.
+- One commit per step; message `FNN step N: <what>`.
 
 ## Feature template
 
