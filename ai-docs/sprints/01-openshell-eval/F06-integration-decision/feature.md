@@ -10,4 +10,4 @@ DONE: decisions + caveats updated; Sprint 02 README exists.
 GOOD: every decision cites a proof from F01–F05.
 Proof: review — each claim links to a logged Proof result.
 Log:
-- step 1-3: summary.md, D10 (GO), sprints/02-dev-loop/README.md (F11–F16).
+- step 1-3: summary.md, D10 (GO), sprints/02-opencode-integration/README.md (F11–F16).
