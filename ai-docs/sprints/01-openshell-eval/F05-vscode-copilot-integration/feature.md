@@ -1,5 +1,5 @@
 # F05 — VS Code Copilot Chat ↔ OpenShell integration
-Status: doing
+Status: done
 Description: Make Copilot Chat agent-mode tools (terminal, file edits, MCP) execute inside OpenShell.
 Goal: Pick and prototype the integration path; know if an extension is needed.
 Plan:
@@ -11,3 +11,5 @@ GOOD: built-in host terminal/file tools not reachable by agent; documented limit
 Proof: same canary + F02 harness via Copilot Chat prompt → all blocked.
 Log:
 - 2026-10-09: step 1 SSH plumbing via `sandbox ssh-config`; Copilot hosts allowed only for /sandbox/.vscode-server/**; curl + server download denied. GUI step waits on user.
+- 2026-10-09: step 2 Option A works: Copilot agent edited, committed (40e8efa), ran probe 45/0 in sandbox. Fixes: /dev/pts policy (C29), enterprise host, .profile PATH (C09). Token in sandbox (C28).
+- 2026-10-09: step 3 Option B rejected (D09): extension can add sandbox tools but not disable built-ins. Custom model endpoint (§11.4) → later.

@@ -59,6 +59,6 @@ Status: pass = automated test passes · todo = open F08/F09 case · later = out 
 | X05 | timing/size covert channel via allowed host | S | none realistic | later | later |
 | X06 | agent asks user to approve broad rule | S/Z | rule approval UX, scope limits | agent has no gateway access (F08); asking the human is UX → Z3R0 approval flow | later |
 | X07 | same-name sandbox recreate race picks stale state | H | unique names | — | gap (C14) |
-| X08 | VS Code server / extension inside sandbox phones home | S | egress allowlist | F05 | todo |
+| X08 | VS Code server / extension inside sandbox phones home | S | egress allowlist | F05 | pass |
 | X09 | agent edits its own policy file in workspace | S | policy lives on gateway | F08 sup:list-state-dir, gw:* (policy only on gateway) | pass |
 | X10 | foreign (attacker) API key to allowed endpoint, e.g. LLM provider | S | strip non-placeholder auth | PoC03 foreign-auth-header-blocked FAIL | gap (C18) |

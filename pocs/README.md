@@ -11,3 +11,4 @@ Executable proofs per feature. Each dir: `run.sh` (exits 0 = PASS, cleans up aft
 | containment | F02: hostile-agent probes must be blocked | `tests/containment/run.sh` |
 
 Prereqs: host setup from `ai-docs/sprints/01-openshell-eval/F01-openshell-baseline/review.md`.
+| 05-vscode-remote | VS Code Remote-SSH into sandbox, Copilot egress scoped to vscode-server, pty policy | `pocs/05-vscode-remote/run.sh` + manual Copilot prompts |

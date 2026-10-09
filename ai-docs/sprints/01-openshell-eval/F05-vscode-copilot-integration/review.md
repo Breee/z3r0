@@ -22,3 +22,10 @@ openshell sandbox exec -n vsc05 -- git -C /sandbox/hello-go log --oneline -1
 openshell logs vsc05 2>&1 | grep -i deny | tail
 ```
 Cleanup: `scripts/sandbox-down.sh vsc05; rm ~/.ssh/openshell-vsc05.conf`
+
+## Result of step 2 (2026-10-09)
+```sh
+openshell sandbox exec -n vsc05 --env PATH=/usr/local/go/bin:/usr/bin:/bin -- sh -c 'cd /sandbox/hello-go && git log --oneline -2 && go test ./...'
+openshell logs vsc05 2>&1 | grep DENIED | grep -oE "\-> [a-z0-9.-]+" | sort | uniq -c
+```
+Expected: Copilot commit `Add Goodbye function` on top of `init`; `ok example.com/hello`; denied only telemetry (mobile.events.data.microsoft.com, telemetry.enterprise.githubcopilot.com) + probe targets. Copilot reported probe 45 PASS 0 FAIL.
