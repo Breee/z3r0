@@ -8,3 +8,4 @@ Format: `DNN — YYYY-MM-DD — <decision>` + 1-line reason.
 - D04 — 2026-10-09 — Podman 6.1.3 (manual install) is required; make it work rootless. Reason: user requirement.
 - D05 — 2026-10-09 — Hard requirement: agent is never root and cannot use host Podman. Reason: user requirement; proved in F02.
 - D06 — 2026-10-09 — Sandbox breakout = full compromise of the gateway's host user (gateway, KEK + provider secrets, podman, ~/.ssh). Treat laptop as untrusted: run gateway+podman as a dedicated host user, only short-lived/low-value creds on laptop, authority stays server-side (MR/CI/GitOps). Reason: F03 finding, arch §14.14 "compromised workstation". Verified in F09.
+- D07: Agent traffic to credentialed APIs goes through our gateway (strip client auth, inject ours) until OpenShell rejects foreign credentials upstream (ai-docs/upstream/). Reason: C18 proven.
