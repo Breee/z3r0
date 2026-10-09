@@ -13,3 +13,9 @@ tests/attacks/run.sh; echo rc=$?
 grep -n "C17\|C19" ai-docs/caveats.md
 ```
 Expected: step 1 lines as before, then `PASS launder:{other-host-header,other-host-query,body,path}`, `GAP launder:{query,other-header,basic-auth} (C17)`, `GAP exfil:data-in-query (C19)`, `rc=0`.
+## Step 3: Gateway / supervisor
+```sh
+cat tests/attacks/gateway.sh
+tests/attacks/run.sh; echo rc=$?
+```
+Expected: `PASS control:pid1-is-supervisor`, 16 `PASS sup:*`/`gw:*`, no FAIL, `rc=0`.

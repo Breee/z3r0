@@ -24,4 +24,5 @@ pol httpbin  httpbin.org:443:read-only:rest:enforce
 run egress.sh allow
 pol postman  postman-echo.com:443:read-only:rest:enforce
 run exfil.sh "$SECRET"                     # step 2
+run gateway.sh -                           # step 3
 exit $rc
