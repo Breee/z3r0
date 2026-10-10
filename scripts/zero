@@ -1,6 +1,6 @@
 #!/bin/sh
-# z3r0: per-repo OpenShell sandbox with `opencode serve` inside; host opencode attaches (F17).
-# Usage (inside a git repo): z3r0 up | attach | run <prompt> | code | status | stop | rm
+# zero: per-repo OpenShell sandbox with `opencode serve` inside; host opencode attaches (F17).
+# Usage (inside a git repo): zero up | attach | run <prompt> | code | status | stop | rm
 #   up     create-or-reuse sandbox, clone repo in (first time only), start serve + forward
 #   attach up + opencode TUI attached to the sandbox
 #   stop   end the host port forward (sandbox keeps running)
@@ -9,8 +9,8 @@
 set -eu
 IMAGE="${Z3R0_IMAGE:-localhost/z3r0-dev:latest}"
 TOP="$(git rev-parse --show-toplevel)"; REPO="$(basename "$TOP")"
-NAME="z3r0-$(printf %s "$REPO" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' '-')"
-ST="${XDG_STATE_HOME:-$HOME/.local/state}/z3r0/$NAME"; mkdir -p "$ST"; chmod 700 "$ST"
+NAME="zero-$(printf %s "$REPO" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' '-')"
+ST="${XDG_STATE_HOME:-$HOME/.local/state}/zero/$NAME"; mkdir -p "$ST"; chmod 700 "$ST"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOST="openshell-$NAME.default"; DIR="/sandbox/$REPO"
 
@@ -25,12 +25,12 @@ up() {
     openshell policy update "$NAME" --rule-name zen --binary /usr/local/bin/opencode \
       --add-endpoint opencode.ai:443:read-write:rest:enforce --wait >/dev/null 2>&1
     git -C "$TOP" bundle create "$ST/repo.bundle" --all >/dev/null 2>&1
-    openshell sandbox upload "$NAME" "$ST/repo.bundle" /sandbox/.z3r0.bundle >/dev/null 2>&1
+    openshell sandbox upload "$NAME" "$ST/repo.bundle" /sandbox/.zero.bundle >/dev/null 2>&1
     rm -f "$ST/repo.bundle" "$ST/fwd.pid"
     head -c 24 /dev/urandom | base64 | tr -d '/+=' > "$ST/password"; chmod 600 "$ST/password"
   fi
   openshell sandbox ssh-config "$NAME" > "$ST/ssh.conf"
-  s "test -d '$DIR' || { git clone -q /sandbox/.z3r0.bundle '$DIR' 2>/dev/null && rm -f /sandbox/.z3r0.bundle; }"
+  s "test -d '$DIR' || { git clone -q /sandbox/.zero.bundle '$DIR' 2>/dev/null && rm -f /sandbox/.zero.bundle; }"
   [ -f "$ST/port" ] || shuf -i 20000-29999 -n 1 > "$ST/port"
   if ! fwd_alive; then
     ssh -F "$ST/ssh.conf" -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$(cat "$ST/port"):127.0.0.1:4096" "$HOST" </dev/null >/dev/null 2>&1 &

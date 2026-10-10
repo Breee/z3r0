@@ -18,23 +18,23 @@ Expected: bash output `1000`, `/sandbox/hello-go`, `sandbox-s17`; host `ls` fail
 
 ## Step 2
 ```sh
-Z=$PWD/scripts/z3r0
+Z=$PWD/scripts/zero
 R=/tmp/z3r0-demo; rm -rf $R; cp -r tests/fixtures/hello-go $R; cd $R
 git init -q && git add . && git -c user.email=a@b -c user.name=t commit -qm init
 $Z up; $Z up                      # 2nd run reuses
-P=$(cat ~/.local/state/z3r0/z3r0-z3r0-demo/port)
+P=$(cat ~/.local/state/zero/zero-z3r0-demo/port)
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:$P/config   # no password
 $Z run -m opencode/nemotron-3.5-lightning-free "Run id -u; hostname; pwd; go test ./... Then create attached.txt with content ok."
-ls attached.txt; openshell sandbox exec -n z3r0-z3r0-demo -- cat /sandbox/z3r0-demo/attached.txt
+ls attached.txt; openshell sandbox exec -n zero-z3r0-demo -- cat /sandbox/z3r0-demo/attached.txt
 $Z stop; $Z status; $Z attach     # TUI, sandbox kept; quit with ctrl+c
 $Z rm
 ```
-Expected: both `up` print `ready`; curl `401`; agent reports `1000`, `sandbox-z3r0-demo`, `/sandbox/z3r0-demo`, tests ok; host `ls` fails; sandbox cat `ok`; status after stop `forward: off`; attach opens TUI on same session.
+Expected: both `up` print `ready`; curl `401`; agent reports `1000`, `sandbox-zero-z3r0-demo`, `/sandbox/z3r0-demo`, tests ok; host `ls` fails; sandbox cat `ok`; status after stop `forward: off`; attach opens TUI on same session.
 
 ## Step 3
 ```sh
 cd /tmp/z3r0-demo            # repo from step 2 (recreate if removed)
-Z=~/repos/github.com/Breee/z3r0/scripts/z3r0
+Z=~/repos/github.com/Breee/z3r0/scripts/zero
 $Z rm; sleep 15; $Z up       # new sandbox now created with pty policy (F05)
 $Z code                      # VS Code opens /sandbox/z3r0-demo over Remote-SSH
 ```
