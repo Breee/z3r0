@@ -1,13 +1,31 @@
 #!/bin/sh
-# PoC04b: host OpenCode + plugin overriding `bash` -> runs in sandbox; `read` still reads host files (gap).
+# PoC 04b: OpenCode on the host, with a plugin that routes the `bash` tool
+# into a sandbox. The `read` tool still reads host files (known gap).
+#
+# Usage: pocs/04b-host-plugin/run.sh [model]
 set -u
-cd "$(dirname "$0")"; NAME=poc04b; rc=0
-trap 'openshell sandbox delete $NAME >/dev/null 2>&1; rm -f host-marker.txt' EXIT
+. "$(dirname "$0")/../lib.sh"
+cd "$(dirname "$0")"
+
+SANDBOX=poc04b
+MODEL="${1:-$DEFAULT_MODEL}"
+trap 'delete_sandbox; rm -f host-marker.txt' EXIT
+
+step "Setup"
 echo HOST-ONLY-MARKER > host-marker.txt
-openshell sandbox create --name $NAME --from docker.io/library/golang:1.25 --detach >/dev/null 2>&1 || exit 1
-out="$(Z3R0_SANDBOX=$NAME timeout 300 opencode run -m "${1:-opencode/nemotron-3.5-lightning-free}" \
+openshell sandbox create --name "$SANDBOX" \
+  --from docker.io/library/golang:1.25 --detach >/dev/null 2>&1 || exit 1
+
+step "Agent runs on the host"
+out="$(Z3R0_SANDBOX=$SANDBOX timeout 300 opencode run -m "$MODEL" \
   'Use the bash tool to run: hostname. Then use the read tool on host-marker.txt. Report both outputs verbatim.' 2>&1)"
 echo "$out" | tail -5
-echo "$out" | grep -q "sandbox-$NAME" && echo "PASS bash-routed-to-sandbox" || { echo "FAIL bash-routed-to-sandbox"; rc=1; }
-echo "$out" | grep -q HOST-ONLY-MARKER && echo "GAP read-tool-runs-on-host" || echo "INFO read-tool-did-not-read-host"
-exit $rc
+
+step "Checks"
+expect bash-routed-to-sandbox contains "$out" "sandbox-$SANDBOX"
+
+if contains "$out" HOST-ONLY-MARKER; then gap  read-tool-runs-on-host
+else                                      info read-tool-did-not-read-host
+fi
+
+exit $RC

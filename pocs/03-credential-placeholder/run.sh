@@ -1,36 +1,81 @@
 #!/bin/sh
-# PoC 03: OpenShell credential placeholders. Agent sees placeholder; proxy injects real secret
-# only for the bound endpoint (httpbin.org/anything). Needs internet.
+# PoC 03: OpenShell credential placeholders.
+#
+# The agent only ever sees a placeholder. The proxy swaps in the real secret,
+# and only for the bound endpoint (httpbin.org/anything). Needs internet.
+#
 # Usage: pocs/03-credential-placeholder/run.sh
 set -u
+. "$(dirname "$0")/../lib.sh"
 cd "$(dirname "$0")"
-SECRET="REAL-SECRET-$(date +%s)"; N=cred03; rc=0
+
+SANDBOX=cred03
+PROVIDER=echo03
+SECRET="REAL-SECRET-$(date +%s)"
+
 cleanup() {
-  openshell sandbox delete "$N" >/dev/null 2>&1
-  openshell provider delete echo03 >/dev/null 2>&1
-  sleep 5; openshell profile delete z3r0-echo >/dev/null 2>&1
+  delete_sandbox
+  openshell provider delete "$PROVIDER" >/dev/null 2>&1
+  sleep 5   # profile can't be deleted while the provider is still going away
+  openshell profile delete z3r0-echo >/dev/null 2>&1
 }
 trap cleanup EXIT
-X() { timeout 30 openshell sandbox exec -n "$N" -- sh -c "$1" 2>&1; }
-check() { if [ "$2" = ok ]; then echo "PASS $1"; else echo "FAIL $1 ($3)"; rc=1; fi; }
 
-openshell profile lint -f profile.yaml >/dev/null && openshell profile import -f profile.yaml >/dev/null
-openshell provider create --name echo03 --type z3r0-echo --credential "ECHO_TOKEN=$SECRET" >/dev/null
-openshell sandbox create --name "$N" --from docker.io/library/golang:1.25 --provider echo03 --detach >/dev/null 2>&1
+# every sandbox call gets a 30s cap
+sb() { timeout 30 openshell sandbox exec -n "$SANDBOX" -- sh -c "$1" 2>&1; }
 
-v=$(X 'printf %s "$ECHO_TOKEN"')
-case "$v" in openshell:resolve:env:*) check env-is-placeholder ok;; *) check env-is-placeholder no "$v";; esac
-o=$(X "grep -rsl '$SECRET' /proc/self/environ /sandbox /etc /tmp")
-[ -z "$o" ] && check secret-not-in-sandbox ok || check secret-not-in-sandbox no "$o"
-o=$(X 'curl -s https://httpbin.org/anything -H "Authorization: Bearer $ECHO_TOKEN"')
-echo "$o" | grep -q "Bearer $SECRET" && check upstream-gets-real-secret ok || check upstream-gets-real-secret no "$o"
-o=$(X 'curl -s -o /dev/null -w %{http_code} https://httpbin.org/headers -H "Authorization: Bearer $ECHO_TOKEN"')
-[ "$o" = 403 ] && check unbound-path-denied ok || check unbound-path-denied no "$o"
-o=$(X 'curl -s https://httpbin.org/anything -H "Authorization: Bearer openshell:resolve:env:v1999_ECHO_TOKEN"')
-echo "$o" | grep -q credential_unavailable && check forged-placeholder-denied ok || check forged-placeholder-denied no "$o"
-# foreign key: agent sends its own (attacker) credential to the allowed endpoint
-o=$(X 'curl -s -w " HTTP%{http_code}" https://httpbin.org/anything -H "Authorization: Bearer ATTACKER-KEY"')
-echo "$o" | grep -q ATTACKER-KEY && check foreign-auth-header-blocked no "passed upstream: $(echo "$o" | tail -c 40)" || check foreign-auth-header-blocked ok
-o=$(X 'curl -s -w " HTTP%{http_code}" "https://httpbin.org/anything?api_key=ATTACKER-KEY" -H "X-Api-Key: ATTACKER-KEY"')
-echo "$o" | grep -q ATTACKER-KEY && check foreign-key-other-fields-blocked no "passed upstream" || check foreign-key-other-fields-blocked ok
-exit $rc
+# ---- setup --------------------------------------------------------------
+
+step "Setup"
+openshell profile lint   -f profile.yaml >/dev/null || exit 1
+openshell profile import -f profile.yaml >/dev/null || exit 1
+openshell provider create --name "$PROVIDER" --type z3r0-echo \
+  --credential "ECHO_TOKEN=$SECRET" >/dev/null || exit 1
+openshell sandbox create --name "$SANDBOX" --provider "$PROVIDER" \
+  --from docker.io/library/golang:1.25 --detach >/dev/null 2>&1 || exit 1
+
+# ---- checks -------------------------------------------------------------
+
+step "Secret stays outside the sandbox"
+
+token="$(sb 'printf %s "$ECHO_TOKEN"')"
+case "$token" in
+  openshell:resolve:env:*) pass env-is-placeholder ;;
+  *)                       fail env-is-placeholder "$token" ;;
+esac
+
+found="$(sb "grep -rsl '$SECRET' /proc/self/environ /sandbox /etc /tmp")"
+if [ -z "$found" ]; then pass secret-not-in-sandbox
+else                     fail secret-not-in-sandbox "$found"
+fi
+
+step "Proxy injects the secret only where allowed"
+
+out="$(sb 'curl -s https://httpbin.org/anything -H "Authorization: Bearer $ECHO_TOKEN"')"
+if contains "$out" "Bearer $SECRET"; then pass upstream-gets-real-secret
+else                                      fail upstream-gets-real-secret "$out"
+fi
+
+code="$(sb 'curl -s -o /dev/null -w %{http_code} https://httpbin.org/headers -H "Authorization: Bearer $ECHO_TOKEN"')"
+if [ "$code" = 403 ]; then pass unbound-path-denied
+else                       fail unbound-path-denied "HTTP $code"
+fi
+
+out="$(sb 'curl -s https://httpbin.org/anything -H "Authorization: Bearer openshell:resolve:env:v1999_ECHO_TOKEN"')"
+if contains "$out" credential_unavailable; then pass forged-placeholder-denied
+else                                            fail forged-placeholder-denied "$out"
+fi
+
+step "Agent can't smuggle its own key to the allowed endpoint"
+
+out="$(sb 'curl -s https://httpbin.org/anything -H "Authorization: Bearer ATTACKER-KEY"')"
+if contains "$out" ATTACKER-KEY; then fail foreign-auth-header-blocked "reached upstream"
+else                                  pass foreign-auth-header-blocked
+fi
+
+out="$(sb 'curl -s "https://httpbin.org/anything?api_key=ATTACKER-KEY" -H "X-Api-Key: ATTACKER-KEY"')"
+if contains "$out" ATTACKER-KEY; then fail foreign-key-other-fields-blocked "reached upstream"
+else                                  pass foreign-key-other-fields-blocked
+fi
+
+exit $RC
