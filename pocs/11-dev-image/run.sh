@@ -1,30 +1,35 @@
 #!/bin/sh
-# PoC F11: the dev image works in a sandbox without the PATH workaround (C09)
-# and ships no setuid binaries (C12).
-#
+# PoC F11: dev image works in a sandbox without the PATH workaround (C09)
+# and has no setuid binaries (C12).
 # Needs: scripts/build-dev-image.sh
-# Usage: pocs/11-dev-image/run.sh [sandbox-name]
+# Usage: pocs/11-dev-image/run.sh [name]
 set -u
-. "$(dirname "$0")/../lib.sh"
+cd "$(dirname "$0")/../.."
 
-SANDBOX="${1:-poc11}"
-trap delete_sandbox EXIT
+NAME="${1:-poc11}"
+rc=0
 
-step "Setup"
-"$ROOT/scripts/sandbox-up.sh" "$SANDBOX" "$ROOT/tests/fixtures/hello-go" >/dev/null 2>&1 \
-  || { fail create; exit 1; }
+trap 'openshell sandbox delete "$NAME" >/dev/null 2>&1' EXIT
 
-step "Checks"
-go_test="$(in_sandbox 'cd /sandbox/hello-go && go test ./...')"
-oc_version="$(in_sandbox 'opencode --version')"
-tools="$(in_sandbox 'git --version && rg --version | head -1')"
-setuid_count="$(in_sandbox 'find / -xdev -perm /6000 -type f 2>/dev/null | wc -l')"
-uid="$(in_sandbox 'id -u')"
+run() { openshell sandbox exec -n "$NAME" -- sh -c "$1" 2>&1; }
+pass() { echo "PASS $1"; }
+fail() { echo "FAIL $1: $2"; rc=1; }
 
-expect go-test-no-path-env contains "$go_test" '^ok'
-expect opencode-on-path    [ "$oc_version" = 1.18.21 ]
-expect git-and-ripgrep     contains "$tools" ripgrep
-expect no-setuid-binaries  [ "$setuid_count" = 0 ]
-expect non-root            [ "$uid" != 0 ]
+scripts/sandbox-up.sh "$NAME" tests/fixtures/hello-go >/dev/null 2>&1 || { echo "FAIL create"; exit 1; }
 
-exit $RC
+out=$(run 'cd /sandbox/hello-go && go test ./...')
+if echo "$out" | grep -q '^ok'; then pass "go test without PATH env"; else fail "go test without PATH env" "$out"; fi
+
+out=$(run 'opencode --version')
+if [ "$out" = 1.18.21 ]; then pass "opencode on PATH"; else fail "opencode on PATH" "$out"; fi
+
+out=$(run 'git --version && rg --version | head -1')
+if echo "$out" | grep -q ripgrep; then pass "git and rg"; else fail "git and rg" "$out"; fi
+
+out=$(run 'find / -xdev -perm /6000 -type f 2>/dev/null | wc -l')
+if [ "$out" = 0 ]; then pass "no setuid binaries"; else fail "no setuid binaries" "$out"; fi
+
+out=$(run 'id -u')
+if [ "$out" != 0 ]; then pass "non-root"; else fail "non-root" "$out"; fi
+
+exit $rc

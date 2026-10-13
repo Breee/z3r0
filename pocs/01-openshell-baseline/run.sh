@@ -1,25 +1,30 @@
 #!/bin/sh
 # PoC F01: a rootless OpenShell sandbox runs `go test` on an uploaded repo.
-#
 # Usage: pocs/01-openshell-baseline/run.sh [sandbox-name]
-set -u
-. "$(dirname "$0")/../lib.sh"
+set -eu
+cd "$(dirname "$0")/../.."
 
-SANDBOX="${1:-poc01}"
-SANDBOX_ENV="$GO_PATH"
-trap '"$ROOT/scripts/sandbox-down.sh" "$SANDBOX" >/dev/null 2>&1' EXIT
+NAME="${1:-poc01}"
+GO_PATH="PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"   # caveat C09
 
-step "Preflight"
+trap 'scripts/sandbox-down.sh "$NAME" >/dev/null 2>&1 || true' EXIT
+
+echo "== Preflight"
 podman --version
 openshell status
 
-step "Create sandbox and upload repo"
-"$ROOT/scripts/sandbox-up.sh" "$SANDBOX" "$ROOT/tests/fixtures/hello-go" || exit 1
+echo "== Create sandbox"
+scripts/sandbox-up.sh "$NAME" tests/fixtures/hello-go
 
-step "Checks"
-uid="$(in_sandbox 'id -u')"
-expect "runs-as-non-root (uid=$uid)" [ "$uid" != 0 ]
-expect "go-test-passes"              in_sandbox 'cd /sandbox/hello-go && go test ./...'
-expect "git-available"               in_sandbox 'git --version'
+echo "== Checks"
+uid=$(openshell sandbox exec -n "$NAME" -- id -u)
+if [ "$uid" = 0 ]; then
+  echo "FAIL runs as root"
+  exit 1
+fi
+echo "PASS non-root (uid=$uid)"
 
-exit $RC
+openshell sandbox exec -n "$NAME" --env "$GO_PATH" -- sh -c 'cd /sandbox/hello-go && go test ./...'
+openshell sandbox exec -n "$NAME" -- git --version
+
+echo "PASS"

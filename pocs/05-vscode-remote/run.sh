@@ -1,50 +1,54 @@
 #!/bin/sh
 # PoC 05: VS Code Remote-SSH into an OpenShell sandbox.
 # Copilot Chat runs in the remote extension host, inside the sandbox.
-#
-# Leaves the sandbox running. Delete it with: scripts/sandbox-down.sh NAME
-#
-# Usage: pocs/05-vscode-remote/run.sh [sandbox-name]
-set -u
-. "$(dirname "$0")/../lib.sh"
-cd "$ROOT"
+# Leaves the sandbox running; delete with: scripts/sandbox-down.sh NAME
+# Usage: pocs/05-vscode-remote/run.sh [name]
+set -eu
+cd "$(dirname "$0")/../.."
 
-SANDBOX="${1:-vsc05}"
-SSH_CONFIG="$HOME/.ssh/openshell-$SANDBOX.conf"
+NAME="${1:-vsc05}"
+rc=0
 
-# Copilot endpoints, reachable only by binaries under the VS Code server dir
-VSCODE_BINARIES='/sandbox/.vscode-server/**'
-COPILOT_HOSTS='*.githubcopilot.com
-api.enterprise.githubcopilot.com
-api.github.com
-copilot-proxy.githubusercontent.com'
+pass() { echo "PASS $1"; }
+fail() { echo "FAIL $1"; rc=1; }
 
-step "Setup"
-POLICY=pocs/05-vscode-remote/policy.yaml \
-  scripts/sandbox-up.sh "$SANDBOX" tests/fixtures/hello-go >/dev/null || exit 1
-openshell sandbox upload "$SANDBOX" tests/containment /sandbox >/dev/null
-git_init_in_sandbox /sandbox/hello-go
-in_sandbox 'echo "export PATH=/usr/local/go/bin:\$PATH" >> /sandbox/.profile'  # C09
+echo "== Setup"
+POLICY=pocs/05-vscode-remote/policy.yaml scripts/sandbox-up.sh "$NAME" tests/fixtures/hello-go >/dev/null
+openshell sandbox upload "$NAME" tests/containment /sandbox >/dev/null
+openshell sandbox exec -n "$NAME" -- sh -c 'cd /sandbox/hello-go && git init -q && git add -A && git -c user.email=z3r0@local -c user.name=z3r0 commit -qm init'
+openshell sandbox exec -n "$NAME" -- sh -c 'echo "export PATH=/usr/local/go/bin:\$PATH" >> /sandbox/.profile'  # C09
 
-for host in $COPILOT_HOSTS; do
-  openshell policy update "$SANDBOX" \
-    --rule-name copilot \
-    --binary "$VSCODE_BINARIES" \
-    --add-endpoint "$host:443:read-write:rest:enforce" \
-    --wait >/dev/null
+# Copilot endpoints, only for binaries under the VS Code server dir
+for host in '*.githubcopilot.com' api.enterprise.githubcopilot.com api.github.com copilot-proxy.githubusercontent.com; do
+  openshell policy update "$NAME" --rule-name copilot --binary '/sandbox/.vscode-server/**' \
+    --add-endpoint "$host:443:read-write:rest:enforce" --wait >/dev/null
 done
 
-openshell sandbox ssh-config "$SANDBOX" > "$SSH_CONFIG"
-SSH_HOST="$(awk '/^Host /{print $2; exit}' "$SSH_CONFIG")"
-remote() { ssh -F "$SSH_CONFIG" "$SSH_HOST" "$1"; }
+CONFIG="$HOME/.ssh/openshell-$NAME.conf"
+openshell sandbox ssh-config "$NAME" > "$CONFIG"
+HOST=$(awk '/^Host /{print $2; exit}' "$CONFIG")
 
-step "Checks"
-expect     ssh-non-root           [ "$(remote 'id -u')" != 0 ]
-expect_not curl-to-copilot-denied remote 'curl -s -m 5 https://api.githubcopilot.com >/dev/null'
-expect_not server-download-denied remote 'curl -s -m 5 https://update.code.visualstudio.com >/dev/null'
-expect     pty-works              contains "$(remote 'python3 -c "import pty; pid, fd = pty.fork(); print(1) if pid else None"')" 1
+echo "== Checks"
+if [ "$(ssh -F "$CONFIG" "$HOST" id -u)" != 0 ]; then pass "ssh non-root"; else fail "ssh non-root"; fi
 
-echo
-echo "Host:   $SSH_HOST"
-echo "Config: $SSH_CONFIG"
-exit $RC
+if ssh -F "$CONFIG" "$HOST" 'curl -s -m 5 https://api.githubcopilot.com >/dev/null'; then
+  fail "curl to copilot denied"
+else
+  pass "curl to copilot denied"
+fi
+
+if ssh -F "$CONFIG" "$HOST" 'curl -s -m 5 https://update.code.visualstudio.com >/dev/null'; then
+  fail "server download denied"
+else
+  pass "server download denied"
+fi
+
+if ssh -F "$CONFIG" "$HOST" 'python3 -c "import pty; pid, fd = pty.fork(); print(1) if pid else None"' | grep -q 1; then
+  pass "pty works"
+else
+  fail "pty works"
+fi
+
+echo "Host:   $HOST"
+echo "Config: $CONFIG"
+exit $rc
