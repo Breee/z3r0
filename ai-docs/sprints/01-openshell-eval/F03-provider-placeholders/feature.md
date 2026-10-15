@@ -1,5 +1,5 @@
 # F03 — Provider placeholder credentials
-Status: doing
+Status: done
 Description: Check that OpenShell providers inject placeholder creds and substitute real ones only at the supervisor (arch §8, Phase 0 item 4).
 Goal: Agent can call a test API (e.g. GitLab) without ever seeing the real token.
 Plan:
