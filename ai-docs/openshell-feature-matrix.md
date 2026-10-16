@@ -32,3 +32,24 @@ Every OpenShell feature Z3R0 relies on (arch Appendix A), with test status.
 | `sandbox upload` / `sandbox download` | used | C03, C10, C20, C21 |
 | cgroup limits (CPU/mem/pids) | tested | P08: host safe, sandbox dies |
 | Disk quota | not tested | C22, no quota found |
+
+## Gap evaluation (2026-10-16) — do we know enough about OpenShell?
+
+Checked against arch Appendix A and the Phase 2 loop (code → test → container build → push).
+
+| Appendix A assumption | Known? | Blocks Phase 2? | Action |
+|---|---|---|---|
+| Supervisor split, Landlock, non-root, seccomp, no caps | yes (F02) | no | — |
+| Network policy + dynamic update | yes (PoC04/05, zero) | no | — |
+| Placeholders + endpoint-bound substitution | yes, with limits C15/C17/C18 | no (F13 mitigates) | — |
+| Supervisor middleware beyond cred substitution | no — only substitution seen | later (Phantom Proxy, Phase 3+) | note in §24, not a Phase 1 blocker |
+| Podman driver | yes | no | — |
+| **MicroVM driver** (arch E3, §6.2, §9.4) | no — docs only (F09 step 4) | yes: arch §9.5 routes hostile Dockerfiles to E3 | **F16** |
+| **Container build inside sandbox without host socket** (§9.5, §25 item 8) | no — only "host socket unreachable" proven (F02) | yes: Phase 2 loop needs `container build` | **F18** |
+| Kubernetes driver | no | no (Phase 3) | — |
+| OCSF events | no | no (Phase 2 item 11, own feature) | — |
+| Advisor/Prover, rule approve | no | no (optional §24.11) | — |
+
+Hard fact for F18: the sandbox blocks user namespaces (`tests/containment/probe.sh` `priv:unshare-user`), has no caps and `no_new_privs`. Rootless buildah/podman/BuildKit all need userns → a Dockerfile build cannot run in the E1 Podman sandbox. Either the builder needs no namespaces (ko/apko-style, Go only) or the build runs in E3 where VM-root is fine. F18 tests both; F16 is a prerequisite for the second.
+
+Verdict: Phase 1 is **not** complete until F16 + F18 have a PoC result. Everything else in Appendix A is either proven or explicitly deferred to a later phase.
