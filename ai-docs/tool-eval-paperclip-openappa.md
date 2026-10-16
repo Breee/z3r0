@@ -21,9 +21,11 @@ UX/policy layers on top (D02 logic applies).
 - Execution targets (`packages/adapter-utils/src/execution-target.ts`): `local` and `remote/ssh`; sandbox providers (sandbox-managed-runtime, file-sync, callback-bridge).
 - Cross-run contract: bundle local worktree → remote run dir over ssh, no git remote inside, restore commits back; adapters never push. Same shape as zero (git bundle upload, push only via brokered creds).
 
-Integration path: Paperclip `remote/ssh` target → `openshell sandbox ssh-config` host. Paperclip never holds repo creds; push stays zero's job (F12). Secrets Paperclip injects must be placeholders, not real tokens, or it breaks Z-invariants.
+Plugin system: `@paperclipai/plugin-sdk` (`packages/plugins/sdk`, spec `doc/plugins/PLUGIN_SPEC.md`, docs.paperclip.ing/administration/plugins/). JSON manifest + worker `definePlugin({ setup(ctx) })`; hooks: UI slots, events, jobs, tools, actions, local folders, DB namespace, agent sessions, and **sandbox providers** (`packages/plugins/sandbox-providers`, reference `paperclip-plugin-fake-sandbox`).
 
-Benefit: approvals, budgets, audit UI, multi-agent without writing it ourselves.
+Integration path: `paperclip-plugin-zero` sandbox provider → `zero up` / ssh-config exec / bundle sync / teardown. No fork. Fallback: Paperclip `remote/ssh` target → `openshell sandbox ssh-config` host. Paperclip never holds repo creds; push stays zero's job (F12). Secrets Paperclip injects must be placeholders, not real tokens, or it breaks Z-invariants.
+
+Benefit: approvals, budgets, audit UI, multi-agent without writing it ourselves. Candidate for zero's operator UI instead of building one (user, 2026-10-16).
 Cost: Postgres + Node service, trust in its secret handling, one more identity to bind to sessions (§22).
 
 ## OpenAPPA
@@ -39,5 +41,5 @@ Cost: unstable API, policy authoring, no proof yet that it survives a hostile ag
 
 ## Follow-ups
 
-- Phase 2 backlog: PoC "paperclip ssh target → openshell sandbox" (one task end-to-end, no real creds).
+- Phase 2 backlog: PoC `paperclip-plugin-zero` sandbox provider (one task end-to-end, no real creds); UI candidate.
 - Advisor/Prover work: PoC "openappa in dev image, tamper test: agent tries to remove plugin".
