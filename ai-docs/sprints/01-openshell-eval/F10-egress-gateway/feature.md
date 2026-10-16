@@ -1,5 +1,5 @@
 # F10 — Own egress/LLM gateway (foreign-key mitigation)
-Status: deferred (noted, not deployed this sprint)
+Status: deferred → superseded by F13 (sprint 03)
 Description: Sandbox may only reach our gateway for LLM/API traffic; gateway strips client auth and injects ours. Closes C18 until OpenShell supports it (ai-docs/upstream/openshell-foreign-credential-passthrough.md).
 Goal: Attacker key sent from sandbox never reaches upstream.
 Options (both valid, pick in F06):

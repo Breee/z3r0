@@ -16,4 +16,4 @@ Order: F02 → F07 → F08 → F03 → F09 → F10 → F04 → F05 → F06 (secu
 | F07 | Attack-vector catalog (arch + common + creative) | done |
 | F08 | Common + creative attack suite | done |
 | F09 | Host compromise blast radius + hardening | done |
-| F10 | Own egress/LLM gateway: strip foreign keys (C18) | moved to Sprint 02 (F13) |
+| F10 | Own egress/LLM gateway: strip foreign keys (C18) | moved to Sprint 03 (F13) |

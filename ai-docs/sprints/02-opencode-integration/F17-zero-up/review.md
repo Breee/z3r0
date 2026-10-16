@@ -45,3 +45,18 @@ ls /tmp/z3r0-demo            # host unchanged
 $Z rm
 ```
 Expected: VS Code terminal works (pty); Copilot edit visible to OpenCode in same sandbox; tests ok; host has no Goodbye.
+
+## Step 4: Go rewrite
+```sh
+go build ./... && go vet ./... && go test ./...
+Z=scripts/zero
+$Z status                                   # sandbox none / forward off
+$Z up                                       # zero-<repo> ready: http://127.0.0.1:<port> dir /sandbox/<repo>
+$Z status                                   # sandbox up / forward <url> / serve running
+$Z logs | tail -3                           # opencode server listening
+openshell sandbox exec zero-z3r0 -- sh -c 'tr "\0" " " </proc/$(pgrep -f "opencode serve")/cmdline' | grep -c "$(cat ~/.local/state/zero/zero-z3r0/password)"   # 0
+$Z up & $Z up; wait                         # one prints "another zero command is running", exit 1
+$Z stop && $Z status                        # forward off, serve running
+$Z up                                       # same port reused
+```
+Expected: as commented; no password in serve argv; lock rejects concurrent run.

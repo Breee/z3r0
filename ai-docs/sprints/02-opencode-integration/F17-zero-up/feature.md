@@ -16,3 +16,4 @@ Log:
 - 2026-10-09: step 3 fix: connect --editor + code --folder-uri opened 2 windows → "Timed out waiting for local startup lock"; now write ssh entry to ~/.config/openshell/ssh_config (included by ~/.ssh/config) and open one window.
 - 2026-10-09: step 3 verified by user: one VS Code window on /sandbox/<repo>, Copilot + OpenCode share sandbox. DONE.
 - 2026-10-10: CLI renamed z3r0 → zero (scripts/zero; sandbox prefix zero-, state ~/.local/state/zero).
+- 2026-10-15: step 4 zero rewritten in Go (D12): flock on state dir, real error propagation, password via ssh stdin, forward pid verified against /proc cmdline, `zero logs`. Verified up/status/logs/stop/re-up/concurrent-lock; code/rm not re-run (C31).
