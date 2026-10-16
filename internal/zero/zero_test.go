@@ -33,7 +33,7 @@ func TestShellQuote(t *testing.T) {
 	cases := map[string]string{
 		"simple": "'simple'",
 		"it's":   `'it'\''s'`,
-		"/sandbox/My Repo": `'/sandbox/My Repo'`,
+		"/tmp/zero/My Repo": `'/tmp/zero/My Repo'`,
 	}
 	for in, want := range cases {
 		if got := shellQuote(in); got != want {

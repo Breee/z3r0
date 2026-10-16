@@ -139,10 +139,10 @@ func (s *Sandbox) ensureCheckout() error {
 		return fmt.Errorf("git bundle: %w", err)
 	}
 	defer os.Remove(bundle)
-	if _, err := sh("openshell", "sandbox", "upload", s.Name, bundle, "/sandbox/.zero.bundle"); err != nil {
+	if _, err := sh("openshell", "sandbox", "upload", s.Name, bundle, "/tmp/.zero.bundle"); err != nil {
 		return fmt.Errorf("upload bundle: %w", err)
 	}
-	script := "git clone -q /sandbox/.zero.bundle " + shellQuote(s.Dir) + " && rm -f /sandbox/.zero.bundle"
+	script := "mkdir -p /tmp/zero && git clone -q /tmp/.zero.bundle " + shellQuote(s.Dir) + " && rm -f /tmp/.zero.bundle"
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("clone in sandbox: %w", err)
 	}
@@ -296,7 +296,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 		for _, ep := range copilotEndpoints {
 			if _, err := sh("openshell", "policy", "update", s.Name,
 				"--rule-name", "copilot",
-				"--binary", "/sandbox/.vscode-server/**",
+				"--binary", "/go/.vscode-server/**",
 				"--add-endpoint", ep+":443:read-write:rest:enforce",
 				"--wait"); err != nil {
 				return fmt.Errorf("copilot policy (%s): %w", ep, err)

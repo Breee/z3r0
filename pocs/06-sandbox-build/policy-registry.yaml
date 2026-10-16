@@ -1,0 +1,44 @@
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /bin
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /etc
+    - /var/log
+  read_write:
+    - /tmp
+    - /dev/null
+    - /dev/pts
+    - /dev/ptmx
+landlock:
+  compatibility: best_effort
+network_policies:
+  zen:
+    binaries:
+      - path: /usr/local/bin/opencode
+    endpoints:
+      - host: opencode.ai
+        port: 443
+        protocol: rest
+        access: read-write
+        enforcement: enforce
+    name: zen
+  registry:
+    binaries:
+      - path: /tmp/ko
+    endpoints:
+      - host: cgr.dev
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.r2.cloudflarestorage.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+    name: registry
+version: 1

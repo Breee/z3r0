@@ -51,7 +51,7 @@ func New() (*Sandbox, error) {
 		Name:  name,
 		Repo:  repo,
 		Top:   top,
-		Dir:   "/sandbox/" + repo,
+		Dir:   "/tmp/zero/" + repo,
 		State: filepath.Join(stateRoot(), name),
 		Host:  "openshell-" + name + ".default",
 	}, nil
