@@ -22,7 +22,7 @@ Every OpenShell feature Z3R0 relies on (arch Appendix A), with test status.
 | Foreign-key pass-through (no header matchers) | tested | C18, PoC03 foreign-* FAIL |
 | Synthetic DNS (198.18.0.0/15) | tested | C16 |
 | OCSF runtime/security observability | not tested | arch §18, §25 item 11 → Phase 2; no PoC |
-| Inference routing | not tested | arch §16 (agentgateway, optional); no PoC |
+| Inference routing | not tested | arch §15 (agentgateway, optional); no PoC |
 | Rule approve workflow | not tested | same as Policy advisor row; no PoC |
 | Podman driver (rootless) | used | F01, all PoCs |
 | MicroVM driver | not tested | F16 (sprint 03), phases.md Phase 4 |
