@@ -20,15 +20,14 @@ Tracks run in parallel. Each item becomes a GitHub issue (`track:<name>`).
 
 ## Integrations
 
-Every integration uses the same core command (`zero up`) and only adds the client wiring.
+Focus: **opencode and VS Code only.** Every integration uses the same core command (`zero up`) and only adds the client wiring.
 
 | Client | Status | Next |
 |---|---|---|
 | **opencode** | `zero web` works; `zero attach/run` postponed (opencode #47665) | Re-enable attach/run after upstream fix |
 | **VS Code** | `zero code` (Remote-SSH, Copilot) — not re-tested since Go rewrite | Re-test, one-command open |
-| **Claude Code** | — | Run inside sandbox, attach via terminal |
 | **Paperclip** | Evaluated | `paperclip-plugin-zero` sandbox provider (orchestration + UI) |
-| Others (Codex, Copilot CLI) | — | On demand |
+| Others (Claude Code, Codex, Copilot CLI) | out of scope for now | — |
 
 ## Usability (cross-cutting)
 
@@ -41,6 +40,6 @@ Every integration uses the same core command (`zero up`) and only adds the clien
 ## Order
 
 1. Usability 1–2, F13, F15
-2. Signed image, GitHub forge, VS Code re-test, Claude Code
+2. VS Code re-test + one-command open, signed image, GitHub forge
 3. Paperclip plugin, evidence log
 4. VM driver (when upstream fixed), OpenBao, K8s
