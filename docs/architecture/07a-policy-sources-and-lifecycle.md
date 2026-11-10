@@ -4,7 +4,7 @@ Start small. One file per project, the same shape as §7/§13.1, a fixed small c
 
 ### File
 
-`.zero/policy.yaml` on the default branch:
+`.zero/policy.yaml` in the repo:
 
 ```yaml
 network:
@@ -42,13 +42,13 @@ gitlab.com and the model endpoint are always allowed (zero needs them). Which br
 
 ### Trust
 
-The agent can edit any file in its sandbox and branches, so zero reads `.zero/policy.yaml` **on the host from the default branch** via the forge API — never from the sandbox or working tree — and stores the commit SHA in sandbox state. Changing the policy = normal MR.
+zero reads `.zero/policy.yaml` from the developer's **host checkout**, never from the sandbox. The sandbox copy is ignored, so the agent cannot change its own policy. Agent changes reach the host only when the developer checks out the agent's branch — the developer's decision, like running any other code from it. zero stores the commit SHA (and a dirty flag) in sandbox state.
 
 ### Lifecycle
 
 - `zero up` (new sandbox): read, compile, create.
-- Policy changed on the default branch: applied on recreate (`zero rm && zero up`).
-- Invalid file or forge API unreachable: refuse, never fall back to broader.
+- Policy changed: applied on recreate (`zero rm && zero up`).
+- Invalid file: refuse, never fall back to broader.
 
 ### Later (not now)
 

@@ -40,7 +40,7 @@ Reference: project `corewire/technology-and-research/developer` has all of the a
 
 ## 3. Project policy `.zero/policy.yaml` (planned, §7a)
 
-On the default branch, read by zero on the host. For this case:
+Read by zero from the host checkout, never from the sandbox. For this case:
 
 ```yaml
 network:
