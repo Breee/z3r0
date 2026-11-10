@@ -217,7 +217,7 @@ func (s *Sandbox) Attach(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return passthrough("opencode", "attach", s.url(port), "-p", pw, "--dir", s.Dir)
+	return passthroughEnv([]string{"OPENCODE_SERVER_PASSWORD=" + pw}, "opencode", "--server", s.url(port), s.Dir)
 }
 
 // Run is up (silent) + a one-shot opencode run.
@@ -230,8 +230,8 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 	if err != nil {
 		return err
 	}
-	args := append([]string{"run", "--attach", s.url(port), "-p", pw, "--dir", s.Dir}, prompt...)
-	return passthrough("opencode", args...)
+	args := append([]string{"run", "--server", s.url(port)}, prompt...)
+	return passthroughEnv([]string{"OPENCODE_SERVER_PASSWORD=" + pw}, "opencode", args...)
 }
 
 // Status prints sandbox / forward / serve state.

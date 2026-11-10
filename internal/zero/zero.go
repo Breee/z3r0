@@ -219,7 +219,13 @@ func sh(name string, args ...string) (string, error) {
 // passthrough runs a host command attached to the terminal; the underlying
 // ExitError is preserved so main can propagate the child's exit code.
 func passthrough(name string, args ...string) error {
+	return passthroughEnv(nil, name, args...)
+}
+
+// passthroughEnv is passthrough with extra environment (secrets stay out of argv).
+func passthroughEnv(env []string, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%s: %w", name, err)
