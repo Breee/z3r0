@@ -54,7 +54,7 @@ Recorded, not necessarily handled. Scenario: `docs/scenarios/go-container-gitlab
 | P17 | medium | Malicious Go module via allowed `proxy.golang.org` → `go.sum` committed → host or CI build runs it | Code exec in CI / on host (sandbox itself contained) | reasoning | P13 |
 | P18 | medium | Agent-generated content rendered in host browser (`zero web`) or VS Code client (`zero code`): markdown/HTML, workspace settings, extension recommendations | Exec/phishing in host UI process | not tested | X08, F05 |
 | P19 | medium | GitLab MCP tools run with user-scoped `execute_mcp_tool`; some tool may not check the project scope | Read/act on other projects of the user | unverified | ADR 0020 |
-| P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | C34 |
+| P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | ADR 0020 |
 | P21 | low | Sandbox crash or host loss without `zero rm` → token not revoked | Valid token in gateway credential store up to 1 day | by design (expiry) | C35 |
 | P22 | low | Other local host user/process connects to forward port 127.0.0.1:<port> | Needs password (0600 file in state); brute force possible, no rate limit known | not tested | F17 |
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — |
