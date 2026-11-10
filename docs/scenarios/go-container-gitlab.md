@@ -135,7 +135,7 @@ Stop forward → delete sandbox → revoke token (404/401 tolerated) → delete 
 
 ## 11. Evidence (planned, §18)
 
-Per sandbox: policy SHA, rendered policy digest, token id + scope + expiry, every deny, every grant, push events. Today: only OpenShell gateway logs (as user `openshell`) and GitLab's own audit (token name `zero-<repo>`).
+Per sandbox: policy SHA, token id + scope + expiry, every deny, push events. Today: only OpenShell gateway logs (as user `openshell`) and GitLab's own audit (token name `zero-<repo>`).
 
 ## 12. Gaps for this scenario, in order
 
