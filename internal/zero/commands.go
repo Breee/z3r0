@@ -97,7 +97,7 @@ func (s *Sandbox) create() error {
 		}
 	}
 	args := []string{"sandbox", "create", "--name", s.Name, "--from", image(), "--policy", policy, "--detach"}
-	prov, err := s.setupGitLab()
+	prov, err := s.setupForge()
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (s *Sandbox) ensureCheckout() error {
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("clone in sandbox: %w", err)
 	}
-	return s.configureGitLabRemote()
+	return s.configureRemote()
 }
 
 func (s *Sandbox) serveRunning() (bool, error) {
@@ -287,7 +287,7 @@ func (s *Sandbox) Rm(out io.Writer) error {
 			return fmt.Errorf("delete sandbox (state kept for retry): %w", err)
 		}
 	}
-	if err := s.revokeGitLab(); err != nil {
+	if err := s.revokeForge(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	if err := os.RemoveAll(s.State); err != nil {

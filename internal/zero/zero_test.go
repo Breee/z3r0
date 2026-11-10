@@ -57,7 +57,7 @@ func TestForwardCmdlineMatch(t *testing.T) {
 	}
 }
 
-func TestGitlabPath(t *testing.T) {
+func TestForgeFor(t *testing.T) {
 	for in, want := range map[string]string{
 		"git@gitlab.com:corewire/technology-and-research/developer.git": "corewire/technology-and-research/developer",
 		"https://gitlab.com/a/b.git":                                    "a/b",
@@ -65,8 +65,9 @@ func TestGitlabPath(t *testing.T) {
 		"ssh://git@gitlab.com/a/b.git":                                  "a/b",
 		"git@github.com:Breee/z3r0.git":                                 "",
 	} {
-		if got := gitlabPath(in); got != want {
-			t.Errorf("gitlabPath(%q) = %q, want %q", in, got, want)
+		f, got := forgeFor(in)
+		if got != want || (want != "" && f.Name() != "gitlab") || (want == "" && f != nil) {
+			t.Errorf("forgeFor(%q) = %v %q, want gitlab %q", in, f, got, want)
 		}
 	}
 }
