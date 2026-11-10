@@ -105,4 +105,7 @@ install -d -o "$LU" -g "$LU" -m 700 "$M"
 install -o "$LU" -g "$LU" -m 600 "$S/ca.crt" "$M/ca.crt"
 install -o "$LU" -g "$LU" -m 600 "$S/client/tls.crt" "$M/tls.crt"
 install -o "$LU" -g "$LU" -m 600 "$S/client/tls.key" "$M/tls.key"
+i=0; until sudo -u "$LU" openshell gateway info >/dev/null 2>&1; do
+  i=$((i+1)); [ $i -lt 30 ] || { echo "zero install: gateway not reachable" >&2; exit 1; }; sleep 1
+done
 echo "zero install: done (gateway as $OU, OpenShell $VER). Next: zero doctor"
