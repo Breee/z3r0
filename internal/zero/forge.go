@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -82,31 +81,14 @@ func (s *Sandbox) setupForge() (string, error) {
 		}
 	}
 	prov := s.forgeProvider(f)
-	sh("openshell", "provider", "delete", prov)
-	// The token goes in via env lookup, never in argv.
-	cmd := exec.Command("openshell", "provider", "create", "--name", prov,
-		"--type", "zero-"+f.Name(), "--credential", f.TokenEnv())
-	cmd.Env = append(os.Environ(), f.TokenEnv()+"="+tok)
-	if b, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("provider create: %v: %s", err, strings.TrimSpace(string(b)))
+	if err := rt.BindCredential(prov, "zero-"+f.Name(), f.TokenEnv(), tok); err != nil {
+		return "", err
 	}
 	return prov, nil
 }
 
 func importProfile(f Forge) error {
-	tmp, err := os.CreateTemp("", "zero-"+f.Name()+"-*.yaml")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(f.Profile()); err != nil {
-		return err
-	}
-	tmp.Close()
-	// An existing profile is kept; after editing a profile run
-	// `openshell profile delete zero-<forge>` once.
-	if _, err := sh("openshell", "profile", "import", "-f", tmp.Name()); err != nil &&
-		!strings.Contains(err.Error(), "already exists") {
+	if err := rt.ImportCredentialType("zero-"+f.Name(), f.Profile()); err != nil {
 		return fmt.Errorf("import %s profile: %w", f.Name(), err)
 	}
 	return nil
@@ -121,7 +103,7 @@ func (s *Sandbox) revokeForge() error {
 	if err := f.Revoke(id); err != nil {
 		return fmt.Errorf("revoke %s token %s: %w", f.Name(), id, err)
 	}
-	sh("openshell", "provider", "delete", s.forgeProvider(f))
+	rt.UnbindCredential(s.forgeProvider(f))
 	os.Remove(s.path("forge.id"))
 	return nil
 }

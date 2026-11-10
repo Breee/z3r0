@@ -96,15 +96,15 @@ func (s *Sandbox) create() error {
 			return fmt.Errorf("write embedded policy: %w", err)
 		}
 	}
-	args := []string{"sandbox", "create", "--name", s.Name, "--from", image(), "--policy", policy, "--detach"}
+	var creds []string
 	prov, err := s.setupForge()
 	if err != nil {
 		return err
 	}
 	if prov != "" {
-		args = append(args, "--provider", prov)
+		creds = append(creds, prov)
 	}
-	if _, err := sh("openshell", args...); err != nil {
+	if err := rt.Create(s.Name, image(), policy, creds); err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
 	}
 	return nil
@@ -117,20 +117,14 @@ const opencodeBin = "/usr/local/libexec/opencode/node_modules/@opencode/cli/bin/
 // applyZenPolicy allows opencode inside the sandbox to reach its API. Runs
 // until the zen.done marker exists, so a failed attempt is retried.
 func (s *Sandbox) applyZenPolicy() error {
-	for _, ep := range []string{"opencode.ai", "models.opencode.ai"} {
-		if _, err := sh("openshell", "policy", "update", s.Name,
-			"--rule-name", "zen",
-			"--binary", opencodeBin,
-			"--add-endpoint", ep+":443:read-write:rest:enforce",
-			"--wait"); err != nil {
-			return fmt.Errorf("apply opencode policy (%s): %w", ep, err)
-		}
+	if err := rt.AllowEgress(s.Name, "zen", opencodeBin, []string{"opencode.ai", "models.opencode.ai"}); err != nil {
+		return fmt.Errorf("apply opencode policy: %w", err)
 	}
 	return nil
 }
 
 func (s *Sandbox) writeSSHConfig() error {
-	conf, err := sh("openshell", "sandbox", "ssh-config", s.Name)
+	conf, err := rt.SSHConfig(s.Name)
 	if err != nil {
 		return fmt.Errorf("ssh config: %w", err)
 	}
@@ -152,7 +146,7 @@ func (s *Sandbox) ensureCheckout() error {
 		return fmt.Errorf("git bundle: %w", err)
 	}
 	defer os.Remove(bundle)
-	if _, err := sh("openshell", "sandbox", "upload", s.Name, bundle, "/tmp/.zero.bundle"); err != nil {
+	if err := rt.Upload(s.Name, bundle, "/tmp/.zero.bundle"); err != nil {
 		return fmt.Errorf("upload bundle: %w", err)
 	}
 	script := "mkdir -p /tmp/zero && git clone -q /tmp/.zero.bundle " + shellQuote(s.Dir) + " && rm -f /tmp/.zero.bundle"
@@ -299,7 +293,7 @@ func (s *Sandbox) Rm(out io.Writer) error {
 		return err
 	}
 	if s.exists() {
-		if _, err := sh("openshell", "sandbox", "delete", s.Name); err != nil {
+		if err := rt.Delete(s.Name); err != nil {
 			return fmt.Errorf("delete sandbox (state kept for retry): %w", err)
 		}
 	}
@@ -319,14 +313,8 @@ func (s *Sandbox) Code(out io.Writer) error {
 		return err
 	}
 	if !fileExists(s.path("copilot.done")) {
-		for _, ep := range copilotEndpoints {
-			if _, err := sh("openshell", "policy", "update", s.Name,
-				"--rule-name", "copilot",
-				"--binary", "/go/.vscode-server/**",
-				"--add-endpoint", ep+":443:read-write:rest:enforce",
-				"--wait"); err != nil {
-				return fmt.Errorf("copilot policy (%s): %w", ep, err)
-			}
+		if err := rt.AllowEgress(s.Name, "copilot", "/go/.vscode-server/**", copilotEndpoints); err != nil {
+			return fmt.Errorf("copilot policy: %w", err)
 		}
 		if err := s.write("copilot.done", "1", 0o600); err != nil {
 			return err

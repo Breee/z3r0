@@ -53,7 +53,7 @@ func New() (*Sandbox, error) {
 		Top:   top,
 		Dir:   "/tmp/zero/" + repo,
 		State: filepath.Join(stateRoot(), name),
-		Host:  "openshell-" + name + ".default",
+		Host:  rt.HostAlias(name),
 	}, nil
 }
 
@@ -191,8 +191,7 @@ func portFree(p int) bool {
 }
 
 func (s *Sandbox) exists() bool {
-	_, err := sh("openshell", "sandbox", "get", s.Name)
-	return err == nil
+	return rt.Exists(s.Name)
 }
 
 // ssh runs a script on the sandbox via the generated ssh config.
