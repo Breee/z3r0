@@ -59,6 +59,7 @@ func (s *Sandbox) startForward(port int) error {
 	spec := fmt.Sprintf("127.0.0.1:%d:127.0.0.1:%d", port, servePort)
 	cmd := exec.Command("ssh", "-F", s.path("ssh.conf"), "-N",
 		"-o", "ExitOnForwardFailure=yes", "-L", spec, s.Host)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start forward: %w", err)
 	}
