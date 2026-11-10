@@ -23,6 +23,7 @@ Usage (inside a git repo): zero <command>
   stop          end the host port forward (sandbox keeps running)
   logs [-f]     serve.log from inside the sandbox
   rm            stop + delete sandbox (work not pushed is lost)
+  install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
 `
 
@@ -35,6 +36,11 @@ func main() {
 	switch cmd {
 	case "-h", "--help", "help":
 		fmt.Print(usageText)
+		return
+	case "install":
+		if err := zero.Install(); err != nil {
+			fatal(err)
+		}
 		return
 	case "doctor":
 		if err := zero.Doctor(os.Stdout); err != nil {
