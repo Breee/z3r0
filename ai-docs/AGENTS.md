@@ -19,6 +19,8 @@ ai-docs/
 
 ## Rules
 
+- HARD RULE: never hack around bugs, design flaws or security-relevant limits. Record caveat + bug report in `upstream/`, ask the user. See `../AGENTS.md`.
+
 - Work in sprints. One sprint = one directory. One feature = one directory.
 - Keep everything short. No fluff. Bullets over prose.
 - Update feature `Status` + `Log` on every meaningful change.
