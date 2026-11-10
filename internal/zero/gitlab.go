@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -14,12 +15,16 @@ import (
 //go:embed gitlab-profile.yaml
 var gitlabProfileYAML []byte
 
-// gitlabPermissions is the fine-grained scope of the per-sandbox token (D20):
-// clone, push branches, open MRs, read pipelines and job logs. MCP tool
-// execution is user-scoped; each tool still checks the project scope.
-var gitlabPermissions = []string{
-	"read_project", "read_code", "download_code", "push_code", "create_branch",
-	"create_merge_request", "read_merge_request", "read_job", "read_pipeline",
+// gitlabCaps maps policy capabilities to fine-grained token permissions
+// (D20, docs/architecture/07a). git.commit is local only.
+var gitlabCaps = map[string][]string{
+	"git.read":             {"read_project", "read_code", "download_code"},
+	"git.commit":           {},
+	"git.push":             {"push_code", "create_branch"},
+	"gitlab.issue.read":    {"read_work_item"},
+	"gitlab.mr.read":       {"read_merge_request"},
+	"gitlab.mr.create":     {"create_merge_request"},
+	"gitlab.pipeline.read": {"read_pipeline", "read_job"},
 }
 
 var gitlabRemoteRe = regexp.MustCompile(`^(?:git@gitlab\.com:|ssh://git@gitlab\.com/|https://(?:[^@/]+@)?gitlab\.com/)(.+?)(?:\.git)?/?$`)
@@ -42,7 +47,23 @@ func (gitlab) Match(remote string) (string, bool) {
 	return m[1], true
 }
 
-func (gitlab) Mint(label, path string) (string, string, error) {
+func (gitlab) Permissions(caps []string) ([]string, error) {
+	perms := []string{"read_project"}
+	for _, c := range caps {
+		p, ok := gitlabCaps[c]
+		if !ok {
+			return nil, fmt.Errorf("unknown capability %q for gitlab", c)
+		}
+		for _, x := range p {
+			if !slices.Contains(perms, x) {
+				perms = append(perms, x)
+			}
+		}
+	}
+	return perms, nil
+}
+
+func (gitlab) Mint(label, path string, perms []string) (string, string, error) {
 	out, err := sh("glab", "api", "projects/"+url.PathEscape(path))
 	if err != nil {
 		return "", "", fmt.Errorf("project %s: %w", path, err)
@@ -56,7 +77,7 @@ func (gitlab) Mint(label, path string) (string, string, error) {
 		"expires_at": time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02"),
 		"granular_scopes": []map[string]any{{
 			"access":      "selected_memberships",
-			"permissions": gitlabPermissions,
+			"permissions": perms,
 			"project_ids": []int64{proj.ID},
 		}, {
 			"access":      "user",
@@ -68,7 +89,12 @@ func (gitlab) Mint(label, path string) (string, string, error) {
 	cmd.Stdin = strings.NewReader(string(body))
 	b, err := cmd.Output()
 	if err != nil {
-		return "", "", fmt.Errorf("mint token: %w", err)
+		// %v, not %w: a wrapped ExitError would make main exit silently.
+		var stderr []byte
+		if ee, ok := err.(*exec.ExitError); ok {
+			stderr = ee.Stderr
+		}
+		return "", "", fmt.Errorf("mint token (permissions %v): %v: %s", perms, err, strings.TrimSpace(string(stderr)))
 	}
 	var r struct {
 		ID    int64

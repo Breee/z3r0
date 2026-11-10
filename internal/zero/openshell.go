@@ -42,12 +42,12 @@ func (openshell) Upload(name, src, dst string) error {
 	return err
 }
 
-func (openshell) AllowEgress(name, rule, binary string, hosts []string) error {
+func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) error {
 	for _, h := range hosts {
 		if _, err := sh("openshell", "policy", "update", name,
 			"--rule-name", rule,
 			"--binary", binary,
-			"--add-endpoint", h+":443:read-write:rest:enforce",
+			"--add-endpoint", h+":443:"+access+":rest:enforce",
 			"--wait"); err != nil {
 			return fmt.Errorf("%s: %w", h, err)
 		}

@@ -25,8 +25,11 @@ type Forge interface {
 	TokenEnv() string
 	// GitUser is the https username git sends with the token.
 	GitUser() string
+	// Permissions maps policy capabilities to token permissions; unknown
+	// capabilities are an error.
+	Permissions(caps []string) ([]string, error)
 	// Mint creates a short-lived token scoped to path; id is used to revoke.
-	Mint(label, path string) (token, id string, err error)
+	Mint(label, path string, perms []string) (token, id string, err error)
 	// Revoke revokes a token by id; an expired or revoked token is not an error.
 	Revoke(id string) error
 	// MCP is the forge's remote MCP endpoint, or "" if it has none. The agent
@@ -61,7 +64,7 @@ func (s *Sandbox) forgeProvider(f Forge) string { return s.Name + "-" + f.Name()
 
 // setupForge mints a token for origin's forge and stores it as an OpenShell
 // provider. It returns the provider name, or "" when origin is on no known forge.
-func (s *Sandbox) setupForge() (string, error) {
+func (s *Sandbox) setupForge(caps []string) (string, error) {
 	origin, _ := sh("git", "-C", s.Top, "remote", "get-url", "origin")
 	f, path := forgeFor(origin)
 	if f == nil {
@@ -74,7 +77,11 @@ func (s *Sandbox) setupForge() (string, error) {
 	if err := s.revokeForge(); err != nil {
 		return "", err
 	}
-	tok, id, err := f.Mint(s.Name, path)
+	perms, err := f.Permissions(caps)
+	if err != nil {
+		return "", err
+	}
+	tok, id, err := f.Mint(s.Name, path, perms)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", f.Name(), err)
 	}

@@ -13,8 +13,9 @@ type Runtime interface {
 	SSHConfig(name string) (string, error)
 	HostAlias(name string) string
 	Upload(name, src, dst string) error
-	// AllowEgress lets binary reach host:443 (REST, enforced) under rule.
-	AllowEgress(name, rule, binary string, hosts []string) error
+	// AllowEgress lets binary reach host:443 (REST, enforced) under rule;
+	// access is read-only or read-write.
+	AllowEgress(name, rule, binary, access string, hosts []string) error
 	// ImportCredentialType registers how a credential is bound (endpoints,
 	// header, binaries). An existing type is kept.
 	ImportCredentialType(id string, spec []byte) error

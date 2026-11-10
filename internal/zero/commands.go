@@ -96,8 +96,12 @@ func (s *Sandbox) create() error {
 			return fmt.Errorf("write embedded policy: %w", err)
 		}
 	}
+	pol, err := s.loadPolicy()
+	if err != nil {
+		return err
+	}
 	var creds []string
-	prov, err := s.setupForge()
+	prov, err := s.setupForge(pol.Capabilities)
 	if err != nil {
 		return err
 	}
@@ -107,7 +111,10 @@ func (s *Sandbox) create() error {
 	if err := rt.Create(s.Name, image(), policy, creds); err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
 	}
-	return nil
+	if err := s.applyProjectPolicy(pol); err != nil {
+		return err
+	}
+	return s.recordPolicy()
 }
 
 // opencodeBin is the real executable; /usr/local/bin/opencode is a symlink and
@@ -117,7 +124,7 @@ const opencodeBin = "/usr/local/libexec/opencode/node_modules/@opencode/cli/bin/
 // applyZenPolicy allows opencode inside the sandbox to reach its API. Runs
 // until the zen.done marker exists, so a failed attempt is retried.
 func (s *Sandbox) applyZenPolicy() error {
-	if err := rt.AllowEgress(s.Name, "zen", opencodeBin, []string{"opencode.ai", "models.opencode.ai"}); err != nil {
+	if err := rt.AllowEgress(s.Name, "zen", opencodeBin, "read-write", []string{"opencode.ai", "models.opencode.ai"}); err != nil {
 		return fmt.Errorf("apply opencode policy: %w", err)
 	}
 	return nil
@@ -313,7 +320,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 		return err
 	}
 	if !fileExists(s.path("copilot.done")) {
-		if err := rt.AllowEgress(s.Name, "copilot", "/go/.vscode-server/**", copilotEndpoints); err != nil {
+		if err := rt.AllowEgress(s.Name, "copilot", "/go/.vscode-server/**", "read-write", copilotEndpoints); err != nil {
 			return fmt.Errorf("copilot policy: %w", err)
 		}
 		if err := s.write("copilot.done", "1", 0o600); err != nil {

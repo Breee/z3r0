@@ -1,5 +1,7 @@
 ## 7a. Project policy: source and lifecycle
 
+Status: implemented (`internal/zero/policy.go`). Hosts are read-only egress for any sandbox binary; zero records `HEAD` SHA + dirty flag in state `policy.sha`. Not yet: approval prompt when a policy widens.
+
 Start small. One file per project, the same shape as §7/§13.1, a fixed small capability set. No layers, bundles or live grants yet.
 
 ### File
@@ -31,7 +33,7 @@ No file → this default (§13.1 without containers). Unknown keys or capabiliti
 | `git.read` | `read_project read_code download_code` |
 | `git.commit` | local only (see C42: committed hooks run on host after checkout) |
 | `git.push` | `push_code create_branch` |
-| `gitlab.issue.read` | `read_issue` (name unverified) |
+| `gitlab.issue.read` | `read_work_item` |
 | `gitlab.mr.read` | `read_merge_request` |
 | `gitlab.mr.create` | `create_merge_request` |
 | `gitlab.pipeline.read` | `read_pipeline read_job` |

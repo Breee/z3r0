@@ -71,3 +71,18 @@ func TestForgeFor(t *testing.T) {
 		}
 	}
 }
+
+func TestParsePolicy(t *testing.T) {
+	p, err := parsePolicy([]byte("network:\n  allow: [proxy.golang.org]\ncapabilities: [git.read]\n"))
+	if err != nil || p.Network.Allow[0] != "proxy.golang.org" || p.Capabilities[0] != "git.read" {
+		t.Fatalf("got %+v %v", p, err)
+	}
+	for _, bad := range []string{"bogus: 1\n", "network:\n  allow: [\"evil.com:22\"]\n", "network:\n  allow: [\"*\"]\n"} {
+		if _, err := parsePolicy([]byte(bad)); err == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+	if _, err := (gitlab{}).Permissions([]string{"container.build"}); err == nil {
+		t.Error("unknown capability accepted")
+	}
+}
