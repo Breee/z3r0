@@ -137,6 +137,11 @@ func (s *Sandbox) configureRemote() error {
 	script := "cd " + shellQuote(s.Dir) + " && " +
 		"git remote set-url origin " + shellQuote("https://"+f.Host()+"/"+path+".git") + " && " +
 		"git config credential.helper " + shellQuote(helper)
+	for _, k := range []string{"user.name", "user.email"} {
+		if v, err := sh("git", "-C", s.Top, "config", k); err == nil && strings.TrimSpace(v) != "" {
+			script += " && git config " + k + " " + shellQuote(strings.TrimSpace(v))
+		}
+	}
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("configure %s remote: %w", f.Name(), err)
 	}

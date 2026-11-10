@@ -1,5 +1,5 @@
 # F16 — MicroVM driver trial
-Status: todo
+Status: blocked (C32, upstream #4014)
 Description: Run sandboxes under `compute_driver = "vm"` (libkrun, ships in 0.1.2) for kernel isolation (arch E3; P03, P09, C13, C24).
 Goal: Same PoCs pass under the VM driver; startup/memory cost known; guest has no NIC (all egress via supervisor).
 Plan:
@@ -12,3 +12,4 @@ DONE: comparison table in notes.md; gateway.toml snippet in review.md; feature m
 GOOD: startup < 5s, mem overhead < 512 MiB idle; C22 disk quota closed.
 Proof: steps 2–3 scripts unchanged, VM driver active, pass table ≥ podman.
 Log:
+- 2026-11-10: Re-tested on 0.1.4 (vm06 alpine): same #4014 failure. Comment drafted: upstream/openshell-vm-proc-status.md. Steps 2–5 blocked; F18 step 3 blocked with it.
