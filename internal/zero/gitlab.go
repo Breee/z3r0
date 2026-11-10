@@ -15,7 +15,8 @@ import (
 var gitlabProfileYAML []byte
 
 // gitlabPermissions is the fine-grained scope of the per-sandbox token (D20):
-// clone, push branches, open MRs, read pipelines and job logs.
+// clone, push branches, open MRs, read pipelines and job logs. MCP tool
+// execution is user-scoped; each tool still checks the project scope.
 var gitlabPermissions = []string{
 	"read_project", "read_code", "download_code", "push_code", "create_branch",
 	"create_merge_request", "read_merge_request", "read_job", "read_pipeline",
@@ -31,6 +32,7 @@ func (gitlab) Host() string     { return "gitlab.com" }
 func (gitlab) Profile() []byte  { return gitlabProfileYAML }
 func (gitlab) TokenEnv() string { return "GITLAB_TOKEN" }
 func (gitlab) GitUser() string  { return "oauth2" }
+func (gitlab) MCP() string      { return "https://gitlab.com/api/v4/mcp" }
 
 func (gitlab) Match(remote string) (string, bool) {
 	m := gitlabRemoteRe.FindStringSubmatch(remote)
@@ -56,6 +58,9 @@ func (gitlab) Mint(label, path string) (string, string, error) {
 			"access":      "selected_memberships",
 			"permissions": gitlabPermissions,
 			"project_ids": []int64{proj.ID},
+		}, {
+			"access":      "user",
+			"permissions": []string{"execute_mcp_tool"},
 		}},
 	})
 	cmd := exec.Command("glab", "api", "-X", "POST", "/user/personal_access_tokens",

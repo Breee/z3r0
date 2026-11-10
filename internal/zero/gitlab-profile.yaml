@@ -1,6 +1,6 @@
 # Provider profile for the per-sandbox GitLab token (D20). The sandbox only
 # sees a placeholder in GITLAB_TOKEN; the proxy swaps in the real token on
-# gitlab.com requests from git and curl.
+# gitlab.com requests from git, curl, glab and opencode (GitLab MCP).
 id: zero-gitlab
 display_name: zero GitLab
 description: Per-sandbox fine-grained GitLab token
@@ -18,4 +18,4 @@ endpoints:
     protocol: rest
     access: read-write
     enforcement: enforce
-binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl]
+binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl, /usr/local/bin/glab, /usr/local/bin/opencode]

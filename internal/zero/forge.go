@@ -1,6 +1,7 @@
 package zero
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,6 +30,9 @@ type Forge interface {
 	Mint(label, path string) (token, id string, err error)
 	// Revoke revokes a token by id; an expired or revoked token is not an error.
 	Revoke(id string) error
+	// MCP is the forge's remote MCP endpoint, or "" if it has none. The agent
+	// reaches it with "Authorization: Bearer <token placeholder>".
+	MCP() string
 }
 
 var forges = []Forge{gitlab{}}
@@ -135,6 +139,26 @@ func (s *Sandbox) configureRemote() error {
 		"git config credential.helper " + shellQuote(helper)
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("configure %s remote: %w", f.Name(), err)
+	}
+	return s.configureMCP(f)
+}
+
+// configureMCP registers the forge MCP server in the sandbox's global opencode
+// config. The header holds the placeholder; opencode expands {env:...}.
+func (s *Sandbox) configureMCP(f Forge) error {
+	if f.MCP() == "" {
+		return nil
+	}
+	cfg, _ := json.Marshal(map[string]any{
+		"$schema": "https://opencode.ai/config.json",
+		"mcp": map[string]any{f.Name(): map[string]any{
+			"type": "remote", "url": f.MCP(), "enabled": true, "oauth": false,
+			"headers": map[string]string{"Authorization": "Bearer {env:" + f.TokenEnv() + "}"},
+		}},
+	})
+	script := "mkdir -p ~/.config/opencode && printf '%s' " + shellQuote(string(cfg)) + " > ~/.config/opencode/opencode.json"
+	if _, err := s.ssh(script); err != nil {
+		return fmt.Errorf("configure %s mcp: %w", f.Name(), err)
 	}
 	return nil
 }
