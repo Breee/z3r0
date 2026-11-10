@@ -5,9 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 )
@@ -33,7 +31,6 @@ func Doctor(out io.Writer) error {
 		check("openshell gateway", "")
 	}
 	check("gateway user", gatewayUser())
-	check("docker access", dockerAccess())
 	check("client key", clientKey())
 
 	if s, err := New(); err == nil {
@@ -73,24 +70,6 @@ func gatewayUser() string {
 	}
 	if !found {
 		return "no openshell-gateway process found"
-	}
-	return ""
-}
-
-// dockerAccess fails on docker group membership or a writable docker socket
-// (root-equivalent, P03).
-func dockerAccess() string {
-	if g, err := user.LookupGroup("docker"); err == nil {
-		gids, _ := os.Getgroups()
-		id, _ := strconv.Atoi(g.Gid)
-		for _, x := range gids {
-			if x == id {
-				return "login user is in group docker (root-equivalent)"
-			}
-		}
-	}
-	if syscall.Access("/var/run/docker.sock", 2) == nil {
-		return "/var/run/docker.sock is writable (root-equivalent)"
 	}
 	return ""
 }

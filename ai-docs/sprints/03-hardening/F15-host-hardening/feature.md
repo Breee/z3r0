@@ -3,7 +3,7 @@ Status: todo
 Description: Shrink breakout blast radius: KEK, client key, docker group, disk quota (P03, P06).
 Goal: blast-radius.sh as openshell finds nothing usable; disk fill capped.
 Plan:
-1. Remove bree from docker group or document accept → verify: blast-radius
+1. (last) docker group of login user: out of zero scope (gateway + rootless podman run as openshell user); host hygiene only
 2. Client key: restrict / short-lived → verify: C26 status
 3. Disk quota for sandbox volumes → verify: 1G write fails at limit
 DONE: blast-radius findings each fixed or accepted in decisions.md.
