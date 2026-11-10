@@ -59,3 +59,4 @@ Recorded, not necessarily handled. Scenario: `docs/scenarios/go-container-gitlab
 | P22 | low | Other local host user/process connects to forward port 127.0.0.1:<port> | Needs password (0600 file in state); brute force possible, no rate limit known | not tested | F17 |
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — |
 | P24 | low | Supply chain of zero itself: OpenShell tarballs checksum-only, uniget images `insecureAcceptAnything` (digest-pinned), local dev image | Malicious runtime/tooling | accepted for now | C41, ADR 0021 |
+| P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | open, TODO (C43) | C43 |
