@@ -81,3 +81,5 @@ No matching capability means deny. Failure of policy, credential issuance, proof
 
 ---
 
+
+Sources, trust and lifecycle of policy: [7a](07a-policy-sources-and-lifecycle.md).

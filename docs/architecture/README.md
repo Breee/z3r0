@@ -57,6 +57,7 @@ C4Container
 - [5. Capability model](05-capability-model.md)
 - [6. Risk classes and execution isolation](06-risk-classes-and-execution-isolation.md)
 - [7. Policy: one source, many enforcement points](07-policy-one-source-many-enforcement-points.md)
+- [7a. Policy sources and lifecycle](07a-policy-sources-and-lifecycle.md)
 - [8. Credential model](08-credential-model.md)
 - [9. Runtime isolation — OpenShell foundation](09-runtime-isolation-openshell-foundation.md)
 - [10. Deployment topology](10-deployment-topology.md)
