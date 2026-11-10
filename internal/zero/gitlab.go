@@ -87,3 +87,44 @@ func (gitlab) Revoke(id string) error {
 	}
 	return nil
 }
+
+func (gitlab) Guardrails(path string) ([]string, error) {
+	out, err := sh("glab", "api", "projects/"+url.PathEscape(path))
+	if err != nil {
+		return nil, fmt.Errorf("project %s: %w", path, err)
+	}
+	var p struct {
+		DefaultBranch                    string `json:"default_branch"`
+		OnlyAllowMergeIfPipelineSucceeds bool   `json:"only_allow_merge_if_pipeline_succeeds"`
+	}
+	if err := json.Unmarshal([]byte(out), &p); err != nil {
+		return nil, fmt.Errorf("project %s: bad response", path)
+	}
+	var missing []string
+	if !p.OnlyAllowMergeIfPipelineSucceeds {
+		missing = append(missing, "merge allowed without green pipeline")
+	}
+	out, err = sh("glab", "api", "projects/"+url.PathEscape(path)+"/protected_branches/"+url.PathEscape(p.DefaultBranch))
+	if err != nil {
+		return append(missing, p.DefaultBranch+" not protected"), nil
+	}
+	var b struct {
+		Push []struct {
+			AccessLevel int `json:"access_level"`
+		} `json:"push_access_levels"`
+		AllowForcePush bool `json:"allow_force_push"`
+	}
+	if err := json.Unmarshal([]byte(out), &b); err != nil {
+		return nil, fmt.Errorf("protected branch: bad response")
+	}
+	for _, l := range b.Push {
+		if l.AccessLevel != 0 {
+			missing = append(missing, p.DefaultBranch+" allows direct push")
+			break
+		}
+	}
+	if b.AllowForcePush {
+		missing = append(missing, p.DefaultBranch+" allows force push")
+	}
+	return missing, nil
+}

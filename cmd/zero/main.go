@@ -23,6 +23,7 @@ Usage (inside a git repo): zero <command>
   stop          end the host port forward (sandbox keeps running)
   logs [-f]     serve.log from inside the sandbox
   rm            stop + delete sandbox (work not pushed is lost)
+  doctor        check host setup and, inside a repo, forge guardrails
 `
 
 func main() {
@@ -34,6 +35,11 @@ func main() {
 	switch cmd {
 	case "-h", "--help", "help":
 		fmt.Print(usageText)
+		return
+	case "doctor":
+		if err := zero.Doctor(os.Stdout); err != nil {
+			fatal(err)
+		}
 		return
 	}
 

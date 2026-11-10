@@ -32,6 +32,9 @@ type Forge interface {
 	// MCP is the forge's remote MCP endpoint, or "" if it has none. The agent
 	// reaches it with "Authorization: Bearer <token placeholder>".
 	MCP() string
+	// Guardrails lists missing DevOps protections on the project (ADR 0024):
+	// default branch push-protected, merge only with green pipeline.
+	Guardrails(path string) (missing []string, err error)
 }
 
 var forges = []Forge{gitlab{}}
