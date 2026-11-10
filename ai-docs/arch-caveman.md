@@ -1,6 +1,6 @@
 # Z3R0 architecture — caveman version
 
-Compressed from `Z3R0_ARCHITECTURE_v0.9_OPEN_SHELL.md` (v0.9, 2026-10-04). For agents. Section numbers point into the full doc.
+Compressed from `docs/architecture/` (sections `NN-*.md`, requirement IDs in `requirements.yaml`) (v0.9, 2026-10-04). For agents. Section numbers point into the full doc.
 
 ## One sentence
 

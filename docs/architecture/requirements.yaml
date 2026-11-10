@@ -1,0 +1,357 @@
+# Requirements extracted from the architecture. Markers [ID] appear in the source text.
+requirements:
+  - id: Z-INV-1
+    kind: invariant
+    section: "§2"
+    file: 02-core-security-invariants.md
+    text: "The agent process is not trusted as a security boundary"
+  - id: Z-INV-2
+    kind: invariant
+    section: "§2"
+    file: 02-core-security-invariants.md
+    text: "Capabilities, not ambient authority"
+  - id: Z-INV-3
+    kind: invariant
+    section: "§2"
+    file: 02-core-security-invariants.md
+    text: "Every consequential request is authenticated, authorized, and attributable"
+  - id: Z-INV-4
+    kind: invariant
+    section: "§2"
+    file: 02-core-security-invariants.md
+    text: "Agents do not receive long-lived credentials"
+  - id: Z-INV-5
+    kind: invariant
+    section: "§2"
+    file: 02-core-security-invariants.md
+    text: "Runtime containment must survive supply-chain compromise"
+  - id: Z-INV-6
+    kind: invariant
+    section: "§2"
+    file: 02-core-security-invariants.md
+    text: "Evidence and revocation are part of authorization"
+  - id: Z-RULE-1
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Assume the agent can be corrupted. Security must still hold."
+  - id: Z-RULE-2
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Treat agents as developers/operators and enforce normal DevOps, GitOps, cloud-native, and zero-trust principles."
+  - id: Z-RULE-3
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Do not reinvent controls that OpenShell, GitLab, Kubernetes, Cilium, Kyverno, Tetragon, SPIFFE, OpenBao, CI/CD, or GitOps already provide well."
+  - id: Z-RULE-4
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "The capability is the operation, not the CLI executable."
+  - id: Z-RULE-5
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Agents receive capabilities, not ambient credentials."
+  - id: Z-RULE-6
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Authorization happens before privileged authentication is delivered."
+  - id: Z-RULE-7
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Runtime controls apply to child processes and build code, not just the agent binary."
+  - id: Z-RULE-8
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "No normal Docker socket inside an agent environment."
+  - id: Z-RULE-9
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Normal agents may write DEV/QA and feature branches; production mutation is out of scope for v1 and production diagnostics are one-shot, filtered, and read-only."
+  - id: Z-RULE-10
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Agents may investigate production only through Phantom Proxy-mediated diagnostics; humans and controlled delivery systems change production."
+  - id: Z-RULE-11
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Protected branch, CI, code review, GitOps, RBAC, admission, and network/runtime policy remain security boundaries."
+  - id: Z-RULE-12
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Tool output, repository content, logs and external data are untrusted input."
+  - id: Z-RULE-13
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Network egress is a security control, not merely connectivity configuration."
+  - id: Z-RULE-14
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Real credentials should be bound to destination and operation where possible."
+  - id: Z-RULE-15
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "The agent must not be able to disable its own security controls."
+  - id: Z-RULE-16
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Visibility is not authorization."
+  - id: Z-RULE-17
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Plugins/extensions provide UX and context, not the hard security boundary."
+  - id: Z-RULE-18
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Audit and remote revocation are mandatory parts of the security model."
+  - id: Z-RULE-19
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Neither developers nor agent sandboxes receive real secrets; real secret material remains behind the Phantom Proxy."
+  - id: Z-RULE-20
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Authenticated remote access traverses the Phantom Proxy; public unauthenticated access may go direct only under egress policy."
+  - id: Z-RULE-21
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Optional AI scanners are defense-in-depth only and may make handling stricter, never weaker."
+  - id: Z-RULE-22
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Contextual risk models may only escalate deterministic risk."
+  - id: Z-RULE-23
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Dependency/package access is a distinct capability class; enterprise defaults should prefer approved internal mirrors/proxies."
+  - id: Z-RULE-24
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Arbitrary code execution is allowed inside the default OpenShell sandbox; the sandbox boundary, not command allowlists, is the primary containment mechanism."
+  - id: Z-RULE-25
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Strict command allowlisting may be offered as an optional hardened mode."
+  - id: Z-RULE-26
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Every agent-created commit is signed by the active security-epoch SPIFFE identity; unsigned agent commits are forbidden."
+  - id: Z-RULE-27
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Repository instructions and MCP/tool output are untrusted context and never grant authority."
+  - id: Z-RULE-28
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Use specialized/native enforcement where it already exists; Z3R0 fills agent-specific gaps rather than replacing mature DevOps/GitOps/cloud-native controls."
+  - id: Z-RULE-29
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "Phantom Proxy is HTTP(S)-first and is implemented primarily through OpenShell provider substitution, supervisor mediation, and Z3R0 middleware rather than a separate host-wide TLS MITM."
+  - id: Z-RULE-30
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "OpenShell is the primary Z3R0 runtime substrate; Z3R0 should not build a competing sandbox/runtime unless a proven gap requires it."
+  - id: Z-RULE-31
+    kind: rule
+    section: "§23"
+    file: 23-derived-design-rules.md
+    text: "OpenShell low-level policy and formal policy checks complement, but do not replace, Z3R0 semantic capabilities and human-accountable approval."
+  - id: Z-P0-1
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "OpenShell sandbox cannot read developer host secrets or unrelated repositories"
+  - id: Z-P0-2
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "arbitrary agent child processes inherit the intended containment"
+  - id: Z-P0-3
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "unknown egress destinations are denied"
+  - id: Z-P0-4
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "OpenShell provider placeholder credentials cannot be extracted as reusable real credentials"
+  - id: Z-P0-5
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "OpenBao-backed GitLab credentials can be substituted behind OpenShell without entering the sandbox"
+  - id: Z-P0-6
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "feature-branch push works while protected-branch push remains denied by Z3R0 + GitLab controls"
+  - id: Z-P0-7
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "`glab pipeline status` works with narrow GitLab authority"
+  - id: Z-P0-8
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "container build/run works without exposing the normal Docker socket"
+  - id: Z-P0-9
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "hostile tests/Dockerfiles cannot reach host secrets or arbitrary network destinations"
+  - id: Z-P0-10
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "Z3R0 middleware sanitizes representative Kubernetes specs/logs before they reach the sandbox"
+  - id: Z-P0-11
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "OCSF/OTel/Z3R0 traces correlate epoch → process/tool → policy → credential → target"
+  - id: Z-P0-12
+    kind: rollout
+    section: "§25 Phase 0"
+    file: 25-initial-rollout.md
+    text: "hard revoke/quarantine cuts remote authority within the stated budget"
+  - id: Z-BUILD-1
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "The agent never receives the developer's normal Docker socket"
+  - id: Z-BUILD-2
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "rootless execution where available"
+  - id: Z-BUILD-3
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "isolated container/image storage"
+  - id: Z-BUILD-4
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "restricted build context"
+  - id: Z-BUILD-5
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "no arbitrary host mounts"
+  - id: Z-BUILD-6
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "no host network"
+  - id: Z-BUILD-7
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "no privileged containers"
+  - id: Z-BUILD-8
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "no device passthrough unless explicitly justified"
+  - id: Z-BUILD-9
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "resource limits"
+  - id: Z-BUILD-10
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "controlled dependency/registry access"
+  - id: Z-BUILD-11
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "no raw build secrets"
+  - id: Z-BUILD-12
+    kind: rule
+    section: "§9.5"
+    file: 09-runtime-isolation-openshell-foundation.md
+    text: "For more hostile repositories or Dockerfiles, select the OpenShell MicroVM execution profile"
+  - id: Z-OS-1
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "sandbox/supervisor split with the trusted supervisor outside the agent workload"
+  - id: Z-OS-2
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "Landlock-based filesystem restrictions on supported Linux hosts"
+  - id: Z-OS-3
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "non-root/no-capability/no-new-privileges process posture and seccomp restrictions"
+  - id: Z-OS-4
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "supervisor-mediated network policy with destination/binary/L7-aware controls"
+  - id: Z-OS-5
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "provider profiles with placeholder credentials and endpoint-bound substitution"
+  - id: Z-OS-6
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "supervisor middleware capable of inspecting/modifying network traffic"
+  - id: Z-OS-7
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "Podman, MicroVM and Kubernetes compute drivers"
+  - id: Z-OS-8
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "policy updates for dynamic network/provider controls"
+  - id: Z-OS-9
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "OCSF-oriented runtime/security observability"
+  - id: Z-OS-10
+    kind: assumption
+    section: "Appendix A"
+    file: A-openshell-assumptions.md
+    text: "Policy Advisor/Policy Prover functionality where available"

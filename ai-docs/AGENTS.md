@@ -1,13 +1,13 @@
 # ai-docs — Agent Rules
 
-Planning + tracking for Z3R0. Source docs: `../Z3R0_10min_summary.md`, `../Z3R0_ARCHITECTURE_v0.9_OPEN_SHELL.md`.
+Planning + tracking for Z3R0. Source docs: `../Z3R0_10min_summary.md`, `../docs/architecture/` (requirements: `requirements.yaml`), decisions: `../docs/adr/`.
 
 ## Layout
 
 ```
 ai-docs/
 ├── AGENTS.md                 # this file
-├── decisions.md              # ADR log (append-only)
+├── decisions.md              # moved → ../docs/adr/ (MADR)
 ├── caveats.md                # known gaps, risks, gotchas
 ├── attack-paths.md           # all unblocked attack paths found (P01…)
 └── sprints/NN-<slug>/
@@ -24,7 +24,7 @@ ai-docs/
 - Work in sprints. One sprint = one directory. One feature = one directory.
 - Keep everything short. No fluff. Bullets over prose.
 - Update feature `Status` + `Log` on every meaningful change.
-- New decision → append to `decisions.md`. New gap/risk → append to `caveats.md`; new unblocked attack path → `attack-paths.md`.
+- New decision → new `../docs/adr/NNNN-<slug>.md` (MADR, front matter `requirements:` IDs). New gap/risk → append to `caveats.md`; new unblocked attack path → `attack-paths.md`.
 - Feature is DONE only when every `Proof` step passed and its result is logged.
 - Do not rebuild OpenShell/GitLab/K8s. Evaluate and compose.
 - Work step by step: one Plan step at a time, then stop for user review.
