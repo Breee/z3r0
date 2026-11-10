@@ -39,7 +39,18 @@ Focus: **opencode and VS Code only.** Every integration uses the same core comma
 
 ## Order
 
-1. Usability 1–2, F13, F15
-2. VS Code re-test + one-command open, signed image, GitHub forge
-3. Paperclip plugin, evidence log
-4. VM driver (when upstream fixed), OpenBao, K8s
+Core first. Integrations start only after the core gate passes.
+
+**Core gate** (all must pass):
+1. F13 egress/LLM proxy — PoC03 7/7, attack.sh PASS
+2. F15 host hardening — no docker group, gateway key off login user, breakout as login user ≠ host root
+3. Signed dev image from ghcr.io, pulled by digest
+4. Token lifecycle: auto-renew + revoke verified
+5. Full attack suite green on current versions (OpenShell, opencode, image)
+6. VM driver (F16) — tracked, not gating while blocked upstream (#4014); re-checked each OpenShell release
+
+Then:
+1. Usability: `zero`, `zero doctor`, `zero install`, `zero sync`
+2. opencode + VS Code integrations
+3. GitHub forge, Paperclip plugin, evidence log
+4. VM driver (when unblocked), OpenBao, K8s
