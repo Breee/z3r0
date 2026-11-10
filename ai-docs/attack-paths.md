@@ -40,3 +40,22 @@ yes = OpenShell policy/config closes it · partial = narrows it · no = needs ho
 | P12 | no | Use unique sandbox names (workflow). |
 
 Unverified: "no" for P06/P09 means not found in 0.1.2 docs/CLI, not proven impossible.
+
+## Paths in the zero workflow (2026-11-10, not proven unless noted)
+
+Recorded, not necessarily handled. Scenario: `docs/scenarios/go-container-gitlab.md`.
+
+| # | Severity | Path | Impact | Status | Ref |
+|---|---|---|---|---|---|
+| P13 | high | Agent commits hook/tool configs (`.pre-commit-config.yaml`, `.husky/`, `lefthook.yml`, `.envrc`, `.vscode/tasks.json`, `Makefile`, `go:generate`, tests) → developer checks out the branch on the host and runs tooling | Code exec as login user, full host blast radius | reasoning; `.git/hooks`/`.git/config` do not travel (F12) | C42 |
+| P14 | high | Agent edits `.gitlab-ci.yml` on its branch → pipeline runs agent code on the runner with CI job token and non-protected CI/CD variables | Exfil of CI secrets, abuse of job token / runner | reasoning; GitLab protected variables only on protected branches | forge setup |
+| P15 | high | Prompt injection via GitLab content the agent reads (issues, MR comments, job logs, MCP results) or via dependencies/READMEs | Agent performs attacker's actions within its permissions | inherent, not tested | A07, F04 |
+| P16 | medium | Agent widens `.zero/policy.yaml` on a branch → developer checks it out → approves the expansion prompt without reading (approval fatigue) | Broader egress/token scope for next sandbox | design (§7a), not built | X06 |
+| P17 | medium | Malicious Go module via allowed `proxy.golang.org` → `go.sum` committed → host or CI build runs it | Code exec in CI / on host (sandbox itself contained) | reasoning | P13 |
+| P18 | medium | Agent-generated content rendered in host browser (`zero web`) or VS Code client (`zero code`): markdown/HTML, workspace settings, extension recommendations | Exec/phishing in host UI process | not tested | X08, F05 |
+| P19 | medium | GitLab MCP tools run with user-scoped `execute_mcp_tool`; some tool may not check the project scope | Read/act on other projects of the user | unverified | ADR 0020 |
+| P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | C34 |
+| P21 | low | Sandbox crash or host loss without `zero rm` → token not revoked | Valid token in gateway credential store up to 1 day | by design (expiry) | C35 |
+| P22 | low | Other local host user/process connects to forward port 127.0.0.1:<port> | Needs password (0600 file in state); brute force possible, no rate limit known | not tested | F17 |
+| P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — |
+| P24 | low | Supply chain of zero itself: OpenShell tarballs checksum-only, uniget images `insecureAcceptAnything` (digest-pinned), local dev image | Malicious runtime/tooling | accepted for now | C41, ADR 0021 |
