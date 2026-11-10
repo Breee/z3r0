@@ -47,10 +47,11 @@ Core first. Integrations start only after the core gate passes.
 3. Signed dev image from ghcr.io, pulled by digest
 4. Token lifecycle: auto-renew + revoke verified
 5. Full attack suite green on current versions (OpenShell, opencode, image)
-6. VM driver (F16) — tracked, not gating while blocked upstream (#4014); re-checked each OpenShell release
+6. Portable, seamless setup — one command installs zero + gateway + host hardening on a fresh machine, idempotent, no manual sudo steps beyond one prompt; verified on a clean VM per supported OS
+7. VM driver (F16) — tracked, not gating while blocked upstream (#4014); re-checked each OpenShell release
 
 Then:
-1. Usability: `zero`, `zero doctor`, `zero install`, `zero sync`
+1. Usability: `zero`, `zero doctor`, `zero sync`
 2. opencode + VS Code integrations
 3. GitHub forge, Paperclip plugin, evidence log
 4. VM driver (when unblocked), OpenBao, K8s
