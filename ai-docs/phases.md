@@ -24,16 +24,16 @@ Goal: one Go change goes code → test → build → signed commit → push → 
 
 | §25 item | Today | Phase 2 work | Sprint |
 |---|---|---|---|
-| Phase 1 loop | manual steps work (`docs/scenarios/go-container-gitlab.md`) | scripted end-to-end check | 05 |
-| 5 OpenBao GitLab creds | zero mints PAT via glab | OpenBao issues/revokes the token, rotation without stale placeholders (C44) | 06 |
+| Phase 1 loop | manual steps work (`docs/scenarios/go-container-gitlab.md`) | scripted end-to-end check | 06 |
+| 5 OpenBao GitLab creds | zero mints PAT via glab | OpenBao issues/revokes the token, rotation without stale placeholders (C44) | 05 |
 | 6 branch push / protected deny | done (F12, F14); any-branch risk C43 | — (GitLab-owned) | — |
-| 7 glab pipeline | done | part of loop check | 05 |
-| 8 build w/o docker socket | ko image build in sandbox | part of loop check; Dockerfile builds deferred to Phase 4 | 05 |
-| 11 trace | none | per-sandbox audit log from OpenShell events + zero actions | 06 |
-| 12 revoke | token revoked on `zero rm` | `zero revoke` soft/hard/quarantine, leftover-token cleanup after crash | 06 |
-| signed commit (Phase 1 loop) | unsigned | per-session signing, verified on GitLab | 05 |
+| 7 glab pipeline | done | part of loop check | 06 |
+| 8 build w/o docker socket | ko image build in sandbox | part of loop check; Dockerfile builds deferred to Phase 4 | 06 |
+| 11 trace | none | per-sandbox audit log from OpenShell events + zero actions | 05 |
+| 12 revoke | token revoked on `zero rm` | `zero revoke` soft/hard/quarantine, leftover-token cleanup after crash | 05 |
+| signed commit (Phase 1 loop) | unsigned | per-session signing, verified on GitLab | 06 |
 
-Sprint 05 — control loop: signed dev image on ghcr (ADR 0021), policy widening prompt, signed commits, end-to-end loop script.
-Sprint 06 — evidence & control: audit log, revocation, OpenBao broker.
+Sprint 05 — zero core: audit log, revocation, OpenBao broker, signed ghcr image, policy widening prompt. Client-independent.
+Sprint 06 — control loop: signed commits, end-to-end loop script on top of the core.
 
 Exit check: `pocs/07-control-loop/run.sh` passes end to end; audit log shows every step; `zero revoke` stops push within seconds.
