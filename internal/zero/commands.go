@@ -96,8 +96,15 @@ func (s *Sandbox) create() error {
 			return fmt.Errorf("write embedded policy: %w", err)
 		}
 	}
-	if _, err := sh("openshell", "sandbox", "create",
-		"--name", s.Name, "--from", image(), "--policy", policy, "--detach"); err != nil {
+	args := []string{"sandbox", "create", "--name", s.Name, "--from", image(), "--policy", policy, "--detach"}
+	prov, err := s.setupGitLab()
+	if err != nil {
+		return err
+	}
+	if prov != "" {
+		args = append(args, "--provider", prov)
+	}
+	if _, err := sh("openshell", args...); err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
 	}
 	return nil
@@ -146,7 +153,7 @@ func (s *Sandbox) ensureCheckout() error {
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("clone in sandbox: %w", err)
 	}
-	return nil
+	return s.configureGitLabRemote()
 }
 
 func (s *Sandbox) serveRunning() (bool, error) {
@@ -279,6 +286,9 @@ func (s *Sandbox) Rm(out io.Writer) error {
 		if _, err := sh("openshell", "sandbox", "delete", s.Name); err != nil {
 			return fmt.Errorf("delete sandbox (state kept for retry): %w", err)
 		}
+	}
+	if err := s.revokeGitLab(); err != nil {
+		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	if err := os.RemoveAll(s.State); err != nil {
 		return fmt.Errorf("remove state: %w", err)

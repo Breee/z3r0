@@ -31,8 +31,8 @@ func TestStateRoot(t *testing.T) {
 
 func TestShellQuote(t *testing.T) {
 	cases := map[string]string{
-		"simple": "'simple'",
-		"it's":   `'it'\''s'`,
+		"simple":            "'simple'",
+		"it's":              `'it'\''s'`,
 		"/tmp/zero/My Repo": `'/tmp/zero/My Repo'`,
 	}
 	for in, want := range cases {
@@ -54,5 +54,19 @@ func TestForwardCmdlineMatch(t *testing.T) {
 	}
 	if fwdRe.MatchString("ssh\x00-s\x00some-other-session\x00") {
 		t.Error("unrelated cmdline must not match")
+	}
+}
+
+func TestGitlabPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"git@gitlab.com:corewire/technology-and-research/developer.git": "corewire/technology-and-research/developer",
+		"https://gitlab.com/a/b.git":                                    "a/b",
+		"https://user:x@gitlab.com/a/b":                                 "a/b",
+		"ssh://git@gitlab.com/a/b.git":                                  "a/b",
+		"git@github.com:Breee/z3r0.git":                                 "",
+	} {
+		if got := gitlabPath(in); got != want {
+			t.Errorf("gitlabPath(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

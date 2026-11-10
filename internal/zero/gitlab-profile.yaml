@@ -1,0 +1,21 @@
+# Provider profile for the per-sandbox GitLab token (D20). The sandbox only
+# sees a placeholder in GITLAB_TOKEN; the proxy swaps in the real token on
+# gitlab.com requests from git and curl.
+id: zero-gitlab
+display_name: zero GitLab
+description: Per-sandbox fine-grained GitLab token
+category: source_control
+credentials:
+  - name: token
+    description: fine-grained project token minted by zero
+    env_vars: [GITLAB_TOKEN]
+    required: true
+    auth_style: basic
+    header_name: authorization
+endpoints:
+  - host: gitlab.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl]
