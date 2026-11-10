@@ -7,8 +7,8 @@ Plan:
 2. Namespace-free path in E1: `ko build` (Go, no Dockerfile) and `apko` → verify: image tar produced, no socket, storage under `/sandbox`.
 3. Dockerfile path in E3 (needs F16): podman/buildah as VM-root, storage on overlay disk, registry pulls via supervisor-allowlisted endpoint → verify: `tests/fixtures/hello-go` Dockerfile builds; image never appears in host `podman images` (via `scripts/podman-gw.sh`).
 4. Hostile Dockerfile set (arch §13.4–13.7, F07 catalog): `RUN cat ~/.ssh/*`, `--mount=type=secret`, `RUN curl evil`, `--network=host`, `--privileged` runner, `RUN mount` → verify: every case blocked or inert; add to `tests/containment/`.
-5. Push built image to allowlisted registry with placeholder cred → verify: push OK, raw token never in sandbox (`env`, image layers grep).
-DONE: step 1 errors logged; steps 2–5 pass/fail table in notes.md; feature matrix row added `In-sandbox container build`; caveats for anything inert-only.
+5. ~~Push built image to registry~~ dropped (D23): agents never push images; images are built and published by CI only.
+DONE: step 1 errors logged; steps 2–4 pass/fail table in notes.md; feature matrix row added `In-sandbox container build`; caveats for anything inert-only.
 GOOD: one script `pocs/06-sandbox-build/run.sh` with pass/fail table; build time measured E1 (ko) vs E3 (podman).
 Proof: `pocs/06-sandbox-build/run.sh` → all PASS; host `podman images` unchanged.
 Log:
