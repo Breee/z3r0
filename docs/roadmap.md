@@ -12,7 +12,7 @@ Tracks run in parallel. Each item becomes a GitHub issue (`track:<name>`).
 
 | Track | Now (done) | Next | Later |
 |---|---|---|---|
-| **Isolation** | Podman sandbox (E1): fs/proc/egress containment, attack suite | Host hardening (F15) | VM sandboxes E3 (F16, blocked upstream #4014), risk class → driver (`--vm`), in-sandbox container build (F18), K8s driver |
+| **Isolation** | Podman sandbox (E1): fs/proc/egress containment, attack suite | | VM sandboxes E3 (F16, blocked upstream #4014), risk class → driver (`--vm`), in-sandbox container build (F18), K8s driver |
 | **Credentials** | Placeholder secrets, per-sandbox GitLab token, revoke on rm | Egress/LLM proxy: no foreign keys (F13), token auto-renew | OpenBao-backed issuance, one-shot creds |
 | **Forges** | GitLab (git, glab, MCP) | GitHub (`gh`) | other forges via `Forge` strategy |
 | **Evidence & control** | — | Decision/audit log per sandbox | OTel/OCSF trace, revocation (soft/hard/quarantine), Advisor/Prover (OpenAPPA) |
@@ -43,12 +43,11 @@ Core first. Integrations start only after the core gate passes.
 
 **Core gate** (all must pass):
 1. F13 egress/LLM proxy — PoC03 7/7, attack.sh PASS
-2. F15 host hardening — no docker group, gateway key off login user, breakout as login user ≠ host root
-3. Signed dev image from ghcr.io, pulled by digest
-4. Token lifecycle: auto-renew + revoke verified
-5. Full attack suite green on current versions (OpenShell, opencode, image)
-6. Portable, seamless setup — one command installs zero + gateway + host hardening on a fresh machine, idempotent, no manual sudo steps beyond one prompt; verified on a clean VM per supported OS
-7. VM driver (F16) — tracked, not gating while blocked upstream (#4014); re-checked each OpenShell release
+2. Signed dev image from ghcr.io, pulled by digest
+3. Token lifecycle: auto-renew + revoke verified
+4. Full attack suite green on current versions (OpenShell, opencode, image)
+5. Portable, seamless setup — one command installs zero + gateway on a fresh machine, idempotent, no manual sudo steps beyond one prompt; verified on a clean VM per supported OS
+6. VM driver (F16) — tracked, not gating while blocked upstream (#4014); re-checked each OpenShell release
 
 Then:
 1. Usability: `zero`, `zero doctor`, `zero sync`

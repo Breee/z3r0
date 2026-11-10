@@ -1,5 +1,5 @@
 # F15 — Host hardening
-Status: todo
+Status: removed — host hygiene, not zero scope
 Description: Shrink breakout blast radius: KEK, client key, docker group, disk quota (P03, P06).
 Goal: blast-radius.sh as openshell finds nothing usable; disk fill capped.
 Plan:
