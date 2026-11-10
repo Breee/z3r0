@@ -77,5 +77,6 @@ C4Container
 - [24. Open questions / validation work](24-open-questions-validation-work.md)
 - [25. Initial rollout](25-initial-rollout.md)
 - [26. Working definition of zero / Z3R0](26-working-definition-of-zero-z3r0.md)
+- [27. zero control plane (proposed)](27-control-plane.md)
 - [Appendix A — OpenShell assumptions used by this draft](A-openshell-assumptions.md)
 - [Scenario: Go + containers + GitLab](../scenarios/go-container-gitlab.md)

@@ -26,3 +26,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [22](0022-gitlab-endpoint-in-profile-zero-gitlab-sets-allow.md) | 2026-11-10 | GitLab endpoint in profile `zero-gitlab` sets `allow_encoded_slash: true` (C36) |  |
 | [23](0023-agents-never-push-container-images.md) | 2026-11-10 | Agents never push container images | Z-P0-8, Z-RULE-8 |
 | [24](0024-runtime-dependency-devops-backbone.md) | 2026-11-10 | Damage minimization on a DevOps/GitOps backbone; runtime is a swappable dependency | Z-INV-1, Z-OS-7 |
+| [25](0025-control-plane-basic-and-enterprise.md) | 2026-11-10 | One zero control plane, local (basic) or central (enterprise) — proposed | Z-INV-3, Z-INV-4, Z-INV-6 |
