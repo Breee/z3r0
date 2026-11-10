@@ -40,19 +40,17 @@ Reference: project `corewire/technology-and-research/developer` has all of the a
 
 ## 3. Project policy `.zero/policy.yaml` (planned, §7a)
 
-Lives on the default branch; zero reads it on the host via the GitLab API at HEAD, never from the sandbox. Changes need an MR.
+On the default branch, read by zero on the host. For this case:
 
 ```yaml
-version: 1
-isolation: e1                 # e3 needed for Dockerfile builds (see §7)
-bundles: [go-modules]         # proxy.golang.org, sum.golang.org for binary go
-egress:
-  - host: registry.gitlab.com # pull base images for local test runs
-    binaries: [podman]
-    access: read
+network:
+  allow:
+    - proxy.golang.org
+    - sum.golang.org
+capabilities: [git.read, git.commit, git.push, gitlab.issue.read, gitlab.mr.read, gitlab.mr.create, gitlab.pipeline.read]
 ```
 
-Status: gap. Today every sandbox gets the floor: egress only to opencode.ai, models.opencode.ai (opencode binary) and gitlab.com (git, git-remote-https, curl, glab, opencode). **Consequence: `go mod download` of non-vendored deps fails today.**
+Status: gap. Today every sandbox gets fixed egress: opencode.ai, models.opencode.ai, gitlab.com. **Consequence: `go mod download` of non-vendored deps fails today.**
 
 ## 4. Start: `zero up` (in the repo checkout)
 
@@ -79,7 +77,7 @@ Status: done (live-verified on `developer`).
 |---|---|---|---|
 | read/edit code | `/tmp/zero/<repo>` | Landlock fs policy | done |
 | `gofmt`, `go vet`, `go test ./...` | local, no network | sandbox process | done |
-| `go mod download` | proxy.golang.org | egress policy | gap (needs `go-modules` bundle, §3) |
+| `go mod download` | proxy.golang.org | egress policy | gap (needs project policy, §3) |
 | tests that open sockets on localhost | inside sandbox | — | done |
 | malicious test reads host secrets | — | sandbox has no host mounts; gateway runs as `openshell` | done (PoC01/02, blast-radius) |
 | malicious test exfiltrates | any non-allowlisted host | egress deny | done (PoC03) |
@@ -141,7 +139,7 @@ Per sandbox: policy SHA, rendered policy digest, token id + scope + expiry, ever
 
 ## 12. Gaps for this scenario, in order
 
-1. Project policy + `go-modules` bundle (§3) — without it, only vendored modules work.
+1. Project policy (§3) — without it, only vendored modules work.
 2. Token renewal for sessions > 1 day.
 3. Signed dev image from ghcr.io.
 4. C18: foreign-token exfiltration via gitlab.com (F13).
