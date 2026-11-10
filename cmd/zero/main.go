@@ -18,6 +18,7 @@ Usage (inside a git repo): zero <command>
   attach        up + opencode TUI attached to the sandbox
   run <prompt>  up + one-shot opencode run against the sandbox
   code          up + VS Code Remote-SSH on the same sandbox (Copilot runs inside)
+  web           up + open the opencode web UI in the browser
   status        show sandbox / forward / serve state
   stop          end the host port forward (sandbox keeps running)
   logs [-f]     serve.log from inside the sandbox
@@ -50,6 +51,8 @@ func main() {
 		err = z.Run(os.Stdout, args)
 	case "code":
 		err = z.Code(os.Stdout)
+	case "web":
+		err = z.Web(os.Stdout)
 	case "status":
 		err = z.Status(os.Stdout)
 	case "stop":

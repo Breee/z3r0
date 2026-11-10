@@ -110,15 +110,21 @@ func (s *Sandbox) create() error {
 	return nil
 }
 
+// opencodeBin is the real executable; /usr/local/bin/opencode is a symlink and
+// policy update matches binaries by resolved path (C37).
+const opencodeBin = "/usr/local/libexec/opencode/node_modules/@opencode/cli/bin/opencode.exe"
+
 // applyZenPolicy allows opencode inside the sandbox to reach its API. Runs
 // until the zen.done marker exists, so a failed attempt is retried.
 func (s *Sandbox) applyZenPolicy() error {
-	if _, err := sh("openshell", "policy", "update", s.Name,
-		"--rule-name", "zen",
-		"--binary", "/usr/local/bin/opencode",
-		"--add-endpoint", "opencode.ai:443:read-write:rest:enforce",
-		"--wait"); err != nil {
-		return fmt.Errorf("apply opencode policy: %w", err)
+	for _, ep := range []string{"opencode.ai", "models.opencode.ai"} {
+		if _, err := sh("openshell", "policy", "update", s.Name,
+			"--rule-name", "zen",
+			"--binary", opencodeBin,
+			"--add-endpoint", ep+":443:read-write:rest:enforce",
+			"--wait"); err != nil {
+			return fmt.Errorf("apply opencode policy (%s): %w", ep, err)
+		}
 	}
 	return nil
 }
@@ -205,6 +211,16 @@ func (s *Sandbox) waitReady(port int, pw string, startErr error) error {
 		msg += fmt.Sprintf("; start: %v", startErr)
 	}
 	return fmt.Errorf("%s; check: zero logs", msg)
+}
+
+// Web is up + the opencode web UI of the sandbox server in the browser.
+func (s *Sandbox) Web(out io.Writer) error {
+	port, err := s.Up(out)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "login: opencode / %s\n", s.read("password"))
+	return exec.Command("xdg-open", fmt.Sprintf("http://127.0.0.1:%d", port)).Run()
 }
 
 // Attach is up + the opencode TUI attached to the sandbox.
