@@ -2,7 +2,7 @@
 # zero install: OpenShell gateway + rootless podman under dedicated user `openshell`;
 # the login user only gets the mTLS client cert (F09, F15). Idempotent. Run as root.
 set -eu
-LU="$1"; OU=openshell; VER=0.1.4
+LU="$1"; OU=openshell; VER=0.1.8
 BASE="https://github.com/NVIDIA/OpenShell/releases/download/v$VER"
 LIB="/usr/local/lib/zero/openshell-$VER"
 cd /
@@ -15,8 +15,8 @@ if [ ! -x "$LIB/openshell-gateway" ]; then
   curl -fsSL -o "$T/cli.tgz" "$BASE/openshell-x86_64-unknown-linux-musl.tar.gz"
   curl -fsSL -o "$T/gw.tgz" "$BASE/openshell-gateway-x86_64-unknown-linux-gnu.tar.gz"
   sha256sum -c - <<SUM
-2b65178e62e1ece1d90d482555e9f1f98ff0296e058409b33418104b6333df07  $T/cli.tgz
-43f43554bcaabff2a8147444410d1ad0b7f51bdae7589c2d249982bc8b260b91  $T/gw.tgz
+87f5c41d396dcd36b4c30a7b5e6f41643a656cb31a82b0edbb00319c9a719c2d  $T/cli.tgz
+d2e5e7f80811b7cfbad0d48f0b561ea5e301401d311e4402bbfc419b3d08cbd3  $T/gw.tgz
 SUM
   mkdir -p "$LIB"
   tar -xzf "$T/cli.tgz" -C "$LIB" openshell
