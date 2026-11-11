@@ -1,14 +1,15 @@
-# Sprint 05 — zero core (Phase 2)
+# Sprint 05 — control plane PoCs (Phase 2)
 
-Goal: zero works on its own, independent of which client or agent runs inside: brokered credentials, audit trail, revocation, trusted image, policy approval.
-Exit: every zero action and sandbox egress decision is in the audit log; `zero revoke` stops push within seconds; tokens come from OpenBao and rotate without breaking running processes.
+Goal: prove the building blocks of arch §27 (ADR 0025) as rootless podman containers (Quadlet, dedicated user), same images later in k8s.
+Rule: each PoC is a gate. Fail → caveat + upstream report, stop, ask (AGENTS.md).
 
-| ID | Feature | Arch | Status |
+| ID | PoC | Pass condition | Status |
 |---|---|---|---|
-| F23 | Per-sandbox audit log (OpenShell events + zero actions) | §18, item 11 | todo |
-| F24 | `zero revoke` soft/hard/quarantine, leftover-token cleanup | §19, item 12, P21 | todo |
-| F25 | OpenBao as GitLab credential broker | §8, item 5, C44 | todo |
-| F19 | Signed dev image on ghcr, pulled by digest | ADR 0021, §9 | todo |
-| F20 | Policy widening prompt (`.zero/policy.yaml`) | §7, 07a | todo |
+| P1 | Gateway as container | `zero up` unchanged; gateway sees only its own podman socket | todo |
+| P2 | SPIRE server + agent in containers, attest sandbox supervisor | supervisor gets JWT-SVID for exactly its sandbox; agent reaches neither socket nor SVID | todo |
+| P3 | Minimal zero-cp token endpoint | supervisor injects test token; agent never sees it; unknown SVID denied; decision log has both | todo |
+| P4 | OpenBao, zero-cp authenticates with own SVID | read works with SVID, denied without | todo |
+| P5 | GitLab end to end | push via grant; revoke → push fails ≤60s, token revoked at GitLab; restart cleans leftover tokens | todo |
+| P6 | Same images on kind | P2–P5 pass; k8s differences documented | todo |
 
-Order: F23 → F24 → F25 → F19 → F20.
+Order: P1 → P6. Former F19–F25 drafts superseded by this plan.
