@@ -1,0 +1,32 @@
+name: dev-image
+on:
+  push:
+    branches: [main]
+    paths: [images/dev/**, .github/workflows/dev-image.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/breee/z3r0-dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sigstore/cosign-installer@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: images/dev
+          file: images/dev/Containerfile
+          push: true
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+      - run: cosign sign --yes "$IMAGE@${{ steps.build.outputs.digest }}"
+      - run: echo "$IMAGE@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
