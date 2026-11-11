@@ -7,7 +7,7 @@ type Runtime interface {
 	Exists(name string) bool
 	// Create starts a sandbox from image with a filesystem policy file and
 	// credential bindings (ids returned by BindCredential).
-	Create(name, image, policyFile string, creds []string) error
+	Create(name, image, policyFile string, creds, env []string) error
 	Delete(name string) error
 	// SSHConfig returns an ssh_config snippet; HostAlias is its Host entry.
 	SSHConfig(name string) (string, error)

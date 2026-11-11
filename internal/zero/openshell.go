@@ -17,10 +17,13 @@ func (openshell) Exists(name string) bool {
 	return err == nil
 }
 
-func (openshell) Create(name, image, policyFile string, creds []string) error {
+func (openshell) Create(name, image, policyFile string, creds, env []string) error {
 	args := []string{"sandbox", "create", "--name", name, "--from", image, "--policy", policyFile, "--detach"}
 	for _, c := range creds {
 		args = append(args, "--provider", c)
+	}
+	for _, e := range env {
+		args = append(args, "--env", e)
 	}
 	_, err := sh("openshell", args...)
 	return err

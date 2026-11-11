@@ -39,6 +39,10 @@ func (gitlab) TokenEnv() string { return "GITLAB_TOKEN" }
 func (gitlab) GitUser() string  { return "oauth2" }
 func (gitlab) MCP() string      { return "https://gitlab.com/api/v4/mcp" }
 
+// glab sends PATs as PRIVATE-TOKEN, which OpenShell >= 0.1.8 does not
+// substitute; as OAuth it sends Authorization: Bearer (ADR 0026, C46, #65).
+func (gitlab) Env() []string { return []string{"GLAB_IS_OAUTH2=true"} }
+
 func (gitlab) Match(remote string) (string, bool) {
 	m := gitlabRemoteRe.FindStringSubmatch(remote)
 	if m == nil {

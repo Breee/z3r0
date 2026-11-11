@@ -100,15 +100,16 @@ func (s *Sandbox) create() error {
 	if err != nil {
 		return err
 	}
-	var creds []string
+	var creds, env []string
 	prov, err := s.setupForge(pol.Capabilities)
 	if err != nil {
 		return err
 	}
 	if prov != "" {
 		creds = append(creds, prov)
+		env = forgeByName(s.read("forge")).Env()
 	}
-	if err := rt.Create(s.Name, image(), policy, creds); err != nil {
+	if err := rt.Create(s.Name, image(), policy, creds, env); err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
 	}
 	if err := s.applyProjectPolicy(pol); err != nil {
