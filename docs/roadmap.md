@@ -34,7 +34,6 @@ Focus: **opencode and VS Code only.** Every integration uses the same core comma
 1. `zero` alone = up + open default client
 2. `zero doctor` — checks host setup, prints fixes
 3. `zero install` — PATH + guided host setup
-4. `zero sync` — bring sandbox branches to host safely
 5. Clear progress + actionable errors
 
 ## Order
@@ -49,7 +48,7 @@ Core first. Integrations start only after the core gate passes.
 5. VM driver (F16) — tracked, not gating while blocked upstream (#4014); re-checked each OpenShell release
 
 Then:
-1. Usability: `zero`, `zero doctor`, `zero sync`
+1. Usability: `zero`, `zero doctor`
 2. opencode + VS Code integrations
 3. GitHub forge, Paperclip plugin, evidence log
 4. VM driver (when unblocked), OpenBao, K8s

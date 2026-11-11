@@ -28,3 +28,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [24](0024-runtime-dependency-devops-backbone.md) | 2026-11-10 | Damage minimization on a DevOps/GitOps backbone; runtime is a swappable dependency | Z-INV-1, Z-OS-7 |
 | [25](0025-control-plane-basic-and-enterprise.md) | 2026-11-10 | One zero control plane, local (basic) or central (enterprise) — proposed | Z-INV-3, Z-INV-4, Z-INV-6 |
 | [26](0026-glab-bearer-placement.md) | 2026-11-11 | glab sends the GitLab token as Bearer (GLAB_IS_OAUTH2) | Z-INV-1 |
+| [27](0027-no-sync-back.md) | 2026-11-11 | No sync-back: git push is the only exit | Z-INV-1 |
