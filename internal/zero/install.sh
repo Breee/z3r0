@@ -74,6 +74,7 @@ as tee "$OH/.config/systemd/user/openshell-gateway.service" >/dev/null <<UNIT
 [Unit]
 Description=OpenShell Gateway (zero)
 After=default.target podman.socket
+Requires=podman.socket
 
 [Service]
 Type=simple
