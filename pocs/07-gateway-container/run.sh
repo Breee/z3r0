@@ -6,7 +6,7 @@ openshell -g $G sandbox delete $N >/dev/null 2>&1
 if openshell -g $G sandbox create --name $N --from localhost/z3r0-dev:latest --policy internal/zero/policy.yaml --detach >/dev/null 2>&1 \
   && openshell -g $G sandbox ssh-config $N > /tmp/opencode/p1.ssh \
   && ssh -F /tmp/opencode/p1.ssh "$(awk '/^Host /{print $2;exit}' /tmp/opencode/p1.ssh)" id | grep -q .; then
-  echo "pass sandbox create + ssh"; else echo "FAIL sandbox create + ssh"; ok=1; fi
+  echo "pass sandbox create + ssh"; else echo "FAIL sandbox create + ssh"; openshell -g $G sandbox delete $N >/dev/null 2>&1; exit 1; fi
 if ssh -F /tmp/opencode/p1.ssh "$(awk '/^Host /{print $2;exit}' /tmp/opencode/p1.ssh)" 'curl -s -m 5 https://example.com' >/dev/null 2>&1; then
   echo "FAIL egress default deny"; ok=1; else echo "pass egress default deny"; fi
 openshell -g $G sandbox delete $N >/dev/null 2>&1
