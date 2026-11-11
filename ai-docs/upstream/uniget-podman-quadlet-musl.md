@@ -1,37 +1,21 @@
-# uniget-org/tools: podman quadlet/rootlessport are musl-linked, not executable on glibc hosts
+# uniget podman: quadlet/rootlessport musl-linked
 
-Existing issues: none found (searched "quadlet", "musl podman" in uniget-org/tools, 2026-11-11).
+Target: MR to gitlab.com/uniget-org/tools (issues disabled there; GitHub mirror issue optional). Tracking: #67.
 
-## Issue draft
+## Issue
 
-**Title:** podman: quadlet and rootlessport are dynamically linked against musl, fail on glibc hosts
+**What:** `tools/podman` 6.1.3 ships `libexec/podman/quadlet` and `rootlessport` dynamically linked against `/lib/ld-musl-x86_64.so.1`. On glibc hosts (Ubuntu 26.04) they cannot execute. systemd's quadlet generator fails silently: no `.service` units from `.container` files.
 
-**Versions:** uniget tool `podman` 6.1.3 (`master` builds 6.2.0 with the same Dockerfile), host Ubuntu 26.04 (glibc, no musl loader).
+**Why:** Podman's Makefile passes `-extldflags '-static'` via `LDFLAGS_PODMAN`, but both binaries have no cgo, so Go uses the internal linker and ignores it. With `CGO_ENABLED=1` on Alpine they get the musl interpreter.
 
-**Repro**
-```
-$ file /usr/local/libexec/podman/quadlet
-ELF 64-bit LSB executable, x86-64, dynamically linked, interpreter /lib/ld-musl-x86_64.so.1
-$ /usr/local/libexec/podman/quadlet --dryrun
-cannot execute: required file not found
-```
-`/usr/local/lib/systemd/user-generators/podman-user-generator` points to it, so systemd silently generates no units: any `~/.config/containers/systemd/*.container` → `Unit <name>.service not found`. `rootlessport` has the same problem (rootless `-p` port forwarding).
+**Repro:** `uniget install podman` → `file /usr/local/libexec/podman/quadlet` → `interpreter /lib/ld-musl-x86_64.so.1`; put a `.container` in `~/.config/containers/systemd/`, `systemctl --user daemon-reload` → unit not found.
 
-**Expected:** helpers statically linked like `podman` itself.
+## MR
 
-**Cause:** podman's Makefile links `quadlet` and `rootlessport` with `LDFLAGS_PODMAN`, but these binaries import no cgo packages, so Go uses the internal linker and ignores `-extldflags '-static'`; with `CGO_ENABLED=1` they still get the musl interpreter.
+**Title:** podman: build quadlet and rootlessport statically
 
-## PR draft
+**What:** Rebuild `bin/quadlet` and `bin/rootlessport` with `CGO_ENABLED=0` after the main build (patch: `uniget-podman-quadlet-musl.patch`).
 
-**Branch:** `fix-podman-static-helpers` · **Title:** podman: build quadlet and rootlessport statically
+**Why:** Binaries are musl-linked and do not run on glibc hosts; quadlet generator silently produces no units.
 
-**Body:**
-quadlet and rootlessport don't use cgo, so `-extldflags '-static'` is ignored and they end up linked against `/lib/ld-musl-x86_64.so.1`, which glibc distros don't have (Quadlet generator silently fails). Rebuild both with `CGO_ENABLED=0` after the main build.
-
-Tested locally (podman build of `tools/podman`, version 6.2.0):
-- `file libexec/podman/quadlet` → statically linked (before: musl interpreter)
-- `file libexec/podman/rootlessport` → statically linked
-- `bin/podman` unchanged, statically linked
-- `quadlet --dryrun` on a sample `.container` generates the service on Ubuntu 26.04
-
-Patch: `uniget-podman-quadlet-musl.patch` (same directory).
+**How tested:** `make podman--tar`, `uniget install --path-to-tar-mappings=podman=.../image.tar` on Ubuntu 26.04: both binaries `statically linked`; `.container` file → `systemctl --user daemon-reload` → generated `zq.service` present.
