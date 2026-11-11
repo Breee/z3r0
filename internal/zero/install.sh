@@ -46,6 +46,7 @@ as tee "$OH/.config/containers/policy.json" >/dev/null <<'JSON'
       "ghcr.io/nvidia": [{"type": "insecureAcceptAnything"}],
       "ghcr.io/anomalyco": [{"type": "insecureAcceptAnything"}],
       "ghcr.io/uniget-org": [{"type": "insecureAcceptAnything"}],
+      "ghcr.io/breee/z3r0-dev": [{"type": "insecureAcceptAnything"}],
       "nvcr.io": [{"type": "insecureAcceptAnything"}],
       "docker.io/library": [{"type": "insecureAcceptAnything"}]
     },

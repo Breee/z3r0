@@ -86,7 +86,7 @@ func image() string {
 	if v := os.Getenv("Z3R0_IMAGE"); v != "" {
 		return v
 	}
-	return "localhost/z3r0-dev:latest"
+	return devImage
 }
 
 func (s *Sandbox) path(parts ...string) string {
@@ -253,3 +253,6 @@ func probeConfig(port int, pw string) (int, error) {
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 	return resp.StatusCode, nil
 }
+
+// devImage is built and cosign-signed by .github/workflows/dev-image.yml (ADR 0028).
+const devImage = "ghcr.io/breee/z3r0-dev@sha256:a279d03ce95e34d75f71a082c1e85f9b59611fcad2fd4871614403396d8064b0"
