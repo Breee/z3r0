@@ -237,10 +237,10 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// probeConfig hits /config through the forward with basic auth.
+// probeConfig hits the authenticated API through the forward; the web UI answers 200 on any other path.
 func probeConfig(port int, pw string) (int, error) {
 	client := &http.Client{Timeout: 2 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/config", port), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/api/session", port), nil)
 	if err != nil {
 		return 0, err
 	}
@@ -251,6 +251,9 @@ func probeConfig(port int, pw string) (int, error) {
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode == http.StatusOK && !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
+		return 0, fmt.Errorf("unexpected content type %q", resp.Header.Get("Content-Type"))
+	}
 	return resp.StatusCode, nil
 }
 

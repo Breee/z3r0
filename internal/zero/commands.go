@@ -200,7 +200,7 @@ func (s *Sandbox) startServe(pw string) error {
 	return nil
 }
 
-// waitReady polls /config through the forward until serve answers 200.
+// waitReady polls /api/session through the forward until serve answers 200.
 func (s *Sandbox) waitReady(port int, pw string, startErr error) error {
 	url := s.url(port)
 	last := "connection refused"
