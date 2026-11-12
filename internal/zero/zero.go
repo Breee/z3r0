@@ -36,7 +36,11 @@ type Sandbox struct {
 	Dir   string // checkout path inside the sandbox
 	State string // local state dir (0700)
 	Host  string // ssh host alias from `openshell sandbox ssh-config`
+	gw    string // OpenShell gateway; empty = active gateway (podman, E1)
 }
+
+// vmGateway is the second OpenShell gateway with the MicroVM driver (E3, ADR 0015).
+const vmGateway = "openshell-vm"
 
 // New resolves the enclosing git repo into a sandbox description. zero only
 // operates inside a git work tree; the sandbox name derives from the repo name.
@@ -47,14 +51,35 @@ func New() (*Sandbox, error) {
 	}
 	repo := filepath.Base(top)
 	name := SandboxName(repo)
-	return &Sandbox{
+	s := &Sandbox{
 		Name:  name,
 		Repo:  repo,
 		Top:   top,
 		Dir:   "/tmp/zero/" + repo,
 		State: filepath.Join(stateRoot(), name),
 		Host:  rt.HostAlias(name),
-	}, nil
+	}
+	s.setGateway(s.read("gateway"))
+	return s, nil
+}
+
+// UseVM selects the MicroVM gateway for a new sandbox. An existing sandbox
+// keeps the gateway it was created on.
+func (s *Sandbox) UseVM() error {
+	if gw := s.read("gateway"); gw != vmGateway && rt.Exists(s.Name) {
+		return fmt.Errorf("%s exists on the podman gateway; zero rm first", s.Name)
+	}
+	s.setGateway(vmGateway)
+	return nil
+}
+
+// setGateway routes every openshell call (and ssh ProxyCommand) to gw.
+func (s *Sandbox) setGateway(gw string) {
+	if gw == "" {
+		return
+	}
+	s.gw = gw
+	os.Setenv("OPENSHELL_GATEWAY", gw)
 }
 
 // SandboxName maps a repo basename to the sandbox name: lowercase, every

@@ -97,6 +97,11 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 // create makes the sandbox from the dev image with the embedded filesystem
 // policy (override with Z3R0_POLICY).
 func (s *Sandbox) create() error {
+	if s.gw != "" {
+		if err := s.write("gateway", s.gw, 0o600); err != nil {
+			return err
+		}
+	}
 	policy := os.Getenv("Z3R0_POLICY")
 	if policy == "" {
 		policy = s.path("policy.yaml")
