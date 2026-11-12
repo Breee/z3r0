@@ -64,7 +64,8 @@ UMask=0077
 WantedBy=default.target
 UNIT
 as "$OU" "$OUID" "$OH" systemctl --user daemon-reload
-as "$OU" "$OUID" "$OH" systemctl --user enable --now openshell-gateway-vm.service
+as "$OU" "$OUID" "$OH" systemctl --user enable openshell-gateway-vm.service
+as "$OU" "$OUID" "$OH" systemctl --user restart openshell-gateway-vm.service
 sleep 5
 as "$OU" "$OUID" "$OH" systemctl --user is-active openshell-gateway-vm.service
 # 2. register for the login user (same client cert as gateway `openshell`)
