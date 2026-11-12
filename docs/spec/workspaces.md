@@ -196,7 +196,7 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: first run of a
 | Detect | git repo + remote matches a forge (`Forge.Match`) | everything else (incl. git without forge remote) |
 | Into sandbox | git bundle of host commits, current branch checked out | copy, read-only (filesystem policy) |
 | Uncommitted host changes | not included (warn) | included |
-| Excluded | gitignored by nature | `.zeroignore` + built-in: `.env*`, `*.pem`, `*.key`, `id_*`, `.git-credentials`, `.netrc`, `.ssh/`, `.aws/`, `.kube/` |
+| Excluded | gitignored by nature | always (not overridable): `.env*`, `*.pem`, `*.key`, `id_*`, `.git-credentials`, `.netrc`, `.ssh/`, `.aws/`, `.kube/`; plus `.zeroignore` |
 | Exit | `git push` via forge token | none |
 | Policy source | `<folder>/.zero/policy.yaml` on host | none (no network grants) |
 | Size limit | — | 100 MiB, override `--max-input` |
@@ -214,8 +214,8 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: first run of a
 |---|---|---|
 | F1 | Hidden current context → wrong `rm` | cwd first, `ctx:` line, type-name confirm (5.7) |
 | F2 | Folder in several workspaces | ambiguity error unless current matches (5.8) |
-| F3 | Input folders leak host secrets (`.env`) into sandbox | default exclude list + `.zeroignore` + size/file summary (5.3) |
-| F4 | Permission union: capability for repo A applies to repo B | accepted; shown in status. Alternative = token per repo (more tokens, more renewal). **Needs decision.** |
+| F3 | Input folders leak host secrets (`.env`) into sandbox | **decided**: secret patterns (`.env*` etc.) never copied, not overridable; extra excludes via `.zeroignore`; file summary on `up` (5.3) |
+| F4 | Permission union: capability for repo A applies to repo B | **decided**: accepted, one token per forge per workspace; shown in status |
 | F5 | Egress narrowing not live | print "until recreate" (5.5) |
 | F6 | Removed repo keeps unpushed work in sandbox | warn; token no longer covers it (5.5) |
 | F7 | Uncommitted host changes silently missing in sandbox | warn on `up` |
