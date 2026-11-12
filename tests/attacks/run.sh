@@ -14,6 +14,7 @@ trap cleanup EXIT
 pol() { openshell policy update "$NAME" --rule-name "$1" --binary /usr/bin/curl --add-endpoint "$2" --wait >/dev/null 2>&1; }
 run() { openshell sandbox exec -n "$NAME" -- sh "/tmp/attacks/$1" "$2" || rc=1; }
 
+cleanup                                   # leftovers from an aborted run
 openshell profile import -f "$P" >/dev/null
 openshell provider create --name echo08 --type z3r0-echo --credential "ECHO_TOKEN=$SECRET" >/dev/null
 openshell sandbox create --name "$NAME" --from docker.io/library/golang:1.25 --provider echo08 --detach >/dev/null 2>&1
