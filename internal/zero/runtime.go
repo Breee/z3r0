@@ -23,6 +23,8 @@ type Runtime interface {
 	// sandbox as a placeholder only.
 	BindCredential(id, typ, env, secret string) error
 	UnbindCredential(id string)
+	// RotateCredential replaces the secret of an existing binding.
+	RotateCredential(id, env, secret string) error
 }
 
 var rt Runtime = openshell{}

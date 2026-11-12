@@ -4,8 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
+
+// Token is an active forge token as listed by the forge.
+type Token struct {
+	ID, Name string
+	Expires  time.Time
+}
+
+// renewBefore is how long before expiry zero up re-mints the token.
+const renewBefore = 12 * time.Hour
+
+// tokenLabel names tokens <sandbox>@<host>, so orphans of this machine are
+// recognisable without touching tokens of other machines.
+func tokenLabel(sandbox string) string {
+	h, _ := os.Hostname()
+	return sandbox + "@" + h
+}
 
 // Forge is a git hosting strategy (D20). zero owns the lifecycle — profile
 // import, OpenShell provider, sandbox remote, state — and a Forge only knows
@@ -32,6 +50,8 @@ type Forge interface {
 	Mint(label, path string, perms []string) (token, id string, err error)
 	// Revoke revokes a token by id; an expired or revoked token is not an error.
 	Revoke(id string) error
+	// Tokens lists the user's active tokens.
+	Tokens() ([]Token, error)
 	// MCP is the forge's remote MCP endpoint, or "" if it has none. The agent
 	// reaches it with "Authorization: Bearer <token placeholder>".
 	MCP() string
@@ -79,11 +99,14 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	if err := s.revokeForge(); err != nil {
 		return "", err
 	}
+	if err := revokeOrphans(f); err != nil {
+		return "", err
+	}
 	perms, err := f.Permissions(caps)
 	if err != nil {
 		return "", err
 	}
-	tok, id, err := f.Mint(s.Name, path, perms)
+	tok, id, err := f.Mint(tokenLabel(s.Name), path, perms)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", f.Name(), err)
 	}
@@ -117,6 +140,84 @@ func (s *Sandbox) revokeForge() error {
 	}
 	rt.UnbindCredential(s.forgeProvider(f))
 	os.Remove(s.path("forge.id"))
+	return nil
+}
+
+// renewForge re-mints the token of a running sandbox when it expires within
+// renewBefore. New processes get the new token; running ones keep the old (C44).
+func (s *Sandbox) renewForge(caps []string) error {
+	f, id, path := forgeByName(s.read("forge")), s.read("forge.id"), s.read("forge.path")
+	if f == nil || id == "" {
+		return nil
+	}
+	toks, err := f.Tokens()
+	if err != nil {
+		return err
+	}
+	for _, t := range toks {
+		if t.ID == id && time.Until(t.Expires) > renewBefore {
+			return nil
+		}
+	}
+	perms, err := f.Permissions(caps)
+	if err != nil {
+		return err
+	}
+	tok, nid, err := f.Mint(tokenLabel(s.Name), path, perms)
+	if err != nil {
+		return fmt.Errorf("%s: %w", f.Name(), err)
+	}
+	probe := "printf %s \"$" + f.TokenEnv() + "\""
+	before, err := s.ssh(probe)
+	if err != nil {
+		f.Revoke(nid)
+		return err
+	}
+	if err := rt.RotateCredential(s.forgeProvider(f), f.TokenEnv(), tok); err != nil {
+		f.Revoke(nid)
+		return err
+	}
+	if err := s.write("forge.id", nid, 0o600); err != nil {
+		return err
+	}
+	// The sandbox polls provider revisions; keep the old token valid until new
+	// sessions resolve the new placeholder.
+	for i := 0; ; i++ {
+		if now, err := s.ssh(probe); err == nil && now != before {
+			break
+		}
+		if i == 60 {
+			return fmt.Errorf("sandbox did not pick up new %s token in 60s; old token %s kept", f.Name(), id)
+		}
+		time.Sleep(time.Second)
+	}
+	if err := f.Revoke(id); err != nil {
+		return fmt.Errorf("revoke old %s token %s: %w", f.Name(), id, err)
+	}
+	return nil
+}
+
+// revokeOrphans revokes this machine's zero tokens that no live sandbox owns,
+// e.g. left behind by a crash or a sandbox deleted outside zero.
+func revokeOrphans(f Forge) error {
+	toks, err := f.Tokens()
+	if err != nil {
+		return err
+	}
+	suffix := tokenLabel("")
+	for _, t := range toks {
+		name, ok := strings.CutSuffix(t.Name, suffix)
+		if !ok || !strings.HasPrefix(name, "zero-") {
+			continue
+		}
+		b, _ := os.ReadFile(filepath.Join(stateRoot(), name, "forge.id"))
+		if strings.TrimSpace(string(b)) == t.ID && rt.Exists(name) {
+			continue
+		}
+		if err := f.Revoke(t.ID); err != nil {
+			return fmt.Errorf("revoke orphan %s token %s (%s): %w", f.Name(), t.ID, t.Name, err)
+		}
+	}
 	return nil
 }
 

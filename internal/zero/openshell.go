@@ -90,3 +90,13 @@ func (openshell) BindCredential(id, typ, env, secret string) error {
 }
 
 func (openshell) UnbindCredential(id string) { sh("openshell", "provider", "delete", id) }
+
+// RotateCredential passes the secret via env lookup, never in argv.
+func (openshell) RotateCredential(id, env, secret string) error {
+	cmd := exec.Command("openshell", "provider", "update", id, "--credential", env)
+	cmd.Env = append(os.Environ(), env+"="+secret)
+	if b, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("provider update: %v: %s", err, strings.TrimSpace(string(b)))
+	}
+	return nil
+}

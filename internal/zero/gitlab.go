@@ -118,6 +118,28 @@ func (gitlab) Revoke(id string) error {
 	return nil
 }
 
+func (gitlab) Tokens() ([]Token, error) {
+	out, err := sh("glab", "api", "--paginate", "/personal_access_tokens?state=active&per_page=100")
+	if err != nil {
+		return nil, fmt.Errorf("list tokens: %w", err)
+	}
+	var list []struct {
+		ID        int64
+		Name      string
+		ExpiresAt string `json:"expires_at"`
+	}
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		return nil, fmt.Errorf("list tokens: bad response")
+	}
+	var toks []Token
+	for _, t := range list {
+		// GitLab tokens expire at the start of expires_at (UTC).
+		exp, _ := time.Parse("2006-01-02", t.ExpiresAt)
+		toks = append(toks, Token{ID: fmt.Sprint(t.ID), Name: t.Name, Expires: exp})
+	}
+	return toks, nil
+}
+
 func (gitlab) Guardrails(path string) ([]string, error) {
 	out, err := sh("glab", "api", "projects/"+url.PathEscape(path))
 	if err != nil {

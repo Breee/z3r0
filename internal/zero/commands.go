@@ -40,6 +40,14 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		// Policy markers are sandbox-scoped: a fresh sandbox needs them again.
 		os.Remove(s.path("zen.done"))
 		os.Remove(s.path("copilot.done"))
+	} else {
+		pol, err := s.loadPolicy()
+		if err != nil {
+			return 0, err
+		}
+		if err := s.renewForge(pol.Capabilities); err != nil {
+			return 0, err
+		}
 	}
 	if !fileExists(s.path("zen.done")) {
 		if err := s.applyZenPolicy(); err != nil {
