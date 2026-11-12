@@ -1,5 +1,5 @@
 name: Upstream report
-description: Bug/limit in OpenShell, podman, glab, opencode, GitLab, ... (hard rule: no workarounds).
+description: "Bug/limit in OpenShell, podman, glab, opencode, GitLab, ... (hard rule: no workarounds)."
 title: "upstream: "
 labels: ["type:upstream"]
 projects: ["Breee/2"]

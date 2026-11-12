@@ -1,5 +1,5 @@
 name: Bug
-description: zero behaves wrong.
+description: "zero behaves wrong."
 title: ""
 labels: ["type:bug"]
 projects: ["Breee/2"]

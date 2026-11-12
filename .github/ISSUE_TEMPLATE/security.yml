@@ -1,5 +1,5 @@
 name: Security risk / caveat
-description: A way the agent can do damage or a weakened invariant. For accepted limits use type:caveat.
+description: "A way the agent can do damage or a weakened invariant. For accepted limits use type:caveat."
 title: ""
 labels: ["type:security"]
 projects: ["Breee/2"]
