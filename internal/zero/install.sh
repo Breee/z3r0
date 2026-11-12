@@ -8,6 +8,9 @@ LIB="/usr/local/lib/zero/openshell-$VER"
 cd /
 
 [ "$(uname -m)" = x86_64 ] || { echo "zero install: only x86_64 is pinned" >&2; exit 1; }
+for b in podman newuidmap newgidmap systemctl curl; do
+  command -v "$b" >/dev/null || { echo "zero install: missing $b (Debian/Ubuntu: apt install podman uidmap passt curl)" >&2; exit 1; }
+done
 
 # 1. pinned OpenShell binaries (sha256 pinned in zero, see C41)
 if [ ! -x "$LIB/openshell-gateway" ]; then
@@ -33,7 +36,7 @@ grep -q "^$OU:" /etc/subgid || usermod --add-subgids 200000-265535 "$OU"
 loginctl enable-linger "$OU"
 OUID=$(id -u "$OU"); OH=$(getent passwd "$OU" | cut -d: -f6); LH=$(getent passwd "$LU" | cut -d: -f6)
 chmod 700 "$OH"
-i=0; while [ ! -d "/run/user/$OUID" ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done
+i=0; while [ ! -S "/run/user/$OUID/bus" ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done
 as() { sudo -u "$OU" env HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG_HOME="$OH/.config" "$@"; }
 
 # 3. rootless podman: image allowlist, user socket
@@ -101,12 +104,13 @@ i=0; until [ -r "$OH/.local/state/openshell/tls/client/tls.key" ] && as systemct
 done
 
 # 5. login user: register gateway, client cert only
-sudo -u "$LU" sh -c 'openshell gateway list 2>/dev/null | grep -qw openshell || openshell gateway add --local --name openshell https://127.0.0.1:17670 >/dev/null'
 M="$LH/.config/openshell/gateways/openshell/mtls"; S="$OH/.local/state/openshell/tls"
-install -d -o "$LU" -g "$LU" -m 700 "$M"
+sudo -u "$LU" mkdir -p -m 700 "$M"
 install -o "$LU" -g "$LU" -m 600 "$S/ca.crt" "$M/ca.crt"
 install -o "$LU" -g "$LU" -m 600 "$S/client/tls.crt" "$M/tls.crt"
 install -o "$LU" -g "$LU" -m 600 "$S/client/tls.key" "$M/tls.key"
+[ -f "$LH/.config/openshell/gateways/openshell/metadata.json" ] ||
+  sudo -u "$LU" openshell gateway add --local --name openshell https://127.0.0.1:17670 >/dev/null
 i=0; until sudo -u "$LU" openshell gateway info >/dev/null 2>&1; do
   i=$((i+1)); [ $i -lt 30 ] || { echo "zero install: gateway not reachable" >&2; exit 1; }; sleep 1
 done
