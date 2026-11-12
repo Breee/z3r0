@@ -1,0 +1,30 @@
+name: Upstream report
+description: Bug/limit in OpenShell, podman, glab, opencode, GitLab, ... (hard rule: no workarounds).
+title: "upstream: "
+labels: ["type:upstream"]
+projects: ["Breee/2"]
+body:
+  - type: input
+    id: project
+    attributes: {label: Project + existing issue, description: "Link existing upstream issue if any."}
+    validations: {required: true}
+  - type: input
+    id: draft
+    attributes: {label: Draft file, description: "ai-docs/upstream/<project>-<slug>.md"}
+    validations: {required: true}
+  - type: input
+    id: caveat
+    attributes: {label: Caveat, description: "C-number in ai-docs/caveats.md"}
+    validations: {required: true}
+  - type: textarea
+    id: good
+    attributes: {label: GOOD, description: "Target behaviour / quality bar."}
+    validations: {required: true}
+  - type: textarea
+    id: done
+    attributes: {label: DONE, description: "Checkable exit criteria. Each one must be provable by a command + output."}
+    validations: {required: true}
+  - type: textarea
+    id: proof
+    attributes: {label: PROOF plan, description: "Exact commands/tests that will prove DONE."}
+    validations: {required: true}
