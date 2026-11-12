@@ -12,7 +12,7 @@ allowed() { # control: PASS if cmd succeeds (proves probes can detect access)
   n="$1"; shift
   if "$@" >/dev/null 2>&1; then echo "PASS $n"; else echo "FAIL $n"; rc=1; fi
 }
-allowed "control:read-workspace" cat /sandbox/containment/probe.sh
+allowed "control:read-workspace" cat /tmp/containment/probe.sh
 command -v python3 >/dev/null || echo "SKIP proc:python (no python3 in image)"
 
 # --- filesystem (step 2) ---
@@ -22,7 +22,7 @@ done
 blocked "fs:host-home-visible" test -e "$H"
 blocked "fs:canary-in-fs" grep -rqsI --exclude-dir=proc --exclude-dir=sys --exclude-dir=go --exclude-dir=containment "$C" /
 for p in .ssh .kube .config/gh; do
-  blocked "fs:sandbox-home-$p" test -e "/sandbox/$p"
+  blocked "fs:sandbox-home-$p" test -e "$HOME/$p"
 done
 
 # --- child processes repeat the same read (step 2) ---

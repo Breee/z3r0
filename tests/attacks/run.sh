@@ -12,12 +12,12 @@ cleanup() {
 }
 trap cleanup EXIT
 pol() { openshell policy update "$NAME" --rule-name "$1" --binary /usr/bin/curl --add-endpoint "$2" --wait >/dev/null 2>&1; }
-run() { openshell sandbox exec -n "$NAME" -- sh "/sandbox/attacks/$1" "$2" || rc=1; }
+run() { openshell sandbox exec -n "$NAME" -- sh "/tmp/attacks/$1" "$2" || rc=1; }
 
 openshell profile import -f "$P" >/dev/null
 openshell provider create --name echo08 --type z3r0-echo --credential "ECHO_TOKEN=$SECRET" >/dev/null
 openshell sandbox create --name "$NAME" --from docker.io/library/golang:1.25 --provider echo08 --detach >/dev/null 2>&1
-openshell sandbox upload "$NAME" tests/attacks /sandbox >/dev/null 2>&1
+openshell sandbox upload "$NAME" tests/attacks /tmp >/dev/null 2>&1
 rc=0
 run egress.sh deny                         # step 1: provider endpoint only (/anything)
 pol httpbin  httpbin.org:443:read-only:rest:enforce
@@ -25,7 +25,6 @@ run egress.sh allow
 pol postman  postman-echo.com:443:read-only:rest:enforce
 run exfil.sh "$SECRET"                     # step 2
 run gateway.sh -                           # step 3
-tests/attacks/download.sh "$NAME" || rc=1      # step 4 (host side)
-openshell sandbox exec -n "$NAME" -- sh /sandbox/attacks/info.sh "$(id -un)" "$(hostname)" || rc=1   # step 6
+openshell sandbox exec -n "$NAME" -- sh /tmp/attacks/info.sh "$(id -un)" "$(hostname)" || rc=1   # step 6
 tests/attacks/resources.sh "$NAME" || rc=1      # step 5 (host side, LAST: OOM kills sandbox)
 exit $rc

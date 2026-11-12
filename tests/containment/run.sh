@@ -11,7 +11,7 @@ trap 'rm -f "$CFILE"; scripts/sandbox-down.sh "$NAME" >/dev/null 2>&1 || true' E
 
 scripts/sandbox-up.sh "$NAME" tests/containment >/dev/null
 rc=0
-openshell sandbox exec -n "$NAME" -- sh /sandbox/containment/probe.sh "$HOME" "$CANARY" "$(id -u)" || rc=1
+openshell sandbox exec -n "$NAME" -- sh /tmp/containment/probe.sh "$HOME" "$CANARY" "$(id -u)" || rc=1
 
 # host side: sandbox container may only bind-mount the openshell-sandbox binary (gateway enable_bind_mounts=false)
 id=$(scripts/podman-gw.sh ps --format '{{.Names}}' | grep "^openshell-default--$NAME-")
