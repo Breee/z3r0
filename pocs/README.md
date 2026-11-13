@@ -15,3 +15,4 @@ Prereqs: host setup from `ai-docs/sprints/01-openshell-eval/F01-openshell-baseli
 | 04b-host-plugin | F04: host OpenCode, plugin routes `bash` into sandbox; `read` still on host (GAP) | `pocs/04b-host-plugin/run.sh [model]` |
 | 05-vscode-remote | VS Code Remote-SSH into sandbox, Copilot egress scoped to vscode-server, pty works. Leaves sandbox running | `pocs/05-vscode-remote/run.sh [name]` + manual Copilot prompts |
 | 11-dev-image | F11: dev image has go/opencode/git/rg on PATH, no setuid, non-root. Needs `scripts/build-dev-image.sh` | `pocs/11-dev-image/run.sh [name]` |
+| 08-spire-podman | #83: SPIRE attests each sandbox supervisor on podman (per-sandbox JWT-SVID); agent cannot reach the socket | manual, see `pocs/08-spire-podman/README.md` |
