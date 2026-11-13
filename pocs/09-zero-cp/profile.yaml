@@ -1,0 +1,24 @@
+id: zero-cp-poc
+display_name: zero-cp PoC
+description: Test token granted by zero-cp to registered sandbox SPIFFE IDs
+category: other
+credentials:
+  - name: access_token
+    description: Test token from zero-cp
+    required: true
+    auth_style: bearer
+    header_name: Authorization
+    token_grant:
+      grant_type: client_credentials
+      token_endpoint: http://127.0.0.1:18090/token
+      jwt_svid_audience: zero-cp
+      client_assertion_type: urn:ietf:params:oauth:client-assertion-type:jwt-spiffe
+      cache_ttl: 0s
+endpoints:
+  - host: host.openshell.internal
+    port: 18090
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  - /usr/bin/curl
