@@ -42,4 +42,4 @@ $O sandbox exec --name s1 -- ls /spiffe-workload-api
 
 ## Not covered
 
-Token exchange with the SVID (`token_grant`), SVID use by the real supervisor against zero-cp (P3), SPIRE under the `openshell` user in `zero install`.
+The supervisor process itself fetching the SVID (checked with the `spire-agent` CLI exec'd inside the supervisor container, same attestation path). Token exchange with the SVID (`token_grant`), SVID use by the real supervisor against zero-cp (P3), SPIRE under the `openshell` user in `zero install`.
