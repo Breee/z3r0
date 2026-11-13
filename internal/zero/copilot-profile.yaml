@@ -1,0 +1,21 @@
+# Provider profile for GitHub Copilot as model provider (ADR 0029). The sandbox
+# only sees a placeholder in COPILOT_TOKEN; the proxy swaps in the host's
+# Copilot OAuth token on api.githubcopilot.com requests from opencode.
+id: zero-copilot
+display_name: zero Copilot
+description: GitHub Copilot OAuth token for opencode
+category: inference
+credentials:
+  - name: token
+    description: GitHub OAuth token with Copilot access
+    env_vars: [COPILOT_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+endpoints:
+  - host: api.githubcopilot.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries: [/usr/local/libexec/opencode/node_modules/@opencode/cli/bin/opencode.exe]

@@ -19,4 +19,4 @@ endpoints:
     access: read-write
     enforcement: enforce
     allow_encoded_slash: true
-binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl, /usr/local/bin/glab, /usr/local/bin/opencode]
+binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl, /usr/local/bin/glab, /usr/local/libexec/opencode/node_modules/@opencode/cli/bin/opencode.exe]

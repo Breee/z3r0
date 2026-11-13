@@ -40,6 +40,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		// Policy markers are sandbox-scoped: a fresh sandbox needs them again.
 		os.Remove(s.path("zen.done"))
 		os.Remove(s.path("copilot.done"))
+		os.Remove(s.path("copilot-auth.done"))
 	} else {
 		pol, err := s.loadPolicy()
 		if err != nil {
@@ -62,6 +63,14 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	}
 	if err := s.ensureCheckout(); err != nil {
 		return 0, err
+	}
+	if s.read("copilot") != "" && !fileExists(s.path("copilot-auth.done")) {
+		if err := s.importCopilotAuth(); err != nil {
+			return 0, err
+		}
+		if err := s.write("copilot-auth.done", "1", 0o600); err != nil {
+			return 0, err
+		}
 	}
 	pw, err := s.password()
 	if err != nil {
@@ -121,6 +130,13 @@ func (s *Sandbox) create() error {
 	if prov != "" {
 		creds = append(creds, prov)
 		env = forgeByName(s.read("forge")).Env()
+	}
+	cp, err := s.setupCopilot()
+	if err != nil {
+		return err
+	}
+	if cp != "" {
+		creds = append(creds, cp)
 	}
 	if err := rt.Create(s.Name, image(), policy, creds, env); err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
@@ -321,6 +337,7 @@ func (s *Sandbox) Rm(out io.Writer) error {
 	if err := s.revokeForge(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
+	rt.UnbindCredential(s.copilotProvider())
 	if err := os.RemoveAll(s.State); err != nil {
 		return fmt.Errorf("remove state: %w", err)
 	}

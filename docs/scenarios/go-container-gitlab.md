@@ -64,6 +64,7 @@ What zero does, in order (`internal/zero/commands.go`):
    - revoke any leftover token; mint a fine-grained token via `glab api`: project-scoped `read_project read_code download_code push_code create_branch create_merge_request read_merge_request read_job read_pipeline` + user-scoped `execute_mcp_tool`, expires next day;
    - create provider `zero-<repo>-gitlab` (token passed via env, never argv); store token id in state.
 5. Egress rule `zen` for the opencode binary (real path, C37).
+5a. If the host opencode is logged in to GitHub Copilot: provider `<sandbox>-copilot` bound, placeholder imported as opencode credential (ADR 0029).
 6. Clone: `git bundle` of the host repo → upload → `git clone` into `/tmp/zero/<repo>`; origin set to https + credential helper returning the **placeholder**; host `user.name/email` copied.
 7. Write opencode MCP config: GitLab MCP `https://gitlab.com/api/v4/mcp`, `Authorization: Bearer {env:GITLAB_TOKEN}`.
 8. Start `opencode serve` on sandbox 127.0.0.1:4096 with a random password (stdin, never argv); SSH forward to a free host port (own session, C40).
