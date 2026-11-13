@@ -1,11 +1,14 @@
 package zero
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -22,6 +25,16 @@ func Doctor(out io.Writer) error {
 		fails++
 		fmt.Fprintf(out, "FAIL  %s: %s\n", name, problem)
 	}
+
+	// The gateway state belongs to the dedicated user; only root can read it.
+	if os.Getuid() == 0 {
+		check("credential store", credentialStore())
+		if fails > 0 {
+			return fmt.Errorf("%d check(s) failed", fails)
+		}
+		return nil
+	}
+	fmt.Fprintln(out, "skip  credential store: run `sudo zero doctor`")
 
 	if _, err := exec.LookPath("openshell"); err != nil {
 		check("openshell cli", "not on PATH")
@@ -47,6 +60,69 @@ func Doctor(out io.Writer) error {
 		return fmt.Errorf("%d check(s) failed", fails)
 	}
 	return nil
+}
+
+// credentialStore fails unless every running gateway has an owner-only
+// key-encryption key and no forge or Copilot token in plaintext in its state.
+func credentialStore() string {
+	procs, _ := filepath.Glob("/proc/[0-9]*/comm")
+	found := false
+	for _, c := range procs {
+		b, err := os.ReadFile(c)
+		if err != nil || strings.TrimSpace(string(b)) != "openshell-gatew" {
+			continue
+		}
+		found = true
+		dir := filepath.Dir(c)
+		fi, err := os.Stat(dir)
+		if err != nil {
+			continue
+		}
+		uid := fi.Sys().(*syscall.Stat_t).Uid
+		state := ""
+		env, _ := os.ReadFile(filepath.Join(dir, "environ"))
+		for _, kv := range bytes.Split(env, []byte{0}) {
+			if v, ok := bytes.CutPrefix(kv, []byte("XDG_STATE_HOME=")); ok {
+				state = string(v)
+			}
+		}
+		if state == "" {
+			u, err := user.LookupId(strconv.Itoa(int(uid)))
+			if err != nil {
+				return err.Error()
+			}
+			state = filepath.Join(u.HomeDir, ".local/state")
+		}
+		gw := filepath.Join(state, "openshell/gateway")
+		kek := filepath.Join(gw, "credentials/key-encryption-key.bin")
+		ki, err := os.Stat(kek)
+		if err != nil {
+			return "no key-encryption key: " + err.Error()
+		}
+		if ki.Mode().Perm()&0o077 != 0 || ki.Sys().(*syscall.Stat_t).Uid != uid {
+			return kek + " must be 0600 and owned by the gateway user"
+		}
+		plain := ""
+		filepath.WalkDir(gw, func(p string, d os.DirEntry, err error) error {
+			if err != nil || !d.Type().IsRegular() {
+				return nil
+			}
+			data, _ := os.ReadFile(p)
+			for _, pre := range []string{"glpat-", "gho_", "ghu_", "ghp_"} {
+				if bytes.Contains(data, []byte(pre)) {
+					plain = "plaintext token (" + pre + ") in " + p
+				}
+			}
+			return nil
+		})
+		if plain != "" {
+			return plain
+		}
+	}
+	if !found {
+		return "no openshell-gateway process found"
+	}
+	return ""
 }
 
 // gatewayUser fails if the gateway runs as the login user: a sandbox breakout
