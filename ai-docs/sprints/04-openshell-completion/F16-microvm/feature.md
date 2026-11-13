@@ -1,5 +1,5 @@
 # F16 — MicroVM driver trial
-Status: blocked (C32, upstream #4014)
+Status: done (2026-11-13) — VM driver works on OpenShell 0.1.8; podman stays default, `zero up --vm` opt-in; container build still blocked (C48)
 Description: Run sandboxes under `compute_driver = "vm"` (libkrun, ships in 0.1.2) for kernel isolation (arch E3; P03, P09, C13, C24).
 Goal: Same PoCs pass under the VM driver; startup/memory cost known; guest has no NIC (all egress via supervisor).
 Plan:
