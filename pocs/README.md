@@ -17,3 +17,4 @@ Prereqs: host setup from `ai-docs/sprints/01-openshell-eval/F01-openshell-baseli
 | 11-dev-image | F11: dev image has go/opencode/git/rg on PATH, no setuid, non-root. Needs `scripts/build-dev-image.sh` | `pocs/11-dev-image/run.sh [name]` |
 | 08-spire-podman | #83: SPIRE attests each sandbox supervisor on podman (per-sandbox JWT-SVID); agent cannot reach the socket | manual, see `pocs/08-spire-podman/README.md` |
 | 09-zero-cp | #90: zero-cp grants a token only to a registered sandbox SPIFFE ID; supervisor injects it, agent never sees it | `OPENSHELL_SRC=… pocs/09-zero-cp/run.sh` (needs PoC 08 environment) |
+| 10-openbao | #88: gateway stores provider credentials in OpenBao (vault driver), not in its database; fails closed for new credentials/sandboxes when OpenBao is down | `BAO=… pocs/10-openbao/run.sh` |

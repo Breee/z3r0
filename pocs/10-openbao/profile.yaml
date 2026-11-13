@@ -1,0 +1,19 @@
+id: bao-poc
+display_name: OpenBao PoC
+description: Static test credential stored through the vault credential driver
+category: other
+credentials:
+  - name: token
+    description: Test token
+    env_vars: [POC_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: Authorization
+endpoints:
+  - host: host.openshell.internal
+    port: 18090
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  - /usr/bin/curl
