@@ -2,13 +2,15 @@
 
 Status: **draft for review** (#92). Design exploration, not a decision. Follows #91 (forge identity comparison).
 
+Scope: **GitLab + Kubernetes only.** GitLab is the login and the forge; Kubernetes is the GitOps target whose branch/QA environments the agent may read. GitHub, AWS, Jira, private registries and keyless signing were in an earlier draft and are out of scope; flaw numbers are kept stable, dropped ones are marked.
+
 Purpose: walk three complete flows through the proposed target design and find where it breaks.
 
 Legend: ✅ verified by a PoC or live test · 🟡 documented upstream, not tested by us · ❌ does not exist / assumption.
 
 ## 0. Setting
 
-Organisation "Acme": 120 developers, 9 teams, GitLab (most repos) and GitHub (two teams), AWS, a private package registry, Jira. Developers use Linux laptops. A platform team (3 people) operates shared services.
+Organisation "Acme": 120 developers, 9 teams, all repos on GitLab, deployment by GitOps to Kubernetes (one namespace per branch environment, plus QA). Developers use Linux laptops. A platform team (3 people) operates shared services in the cluster.
 
 ### 0.1 Components
 
@@ -18,10 +20,10 @@ Organisation "Acme": 120 developers, 9 teams, GitLab (most repos) and GitHub (tw
 | OpenShell gateway + supervisor | laptop, dedicated `openshell` user | `zero install` | injected credentials in memory, encrypted provider store ✅ (#87) |
 | SPIRE agent | laptop | `zero install` | node key |
 | sandbox (agent) | laptop | — | placeholders only ✅ |
-| **zero-cp** (broker) | central, 2+ replicas | platform team | sessions, epochs, decision log, signing key of the zero OIDC issuer |
+| **zero-cp** (broker) | Kubernetes, 2+ replicas, HTTPS ingress | platform team | sessions, epochs, decision log |
 | SPIRE server | central | platform team | trust domain CA |
-| OpenBao | central | platform team | refresh tokens, GitHub App key, parent tokens |
-| IdP (Keycloak/Entra/GitLab) | central | IT | human identities, groups |
+| OpenBao | central | platform team | GitLab refresh tokens |
+| GitLab | SaaS / central | IT | human identities, group and project membership; OAuth application "zero" |
 | Policy repo (GitOps) | forge | platform + security team | org baseline, team → project/capability mapping |
 | Evidence sink | central | security team | decision log + OCSF events |
 
@@ -31,7 +33,7 @@ A single developer without an organisation runs zero-cp in-process inside the `z
 
 | Identity | Format | Issued by | Lifetime |
 |---|---|---|---|
-| Human | OIDC ID token (`sub`, `groups`) | IdP | 8–12h session |
+| Human | GitLab OIDC ID token (`sub`, groups) | GitLab | 8–12h session |
 | Laptop (node) | SPIFFE ID `spiffe://acme/node/<id>` | SPIRE server, node attestation | days, renewed |
 | Sandbox | SPIFFE ID `spiffe://acme/sandbox/<sandbox-id>` ✅ (PoC 08) | SPIRE agent, workload attestation | JWT-SVID 5 min |
 | Session | `ses_<ulid>`, epoch `n` | zero-cp | until stopped; epoch changes on resume/policy change |
@@ -42,16 +44,13 @@ Binding rule: zero-cp grants a sandbox only what **the human who opened the sess
 ### 0.3 One-time setup
 
 Platform team (once):
-1. Deploy zero-cp, SPIRE server, OpenBao; connect zero-cp to the IdP as OIDC client.
-2. Create the policy repo: org baseline + team mapping (IdP group → forge groups/projects → max capabilities).
-3. Per provider, one trust setup:
-   - GitLab: register OAuth application "zero" (device flow 🟡).
-   - GitHub: create GitHub App "zero", org admin installs it; private key into OpenBao 🟡.
-   - AWS: register zero-cp as OIDC identity provider, role per team with trust condition on claims 🟡.
-   - Private registry / Jira: OAuth client or token-exchange trust, depending on product.
-4. Publish one line for developers: `curl … | sh && sudo zero install --org https://zero.acme.example`.
+1. Deploy zero-cp, SPIRE server, OpenBao to the cluster; expose zero-cp at `https://zero.acme.example`.
+2. Register one OAuth application "zero" in the GitLab top-level group (scopes `openid`, `api`; redirect to zero-cp) 🟡. This is the only identity setup: GitLab is the IdP, no second one.
+3. Create the policy repo: org baseline + maximum capabilities per GitLab group.
+4. Kubernetes: a view-only Role without Secret access in each branch/QA namespace (part of the GitOps templates), and permission for zero-cp to request short-lived tokens for it 🟡.
+5. Publish one line for developers: `curl … | sh && sudo zero install --org https://zero.acme.example`.
 
-Developer (once per laptop): `sudo zero install --org …` → installs binaries, gateway, SPIRE agent; laptop enrols (node attestation, see flaw F1). Then `zero login`.
+Developer (once per laptop): `sudo zero install --org …` → installs binaries, gateway, SPIRE agent; laptop enrols (node attestation, see flaw F1). Then `zero login` (one browser click at GitLab).
 
 ---
 
@@ -68,7 +67,6 @@ sequenceDiagram
   autonumber
   actor Dana
   participant CLI as zero CLI
-  participant IdP
   participant CP as zero-cp
   participant Bao as OpenBao
   participant GL as GitLab
@@ -77,14 +75,11 @@ sequenceDiagram
   participant Ag as agent
 
   Dana->>CLI: zero login
-  CLI->>IdP: OIDC device/browser flow
-  IdP-->>CLI: ID token (sub=dana, groups=[payments])
-  CLI->>CP: open user session (ID token)
-  CP-->>CLI: user session (12h)
-  Note over CLI,GL: first time only: connect GitLab
-  CLI->>GL: OAuth device flow as app "zero"
-  GL-->>CP: refresh token (via CLI → CP)
+  CLI->>CP: start login
+  CP->>GL: OAuth code flow as app "zero" (browser, scopes openid + api)
+  GL-->>CP: ID token (sub=dana) + refresh token
   CP->>Bao: store refresh token under users/dana/gitlab
+  CP-->>CLI: user session (12h)
 
   Dana->>CLI: zero up (in payments/ledger)
   CLI->>CP: create session {repo, policy sha, requested capabilities}
@@ -112,7 +107,7 @@ sequenceDiagram
 
 | Step | Detail | Status |
 |---|---|---|
-| Login | one browser flow; `zero login` also triggers "connect provider" for forges the user has no refresh token for | ❌ not built; OpenBao/zero-cp OIDC against IdP untested |
+| Login | one browser flow gives identity and the GitLab connection in one step; the refresh token never reaches the laptop | ❌ not built; group OAuth app with `openid`+`api` on gitlab.com Free 🟡 untested |
 | Session create | zero-cp, not the CLI, decides capabilities; CLI only proposes (host checkout policy + SHA) | ❌ (today CLI decides) |
 | Policy widening | if `.zero/policy.yaml` asks more than last approved for this repo → Dana confirms in CLI; beyond team maximum → denied, needs policy-repo MR | ❌ (#78) |
 | Bind | zero-cp needs the sandbox's SPIFFE ID; today one SPIRE entry per sandbox must be created after sandbox create ✅ (PoC 08) — who creates it centrally? see F2 |
@@ -126,7 +121,6 @@ sequenceDiagram
 
 | Credential | Where | Lifetime | Usable by |
 |---|---|---|---|
-| IdP ID token | CLI memory / keyring | ≤12h | Dana |
 | zero user session | CLI keyring | ≤12h | Dana's CLI |
 | GitLab refresh token (classic `api` scope) | OpenBao only | until revoked / unused | zero-cp |
 | GitLab access token | zero-cp memory | 2h | zero-cp |
@@ -136,94 +130,61 @@ sequenceDiagram
 ### Failure paths
 
 - zero-cp unreachable → no new grants → pushes fail closed ✅ (PoC 09: 502). Running requests with a cached token continue ≤ cache TTL; the minted GitLab token itself stays valid until revoked (F5).
-- Dana removed from team mid-session → next grant denied; existing child token still valid at GitLab until zero-cp revokes it (needs IdP event or periodic re-check).
-- Laptop offline → no forge access anyway; model access also needs the broker unless cached (F7).
+- Dana removed from team mid-session → next grant denied; existing child token still valid at GitLab until zero-cp revokes it (needs a periodic membership re-check).
+- Laptop offline → no forge access anyway.
 
 ---
 
-## UC2 — Cross-provider task: GitHub repo, private packages, Jira, AWS diagnostics, signed commits
+## UC2 — Read the branch environment (GitOps, Kubernetes)
 
-**Actor:** Sam, team Platform. **Goal:** agent fixes a bug in `acme/infra-tools` (GitHub), needs a private Go module from the internal registry, reads the Jira ticket through MCP, inspects a failing AWS Lambda's logs read-only, and pushes a signed commit.
+**Actor:** Dana, same session as UC1. **Goal:** the agent pushed `zero/ledger-123`; GitOps deployed it to namespace `ledger-zero-ledger-123`; the pod crash-loops. The agent reads pod status, events and logs to fix its own change. It never deploys or changes anything in the cluster.
 
-**Preconditions:** GitHub App "zero" installed on org `acme`; AWS trusts zero-cp's OIDC issuer; Sam is in IdP group `platform`; project policy lists the capabilities `github.pr.create`, `registry.read`, `jira.issue.read`, `aws.logs.read`.
+**Preconditions:** project policy lists capability `k8s.env.read`; the policy repo allows it for group `payments`; the namespace has the view-only Role from the GitOps template.
 
 ### Flow
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor Sam
-  participant CLI as zero CLI
-  participant CP as zero-cp
-  participant Bao as OpenBao
-  participant Sup as supervisor
   participant Ag as agent
-  participant GH as GitHub
-  participant Reg as registry
-  participant Jira
-  participant AWS
-  participant Sig as Fulcio/Rekor
+  participant Sup as supervisor
+  participant CP as zero-cp
+  participant K8s as Kubernetes API
+  participant GL as GitLab
 
-  Sam->>CLI: zero up
-  CLI->>CP: create session (repo acme/infra-tools, capabilities)
-  CP-->>CLI: ses_02 epoch 1 + compiled policy with 5 provider profiles
-
-  Ag->>Sup: go mod download (private module)
-  Sup->>CP: grant(audience registry)
-  CP-->>Sup: zero-issued JWT (aud=registry, sub=ses_02, act=sam) 5 min
-  Sup->>Reg: request with token
-
-  Ag->>Sup: MCP call jira.get_issue
-  Sup->>CP: grant(audience jira)
-  CP->>Bao: Sam's Jira refresh token
-  CP-->>Sup: Jira access token (1h)
-  Sup->>Jira: call
-
-  Ag->>Sup: aws logs tail
-  Sup->>CP: grant(audience aws, role platform-readonly)
-  CP-->>Sup: zero-issued JWT
-  Sup->>AWS: AssumeRoleWithWebIdentity → STS creds 15 min
-  Note over Sup,AWS: supervisor signs AWS requests (SigV4)
-
-  Ag->>Sup: git commit -S (signing request)
-  Sup->>CP: grant(audience sigstore)
-  CP-->>Sup: zero-issued JWT (sub=sam, session claim)
-  Sup->>Sig: keyless certificate + signature
-
-  Ag->>Sup: git push
-  Sup->>CP: grant(audience github, repo acme/infra-tools)
-  CP->>Bao: GitHub App private key (sign JWT in OpenBao transit)
-  CP->>GH: installation token {repositories:[infra-tools], permissions:{contents:write, pull_requests:write}}
-  CP-->>Sup: token (1h)
-  Sup->>GH: push
+  Ag->>Sup: kubectl -n ledger-zero-ledger-123 logs deploy/ledger (placeholder)
+  Sup->>CP: token grant (JWT-SVID, audience k8s, namespace)
+  CP->>GL: is the session's human a member of the project that owns this environment?
+  CP->>CP: namespace belongs to this project + branch? capability allowed?
+  CP->>K8s: TokenRequest for the view-only ServiceAccount in that namespace (10 min)
+  CP-->>Sup: token (cache ≤60s)
+  Sup->>K8s: GET pods/log with real token
+  K8s-->>Ag: logs
 ```
 
 ### Step notes
 
 | Step | Detail | Status |
 |---|---|---|
-| Federated providers (registry, AWS, sigstore) | zero-cp issues its own JWT; provider trusts issuer + claims. No stored secret. | ❌ zero-cp issuer not built; AWS/sigstore accept custom OIDC issuers 🟡 |
-| AWS call signing | AWS needs SigV4 per request; OpenShell substitutes headers, not signatures. OpenShell has `aws_sts_assume_role` refresh 🟡 but signing in the supervisor is unverified → F9 |
-| Commit signing | signing happens where the key is; agent must not hold a key. Needs a signing helper outside the sandbox or supervisor support → F10 |
-| GitHub | installation token per repo + permission, 1h 🟡. Commits/PRs appear as `zero[bot]`, not Sam → attribution via PR body/commit trailer + decision log (F4) |
-| Jira | per-user OAuth (3LO) refresh token in OpenBao; MCP server remote, token injected by supervisor ✅ pattern (GitLab MCP), Jira itself untested |
-| Five providers | each needs: endpoint allowlist, placement profile, mint function. Provider plugin interface in zero-cp | ✅ interface exists for forges in CLI; ❌ generalised |
+| Capability | `k8s.env.read` = get/list/watch pods, events, deployments, logs in the session's branch/QA namespaces. No Secrets, no exec, no port-forward, no writes | ❌ not built |
+| Namespace ownership | zero-cp must know which namespaces belong to which project/branch: naming convention or labels set by the GitOps templates (F24) | ❌ |
+| Human check | sandbox ≤ human: GitLab project membership is the source of truth, no separate K8s user mapping | ❌ |
+| Mint | Kubernetes TokenRequest, bound ServiceAccount token, minimum 10 min 🟡 | ❌ untested |
+| Inject | bearer placement on the cluster API host, same pattern as GitLab ✅ pattern; `kubectl logs -f` (long-lived stream) through the supervisor untested | ❌ |
+| Evidence | Kubernetes audit log shows the ServiceAccount; zero-cp decision log maps it to session + human | ❌ |
 
 ### Credential inventory UC2
 
 | Credential | Stored secret? | Where | Lifetime |
 |---|---|---|---|
-| zero-issued JWT (registry, AWS, sigstore) | no | supervisor memory | 5 min |
-| AWS STS credentials | no | supervisor memory | 15 min |
-| GitHub App private key | **yes, org-wide** | OpenBao transit (never exported) | rotated manually |
-| GitHub installation token | no | supervisor memory | 1h |
-| Jira refresh token | yes, per user | OpenBao | until revoked |
+| ServiceAccount token (view-only, one namespace) | no | supervisor memory | 10 min |
+| zero-cp's own right to request tokens | no (its pod identity) | cluster | — |
 
 ### Failure paths
 
-- Sam's repo not covered by App installation → grant denied with reason; CLI prints "ask org admin to add repo to zero app".
-- Jira refresh token expired → grant fails → agent gets 401-like error → CLI notification "reconnect Jira: `zero login jira`" (agent cannot do the browser flow).
-- AWS trust condition mismatch (wrong team) → STS denies; visible in decision log and CloudTrail.
+- Namespace not owned by the session's project → denied with reason.
+- Environment not deployed yet → Kubernetes 404; agent waits for the pipeline (`gitlab.pipeline.read`).
+- Cluster API not reachable from the laptop (private cluster, VPN) → F25.
 
 ---
 
@@ -245,7 +206,7 @@ What is traceable: human (Dana), session, sandbox, each HTTP request. What is no
 ### 3b. Stolen laptop
 
 1. Dana reports loss. Riya: `zero admin user revoke dana --device <node-id>`.
-2. zero-cp: closes all Dana's sessions, revokes all child tokens, revokes Dana's user session; SPIRE server bans the node (SVID renewal stops; existing JWT-SVIDs ≤5 min).
+2. zero-cp: closes all Dana's sessions, revokes all child tokens, revokes Dana's user session and Kubernetes grants stop; SPIRE server bans the node (SVID renewal stops; existing JWT-SVIDs ≤5 min).
 3. Thief with root on the laptop has: encrypted gateway store + KEK on the same disk → can decrypt whatever the gateway stored locally. In the target design the gateway stores **no** long-lived provider secret (only broker profile); injected tokens are in supervisor memory. So the loot is: child tokens of running sandboxes (revoked in step 2), Dana's zero user session (revoked), nothing reusable.
 4. Refresh tokens are in OpenBao, unreachable without a valid user session + node identity.
 
@@ -253,10 +214,9 @@ Today (laptop-minting): thief gets glab's OAuth refresh token in plaintext confi
 
 ### 3c. Offboarding
 
-1. IT disables Dana in the IdP.
-2. zero-cp learns via SCIM/webhook or at next token refresh/introspection (F6): closes sessions, revokes child tokens, deletes `users/dana/*` in OpenBao, revokes refresh tokens at providers.
-3. GitHub (App tokens): nothing user-specific to revoke; grants stop because the user session is gone.
-4. Audit record: who revoked, when, which tokens.
+1. IT blocks Dana in GitLab.
+2. zero-cp learns at the next token refresh (fails) (F6): closes sessions, revokes child tokens, deletes `users/dana/*` in OpenBao, revokes refresh tokens at providers.
+3. Audit record: who revoked, when, which tokens.
 
 ---
 
@@ -268,25 +228,29 @@ Severity: **H** breaks an invariant or blocks the design · **M** real cost or r
 |---|---|---|---|---|
 | F1 | H | **Laptop node attestation.** SPIRE needs to trust each of 120 laptops. Join tokens don't scale and are bearer secrets; TPM attestation needs TPM enrolment; x509pop needs device certs (MDM). | Without it, sandbox SPIFFE IDs from a laptop prove nothing centrally. | Tie node enrolment to the human: `zero login` → zero-cp issues a join token for *this* device, node ID carries the user. Then sandbox identity is only as strong as "Dana's laptop", which matches the binding rule (sandbox ≤ human). TPM later. ❌ untested |
 | F2 | H | **Who registers sandbox SPIRE entries?** PoC 08: one entry per sandbox created on the SPIRE server after sandbox create. Centrally this means the CLI (developer) asks zero-cp to create entries → developer can ask for arbitrary selectors. And C49: whoever owns the podman socket can forge labels. | Trust boundary is the laptop's `openshell` user, not the sandbox. | Accept explicitly: identity granularity that zero-cp can *trust* is (human, device); sandbox ID is for attribution and for separating concurrent sessions, not a security boundary against the laptop owner. Design must never grant a sandbox more than its human. Alternative: nested SPIRE per laptop. |
-| F3 | H | **zero-cp + OpenBao become the crown jewels.** They hold `api`-scope refresh tokens for 120 users and the org GitHub App key. | Compromise = everything every developer can do, on all forges. Today's design spreads that risk across laptops. | Per-user encryption in OpenBao bound to the user's active session (refresh token usable only while the user is logged in); GitHub App key in transit engine, never exported; zero-cp has no standing read on other users' paths (OpenBao templated policies on the OIDC `sub`). Disappears per provider when granular OAuth / federation exists. Needs threat model + ADR. |
-| F4 | M | **Attribution differs per provider.** GitLab: actions are Dana's. GitHub App: actions are `zero[bot]`. | "Who did this" differs by forge; reviewers may be unable to approve their "own" bot PR or, worse, *can* approve their own agent's PR (four-eyes bypass). | Commit trailers `Zero-Session`, `On-behalf-of`; PR body stamped by zero-cp; branch protection "require approval from someone other than last pusher" does not cover bot-pushed code → document as org guardrail in `zero doctor`. GitHub user-to-server tokens (expire 8h, act as user, limited to App permissions ∩ user permissions) may be the better fit 🟡 — to verify. |
-| F5 | M | **Provider minimum lifetimes.** GitLab PAT expiry is a date (≥ end of day), GitHub installation token 1h, Jira 1h. "Minutes" is only true for federated providers. | Revocation must be an explicit API call that can fail (provider down, zero-cp down). | Revocation queue with retries + alert on failure; orphan sweep by token name prefix ✅ (exists in CLI); report residual lifetime honestly. |
-| F6 | M | **Human session liveness.** IdP disable does not reach zero-cp unless there is SCIM/back-channel logout or short user sessions. | Offboarded user's running sandbox keeps working until session TTL. | Short user session (≤1h) with silent refresh; IdP refresh failure closes sessions. |
-| F7 | M | **Availability.** Every credentialed request depends on zero-cp (+ SPIRE, OpenBao, IdP). 120 developers stop if it is down; laptops on trains/VPN-less networks. | Central SPOF for all agent work, including model access if models are brokered. | Grant cache TTL per provider class (model access longer than forge writes); HA; local mode fallback is a policy decision (security team may forbid). |
-| F8 | M | **Rate limits and quotas.** 120 devs × several sandboxes × token mint per session; GitLab token creation and GitHub App installation-token rate limits; fine-grained PAT count per user. | Throttling looks like random auth failures to the agent. | Cache per (session, provider, resource); measure limits before committing. ❌ unmeasured |
-| F9 | M | **Request signing providers (AWS SigV4, some registries).** OpenShell injects headers; it does not sign requests. | Agent would need real STS keys in the sandbox → breaks "agent never sees credentials". | Check OpenShell `aws_sts_assume_role` behaviour 🟡; else STS creds in sandbox with 15 min life and read-only role (accept as caveat) or a signing proxy. To verify. |
-| F10 | M | **Commit signing.** Keyless signing needs the JWT at signing time on the machine that signs; gitsign in the sandbox would need the zero-issued token inside the sandbox. | Either the agent holds a (short-lived, audience-bound) identity token, or signing moves to the supervisor/host. | Audience-restricted 5-min JWT usable only at Fulcio is low risk but is still "agent holds a credential" → needs explicit ADR. Alternative: sign on push by a host-side helper. |
+| F3 | H | **zero-cp + OpenBao become the crown jewels.** They hold `api`-scope GitLab refresh tokens for 120 users, and zero-cp can request tokens for every branch namespace. | Compromise = everything every developer can do on GitLab. Today's design spreads that risk across laptops. | Per-user encryption in OpenBao bound to the user's active session; zero-cp has no standing read on other users' paths (OpenBao templated policies on `sub`). Disappears when GitLab granular OAuth tokens ship. Needs threat model + ADR. |
+| F4 | — | *dropped (GitHub out of scope).* Remaining point: an agent MR is authored by the human, so the human must not be the only approver → org guardrail for `zero doctor`. | | |
+| F5 | M | **Provider minimum lifetimes.** GitLab PAT expiry is a date (≥ end of day); Kubernetes token ≥10 min. | Revocation at GitLab must be an explicit API call that can fail (GitLab down, zero-cp down). | Revocation queue with retries + alert on failure; orphan sweep by token name prefix ✅ (exists in CLI); report residual lifetime honestly. |
+| F6 | M | **Human session liveness.** Blocking a user in GitLab does not reach zero-cp by itself. | Offboarded user's running sandbox keeps working until session TTL. | Short user session (≤1h) with silent refresh against GitLab; refresh failure closes sessions. |
+| F7 | M | **Availability.** Every credentialed request depends on zero-cp (+ SPIRE, OpenBao, GitLab). 120 developers stop if it is down. | Central SPOF for all agent work. | Grant cache TTL; HA; local mode fallback is a policy decision (security team may forbid). |
+| F8 | M | **Rate limits and quotas.** 120 devs × several sandboxes × token mint per session; GitLab token creation limits; fine-grained PAT count per user. | Throttling looks like random auth failures to the agent. | Cache per (session, resource); measure limits before committing. ❌ unmeasured |
+| F9 | — | *dropped (AWS out of scope).* | | |
+| F10 | M | **Commit signing** (planned F21). The agent must not hold a signing key. | Unsigned or agent-held-key commits weaken attribution. | Sign outside the sandbox (host-side helper or supervisor) or let GitLab sign via web commits; needs its own design + ADR. |
 | F11 | M | **Model traffic is outside the evidence chain.** Prompts/responses go to the model API; nothing ties a tool action to the prompt that caused it. | Cannot reconstruct *why* in 3a. | AI control plane / LLM gateway (arch §15) as another brokered provider; out of scope now, note it. |
-| F12 | M | **Provider plugin sprawl.** Each provider = login flow + mint + revoke + OpenShell profile + capability map + doctor checks. | Maintenance for a 3-person platform team; quality differs per provider. | Tiers: *federated* (generic, config only: issuer trust + audience), *OAuth generic* (config only: endpoints + scopes; token is user-scoped, no attenuation), *native* (code: GitLab, GitHub). Only native ones need code. |
-| F13 | M | **Capability vocabulary across providers.** `git.push`, `gitlab.mr.create`, `github.pr.create`, `aws.logs.read` … | Policy files become provider-specific; team mapping hard to review. | Generic verbs for forges (`forge.change.create`), provider-specific only where unavoidable; keep the set small (arch principle). |
-| F14 | M | **Team mapping source of truth.** IdP groups vs forge membership vs policy repo can disagree. | zero-cp grants what the forge would deny, or denies what the forge allows → confusion. | Forge membership stays authoritative for forge access (token ⊆ user's rights ✅ enforced by GitLab attenuation); policy repo only *reduces*. Don't duplicate membership in zero. |
+| F12 | — | *dropped (two providers only: GitLab, Kubernetes; both native code).* | | |
+| F13 | L | **Capability vocabulary.** Small fixed set: `git.*`, `gitlab.*`, `k8s.env.read`. | Must stay small to be reviewable. | Add verbs only with an ADR. |
+| F14 | M | **Source of truth for access.** GitLab membership vs policy repo can disagree. | zero-cp grants what GitLab would deny, or denies what GitLab allows → confusion. | GitLab membership stays authoritative (token ⊆ user's rights ✅ enforced by GitLab attenuation; K8s read follows project membership); policy repo only *reduces*. Don't duplicate membership in zero. |
 | F15 | L | **Multiple devices / multiple sandboxes per user.** Token names, session listing, "which laptop". | UX and cleanup. | Session ID carries device; `zero ls --all` from zero-cp. |
-| F16 | L | **First-run friction.** "Connect GitLab", "connect Jira", … one browser flow per provider. | 5 prompts on day one. | `zero login` connects all providers the org marks default, sequentially, once. |
+| F16 | — | *dropped (one login covers everything).* | | |
 | F17 | H | **Agent can drive any allowed capability at machine speed.** The broker authorises by capability, not by intent. A rogue agent with `git.push` + `mr.create` can do all of 3a legitimately. | Central design does not reduce *what* a session can do versus today; it improves revocation and evidence only. | Rate/anomaly rules in zero-cp per session (grants per minute, distinct resources), step-up approval for destructive verbs (branch delete, force push) where the provider API allows distinguishing them — for git push it does not (C43). |
-| F18 | M | **Setup is no longer "simple" for the platform team.** zero-cp, SPIRE server, OpenBao (unseal, backup, HA), IdP client, policy repo, per-provider trust. | Contradicts "simple to set up" for the organisation, even though the developer side stays one command. | Ship as one Helm chart / compose bundle with OpenBao + SPIRE embedded defaults; or drop SPIRE centrally (see alternative below). |
+| F18 | M | **Setup is no longer "simple" for the platform team.** zero-cp, SPIRE server, OpenBao (unseal, backup, HA), GitLab app, policy repo, K8s roles. | Contradicts "simple to set up" for the organisation, even though the developer side stays one command. | Ship as one Helm chart with OpenBao + SPIRE embedded defaults; or drop SPIRE centrally (see alternative below). |
 | F19 | M | **Revocation window on a stolen/rooted laptop (3b).** Tokens in supervisor memory can be extracted and used until the provider-side revoke lands (report delay + API call). "Nothing reusable" is only true after that. | Window = time to report + revoke; GitLab child token otherwise valid up to a day. | Heartbeat from laptop to zero-cp; missed heartbeats auto-revoke. Keeps window ≈ heartbeat interval. |
 | F20 | M | **Policy change during a session.** Org baseline or team mapping is tightened while sessions run; flows only check at session create. | Running sessions keep old, wider rights. | Policy version in the session; zero-cp re-evaluates on policy-repo change → new epoch or session close. |
-| F21 | L | **GitHub installation tokens in revocation flows.** 3b/3c only mention child tokens. | 1h tokens stay valid unless revoked. | zero-cp tracks every minted token per session; revoke via `DELETE /installation/token` 🟡. |
+| F21 | — | *dropped (GitHub out of scope).* | | |
+| F22 | M | **Logs contain secrets.** The view Role excludes Secret objects, but applications print tokens and connection strings. | Agent (and model provider) sees them. | Sanitising of Kubernetes output (arch §16, Phase 0 item 10); QA/branch environments must use non-production secrets — org guardrail. |
+| F23 | M | **Log and event content is untrusted input.** Anything that can write to the app's logs can inject instructions (same as P15 for GitLab content). | Prompt injection path into a session that can push. | No technical fix here; damage stays bounded by the session's capabilities. Record as attack path. |
+| F24 | M | **Namespace ownership.** zero-cp must map namespace → project + branch reliably. | Wrong mapping = reading another team's environment. | Labels written by the GitOps templates (project id, branch), verified by zero-cp; never derived from a name the agent supplies. |
+| F25 | L | **Cluster API reachability.** Private clusters are not reachable from laptops without VPN. | Capability unusable for some developers. | zero-cp as read proxy for the allowed verbs instead of handing out a token — also removes the token from the laptop. Open. |
 
 Review (subagent) also noted: detection rules in 3a are GitLab-only and cover one action type — detection is not designed here (belongs to evidence, arch §18).
 
@@ -304,6 +268,5 @@ Loses: cryptographic per-sandbox identity at the centre. Keeps: one login, centr
 
 1. Is (human, device) as the trusted unit acceptable, with sandbox identity for attribution only (F2)?
 2. Central store of `api`-scope refresh tokens (F3): acceptable with per-user binding, or wait for granular OAuth and keep laptop minting until then?
-3. GitHub: bot identity (App installation token) or user identity (user-to-server token) (F4)?
-4. Commit signing: may the sandbox hold a 5-minute, audience-bound signing token (F10)?
-5. Central SPIRE or the leaner variant for laptops?
+3. Kubernetes read: short-lived token to the laptop, or zero-cp as read proxy (F25)?
+4. Central SPIRE or the leaner variant for laptops?
