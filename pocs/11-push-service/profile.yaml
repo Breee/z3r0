@@ -1,0 +1,33 @@
+# PoC 11 (#93): GitLab profile with direct pushes denied; pushes go through the
+# push service on the host, which receives the same substituted token.
+id: zero-gitlab-push
+display_name: zero GitLab (push service)
+description: Per-sandbox GitLab token, git push only via the zero push service
+category: source_control
+credentials:
+  - name: token
+    description: fine-grained project token minted by zero
+    env_vars: [GITLAB_TOKEN]
+    required: true
+    auth_style: basic
+    header_name: authorization
+endpoints:
+  - host: gitlab.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    allow_encoded_slash: true
+    deny_rules:
+      - method: "*"
+        path: /**/git-receive-pack
+      - method: GET
+        path: /**/info/refs
+        query:
+          service: git-receive-pack
+  - host: host.openshell.internal
+    port: 18095
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl, /usr/local/bin/glab]
