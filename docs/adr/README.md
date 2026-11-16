@@ -33,3 +33,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [29](0029-copilot-in-sandbox.md) | 2026-11-13 | Host Copilot login bound as placeholder credential for opencode in the sandbox | Z-INV-1 |
 | [30](0030-push-gate.md) | 2026-11-16 | Push gate: agent can only push its session branch | Z-INV-2, Z-INV-3 |
 | [31](0031-zero-serve.md) | 2026-11-16 | zero serve: one host process for push gate and token upkeep | Z-INV-4, Z-INV-6 |
+| [32](0032-openbao-credential-backend.md) | 2026-11-16 | OpenBao is the credential backend: opt-in storage now, brokering next | Z-INV-4, Z-INV-6 |
