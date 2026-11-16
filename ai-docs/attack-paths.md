@@ -48,7 +48,7 @@ Recorded, not necessarily handled. Scenario: `docs/scenarios/go-container-gitlab
 | # | Severity | Path | Impact | Status | Ref |
 |---|---|---|---|---|---|
 | P13 | high | Agent commits hook/tool configs (`.pre-commit-config.yaml`, `.husky/`, `lefthook.yml`, `.envrc`, `.vscode/tasks.json`, `Makefile`, `go:generate`, tests) → developer checks out the branch on the host and runs tooling | Code exec as login user, full host blast radius | reasoning; `.git/hooks`/`.git/config` do not travel (F12) | C42 |
-| P14 | high | Agent edits `.gitlab-ci.yml` on its branch → pipeline runs agent code on the runner with CI job token and non-protected CI/CD variables | Exfil of CI secrets, abuse of job token / runner | reasoning; GitLab protected variables only on protected branches | forge setup |
+| P14 | high | Agent pushes to its session branch → pipeline starts automatically and runs agent-written code (`.gitlab-ci.yml`, tests, Makefile, scripts, Dockerfile) on a runner outside the sandbox. Detail: section "P14 in depth" | Exfil of CI secrets and the repo, abuse of job token / OIDC / runner | reasoning, not tested; no zero layer covers it (#101) | ADR 0034 |
 | P15 | high | Prompt injection via GitLab content the agent reads (issues, MR comments, job logs, MCP results) or via dependencies/READMEs | Agent performs attacker's actions within its permissions | inherent, not tested | A07, F04 |
 | P16 | medium | Agent widens `.zero/policy.yaml` on a branch → developer checks it out → approves the expansion prompt without reading (approval fatigue) | Broader egress/token scope for next sandbox | design (§7a), not built | X06 |
 | P17 | medium | Malicious Go module via allowed `proxy.golang.org` → `go.sum` committed → host or CI build runs it | Code exec in CI / on host (sandbox itself contained) | reasoning | P13 |
@@ -60,3 +60,33 @@ Recorded, not necessarily handled. Scenario: `docs/scenarios/go-container-gitlab
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — |
 | P24 | low | Supply chain of zero itself: OpenShell tarballs checksum-only, uniget images `insecureAcceptAnything` (digest-pinned), local dev image | Malicious runtime/tooling | accepted for now | C41, ADR 0021 |
 | P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | open, TODO (C43) | C43 |
+
+## P14 in depth: CI is code execution outside the sandbox (2026-11-16, #101)
+
+Not tested; from GitLab documentation and reasoning.
+
+**Why it matters.** Everything else the agent does stays inside the sandbox or passes a zero layer. CI does not: a push to the session branch (allowed by design, L4) starts a pipeline with no human in between, and the pipeline runs whatever the branch contains. No exploit is needed.
+
+**Why the developer trust model does not apply.** GitLab lets every Developer edit the pipeline because a human who sends all CI variables to a remote server is unlikely and accountable. A corrupted agent has neither property: it does it at once, whenever an injected prompt says so. The agent's push must be treated as untrusted input to CI, like a fork MR from a stranger, although it carries the developer's identity (ADR 0034).
+
+**Forbidding edits of `.gitlab-ci.yml` does not close it.** The existing pipeline already runs agent-written tests, Makefiles, scripts and Dockerfiles.
+
+| Reachable from the job | Severity | Note |
+|---|---|---|
+| CI variables not marked protected (project, group, inherited) | high | masking only hides them in the log |
+| Unrestricted egress from the runner | high | bypasses the sandbox allowlist (L1): whole repo can leave |
+| OIDC id tokens (cloud, OpenBao) | high where used | if the trust policy has no branch condition |
+| Job token | medium | read project, write its package/container registry, projects that allowlist it |
+| Code execution on the runner | low on gitlab.com shared runners, high on self-hosted (docker socket, privileged, internal network) | |
+| Compute minutes | low | |
+
+Not reachable: protected variables, protected environments, merge.
+
+**Candidate layers (none built).**
+
+| Layer | Closes | Status |
+|---|---|---|
+| GitLab: variables protected, runners only for protected branches | secrets, self-hosted runner | GitLab feature; `zero doctor` check not built |
+| No automatic pipeline for agent pushes: gate adds `ci.skip`, human starts the pipeline from the MR after reading the diff | everything, as long as the human reads | untested; agent may be able to start a pipeline through the API |
+| Pipeline config from another project | edits of the pipeline file only | untested on gitlab.com Free; scripts still run |
+| Separate untrusted runner for `zero/*` branches (no secrets, egress allowlist) | secrets, egress | idea; needs runner admin |

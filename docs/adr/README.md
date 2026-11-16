@@ -35,3 +35,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [31](0031-zero-serve.md) | 2026-11-16 | zero serve: one host process for push gate and token upkeep | Z-INV-4, Z-INV-6 |
 | [32](0032-openbao-credential-backend.md) | 2026-11-16 | OpenBao is the credential backend: opt-in storage now, brokering next | Z-INV-4, Z-INV-6 |
 | [33](0033-trust-assumption-and-review.md) | 2026-11-16 | Trust assumption: sandbox and supervisor are trusted; review in the MR or the remote view | Z-INV-1, Z-INV-3, Z-INV-5 |
+| [34](0034-agent-is-untrusted-pusher.md) | 2026-11-16 | The agent is an untrusted pusher, not a regular developer | Z-INV-1, Z-INV-2, Z-INV-5 |
