@@ -242,7 +242,9 @@ func (s *Sandbox) serveRunning() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("sandbox unreachable: %w", err)
 	}
-	return out != "stopped", nil
+	// opencode starts the service by itself on a random port (e.g. on
+	// "opencode auth import"); only the forwarded port counts as running.
+	return out == fmt.Sprintf("http://127.0.0.1:%d", servePort), nil
 }
 
 // startServe starts the opencode background service inside the sandbox on
@@ -252,7 +254,7 @@ func (s *Sandbox) startServe() error {
 	_, err := s.ssh("pkill -f '[s]erve --hostname' ; cd " + shellQuote(s.Dir) + " || exit 1; " +
 		"opencode service set hostname 127.0.0.1 >/dev/null && " +
 		"opencode service set port " + fmt.Sprint(servePort) + " >/dev/null && " +
-		"opencode service start >/dev/null")
+		"{ opencode service stop >/dev/null 2>&1; opencode service start >/dev/null; }")
 	return err
 }
 
