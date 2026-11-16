@@ -92,3 +92,32 @@ Not reachable: protected variables, protected environments, merge.
 | No automatic pipeline for agent pushes: gate adds `ci.skip`, human starts the pipeline from the MR after reading the diff | everything, as long as the human reads | untested; agent may be able to start a pipeline through the API |
 | Pipeline config from another project | edits of the pipeline file only | untested on gitlab.com Free; scripts still run |
 | Separate untrusted runner for `zero/*` branches (no secrets, egress allowlist) | secrets, egress | idea; needs runner admin |
+
+## Origins of agent corruption (2026-11-16, #108)
+
+Reasoning, not tested. Every path above starts with an agent that does something its developer did not ask for. This section lists where that comes from. The model cannot reliably tell data from instructions, so the root cannot be closed; it can only be made smaller.
+
+**Rule.** Never give one sandbox all three: untrusted input, access to secrets or private data, and an outbound channel. zero removes secrets (L2, L3) and most outbound channels (L1, L4, L5, 5a). Untrusted input is not limited by zero today.
+
+| # | Origin | Example | Today | Gap |
+|---|---|---|---|---|
+| P26 | Untrusted text the agent reads (prompt injection) | issue or MR comment, web page, dependency README or source, log line, MCP tool result | egress allowlist limits what can be fetched (L1); GitLab MCP is limited to the project by the token | content from non-members of the project reaches the agent unmarked (P15) |
+| P27 | Poisoned instructions in the repo | `AGENTS.md`, skills, `.opencode/`, MCP config changed on a branch | MR review before merge (DevOps backbone) | the agent loads these from the working branch, including one it or a stranger just changed |
+| P28 | Tool and plugin supply chain | MCP server, opencode plugin, skill, npm or Go module | dev image pinned by digest; registries only if allowed in `.zero/policy.yaml` | plugins and MCP servers named in repo config are not checked; modules are not vetted (P17) |
+| P29 | Model or provider | backdoored model, tampered endpoint | model hosts are an explicit allowlist (zen, Copilot) | no approved-model list; model traffic content is not inspected |
+| P30 | The human | careless or malicious prompt | accountability: every token and push carries the developer's identity; policy widening needs approval (#78) | none planned; this is the developer trust model |
+| P31 | Plain model error | wrong command, wrong branch, deletes work | blast radius only: sandbox, session branch, no deletes | none possible at the root |
+
+### Candidate layers at the root
+
+Neither is built. Decision 2026-11-16: record them, build later; follow-up issues #109 and #110.
+
+**Trusted instructions (P27).** Agent configuration (`AGENTS.md`, skills, `.opencode/`, MCP config) is taken from the protected default branch, not from the working branch.
+- Mechanism: at `zero up` zero copies these paths from `origin/<default branch>` of the host checkout into the sandbox and makes them read-only for the agent; changes to them on a session branch take effect only after merge.
+- Unknowns: which paths opencode and VS Code read (global and per project); whether the sandbox filesystem policy can make single paths inside the checkout read-only; how the developer tests a change to these files.
+- Cost: a list of paths per agent tool that must be maintained; friction when working on the instructions themselves.
+
+**Input provenance (P26).** Forge content written by people who are not project members is not handed to the agent, or is handed over marked as untrusted.
+- Mechanism: a filter between the agent and the forge API/MCP that looks up the author of each issue, comment and MR description and drops or labels content from non-members.
+- Unknowns: where the filter runs (OpenShell rules cannot rewrite response bodies; it would be a proxy in `zero serve` or an MCP wrapper); whether labelling changes model behaviour at all; cost of the membership lookups. OpenAPPA covers part of this inside the sandbox (see `tool-eval-paperclip-openappa.md`, not adopted).
+- Cost: another parser of forge responses on the host; does nothing for web pages, dependencies or logs.

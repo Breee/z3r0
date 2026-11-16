@@ -48,7 +48,7 @@ Each layer is a feature. L0–L3 are always on; L4+ are switchable per project/o
 | 8 | Evidence: decision log + OCSF per sandbox → sink | silent misuse, no attribution | Z3, Z6 | partial (local logs only) |
 | — | DevOps backbone: protected branches, MR review, CI, GitOps | merging agent work unreviewed | — | not zero (ADR 0024) |
 
-Known holes no layer closes today (L0 also assumes the host follows `docs/host-recommendations.md`, e.g. no docker group): foreign credentials in requests (C18, #14), spam MRs (accepted as reversible), agent-committed hooks run on host checkout (C42), CI runs agent code once a human starts the pipeline or `ci.run` is approved (P14, [ADR 0034](../adr/0034-agent-is-untrusted-pusher.md), [ADR 0035](../adr/0035-ci-skip-by-default.md)), model traffic content. What zero trusts and what it mitigates: [ADR 0033](../adr/0033-trust-assumption-and-review.md).
+Known holes no layer closes today (L0 also assumes the host follows `docs/host-recommendations.md`, e.g. no docker group): foreign credentials in requests (C18, #14), spam MRs (accepted as reversible), agent-committed hooks run on host checkout (C42), CI runs agent code once a human starts the pipeline or `ci.run` is approved (P14, [ADR 0034](../adr/0034-agent-is-untrusted-pusher.md), [ADR 0035](../adr/0035-ci-skip-by-default.md)), model traffic content. Where corruption comes from and the two candidate layers at the root: `ai-docs/attack-paths.md`, "Origins of agent corruption" (#108). What zero trusts and what it mitigates: [ADR 0033](../adr/0033-trust-assumption-and-review.md).
 
 ## 28.4 Use (what a developer types)
 
