@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -109,12 +110,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	pw, err := s.password()
-	if err != nil {
-		return 0, err
-	}
-
+	os.Remove(s.path("password")) // left by versions that ran serve with a password
 	var port int
+	var err error
 	if f := s.currentForward(); f != nil {
 		port = f.port
 	} else {
@@ -131,9 +129,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	}
 	var startErr error
 	if !running {
-		startErr = s.startServe(pw)
+		startErr = s.startServe()
 	}
-	if err := s.waitReady(port, pw, startErr); err != nil {
+	if err := s.waitReady(port, startErr); err != nil {
 		return 0, err
 	}
 	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, s.url(port), s.Dir)
@@ -240,47 +238,34 @@ func (s *Sandbox) ensureCheckout() error {
 }
 
 func (s *Sandbox) serveRunning() (bool, error) {
-	out, err := s.ssh("if pgrep -x opencode >/dev/null; then echo yes; else echo no; fi")
+	out, err := s.ssh("opencode service status")
 	if err != nil {
 		return false, fmt.Errorf("sandbox unreachable: %w", err)
 	}
-	return out == "yes", nil
+	return out != "stopped", nil
 }
 
-// startServe launches `opencode serve` inside the sandbox. The password is
-// passed on stdin, never in argv. ssh may report a teardown race even when
-// serve started fine — the readiness probe is authoritative.
-func (s *Sandbox) startServe(pw string) error {
-	script := "read -r pw; cd " + shellQuote(s.Dir) + " || exit 1; " +
-		"OPENCODE_SERVER_PASSWORD=\"$pw\" nohup opencode serve --hostname 127.0.0.1 --port " +
-		fmt.Sprint(servePort) + " >/tmp/serve.log 2>&1 </dev/null &"
-	cmd := exec.Command("ssh", "-F", s.path("ssh.conf"), s.Host, script)
-	cmd.Stdin = strings.NewReader(pw + "\n")
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return fmt.Errorf("%s", msg)
-		}
-		return err
-	}
-	return nil
+// startServe starts the opencode background service inside the sandbox on
+// the forwarded port. It has no password: browsers get in with a one-time
+// pairing link (zero web). A leftover password-mode serve is stopped first.
+func (s *Sandbox) startServe() error {
+	_, err := s.ssh("pkill -f '[s]erve --hostname' ; cd " + shellQuote(s.Dir) + " || exit 1; " +
+		"opencode service set hostname 127.0.0.1 >/dev/null && " +
+		"opencode service set port " + fmt.Sprint(servePort) + " >/dev/null && " +
+		"opencode service start >/dev/null")
+	return err
 }
 
-// waitReady polls /api/session through the forward until serve answers 200.
-func (s *Sandbox) waitReady(port int, pw string, startErr error) error {
+// waitReady polls the API through the forward until the service answers.
+func (s *Sandbox) waitReady(port int, startErr error) error {
 	url := s.url(port)
 	last := "connection refused"
 	for i := 0; i < 30; i++ {
-		status, err := probeConfig(port, pw)
-		if err == nil && status == 200 {
+		err := probeServe(port)
+		if err == nil {
 			return nil
 		}
-		if err != nil {
-			last = err.Error()
-		} else {
-			last = fmt.Sprintf("HTTP %d", status)
-		}
+		last = err.Error()
 		time.Sleep(time.Second)
 	}
 	msg := fmt.Sprintf("serve not reachable at %s (%s)", url, last)
@@ -290,14 +275,25 @@ func (s *Sandbox) waitReady(port int, pw string, startErr error) error {
 	return fmt.Errorf("%s; check: zero logs", msg)
 }
 
-// Web is up + the opencode web UI of the sandbox server in the browser.
+var pairLink = regexp.MustCompile(`http://127\.0\.0\.1:\d+/auth/connect/\S+`)
+
+// Web is up + the opencode web UI in the browser, opened with a one-time
+// pairing link from the sandbox service.
 func (s *Sandbox) Web(out io.Writer) error {
 	port, err := s.Up(out)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "login: opencode / %s\n", s.read("password"))
-	return exec.Command("xdg-open", fmt.Sprintf("http://127.0.0.1:%d", port)).Run()
+	text, err := s.ssh("opencode pair --url " + shellQuote(s.url(port)))
+	if err != nil {
+		return fmt.Errorf("pairing link: %w", err)
+	}
+	link := pairLink.FindString(text)
+	if link == "" {
+		return fmt.Errorf("no pairing link in opencode pair output: %s", text)
+	}
+	fmt.Fprintf(out, "open (works once, 5 minutes): %s\n", link)
+	return exec.Command("xdg-open", link).Run()
 }
 
 // Attach is up + the opencode TUI attached to the sandbox.
@@ -306,11 +302,7 @@ func (s *Sandbox) Attach(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	pw, err := s.password()
-	if err != nil {
-		return err
-	}
-	return passthroughEnv([]string{"OPENCODE_SERVER_PASSWORD=" + pw}, "opencode", "--server", s.url(port), s.Dir)
+	return passthrough("opencode", "--server", s.url(port), s.Dir)
 }
 
 // Run is up (silent) + a one-shot opencode run.
@@ -319,12 +311,8 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 	if err != nil {
 		return err
 	}
-	pw, err := s.password()
-	if err != nil {
-		return err
-	}
 	args := append([]string{"run", "--server", s.url(port)}, prompt...)
-	return passthroughEnv([]string{"OPENCODE_SERVER_PASSWORD=" + pw}, "opencode", args...)
+	return passthrough("opencode", args...)
 }
 
 // Status prints sandbox / forward / serve state.
@@ -485,16 +473,16 @@ func (s *Sandbox) ensureHostSSHConfig() error {
 	return os.WriteFile(cfg, buf.Bytes(), 0o600)
 }
 
-// Logs prints serve.log from inside the sandbox; follow tails it live.
+// Logs prints the opencode service log from inside the sandbox; follow tails it live.
 func (s *Sandbox) Logs(out io.Writer, follow bool) error {
 	if !s.exists() {
 		return fmt.Errorf("sandbox %s: none", s.Name)
 	}
 	if follow {
 		return passthrough("ssh", "-F", s.path("ssh.conf"), s.Host,
-			"tail -n 200 -f /tmp/serve.log")
+			"tail -n 200 -f ~/.local/share/opencode/log/opencode.log")
 	}
-	text, err := s.ssh("if test -f /tmp/serve.log; then tail -n 200 /tmp/serve.log; " +
+	text, err := s.ssh("if test -f ~/.local/share/opencode/log/opencode.log; then tail -n 200 ~/.local/share/opencode/log/opencode.log; " +
 		"else echo 'no serve log (serve not started)'; fi")
 	if err != nil {
 		return err

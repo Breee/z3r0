@@ -24,7 +24,7 @@ Usage (inside a git repo): zero <command>
   web           up + open the opencode web UI in the browser
   status        show sandbox / forward / serve state
   stop          end the host port forward (sandbox keeps running)
-  logs [-f]     serve.log from inside the sandbox
+  logs [-f]     opencode service log from inside the sandbox
   pause         stop the sandbox and revoke its token; files stay, zero up continues
   rm            stop + delete sandbox (work not pushed is lost)
   serve         run the broker in the foreground: push gate, token upkeep (zero up starts it itself)

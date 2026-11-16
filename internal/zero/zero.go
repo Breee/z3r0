@@ -4,9 +4,7 @@ package zero
 
 import (
 	"bytes"
-	"crypto/rand"
 	_ "embed"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -28,7 +26,7 @@ var policyYAML []byte
 const servePort = 4096
 
 // Sandbox is the per-repo zero environment: one OpenShell sandbox plus local
-// state (password, port, forward pid, ssh config) under the state dir.
+// state (port, forward pid, ssh config) under the state dir.
 type Sandbox struct {
 	Name  string // zero-<repo>
 	Repo  string // repo basename
@@ -172,22 +170,6 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// password reads or creates the random serve password (0600 state file).
-func (s *Sandbox) password() (string, error) {
-	if p := s.read("password"); p != "" {
-		return p, nil
-	}
-	buf := make([]byte, 24)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("password: %w", err)
-	}
-	p := base64.RawStdEncoding.EncodeToString(buf)
-	if err := s.write("password", p, 0o600); err != nil {
-		return "", err
-	}
-	return p, nil
-}
-
 // port returns the local forward port: the stored one if still free,
 // otherwise a freshly allocated port (guards against port collisions).
 func (s *Sandbox) port() (int, error) {
@@ -264,24 +246,20 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// probeConfig hits the authenticated API through the forward; the web UI answers 200 on any other path.
-func probeConfig(port int, pw string) (int, error) {
+// probeServe asks the API through the forward. Without a paired browser the
+// service answers 401 as JSON; the web UI answers 200 HTML on other paths.
+func probeServe(port int) error {
 	client := &http.Client{Timeout: 2 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/api/session", port), nil)
+	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/api/session", port))
 	if err != nil {
-		return 0, err
-	}
-	req.SetBasicAuth("opencode", pw)
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, err
+		return err
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	if resp.StatusCode == http.StatusOK && !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
-		return 0, fmt.Errorf("unexpected content type %q", resp.Header.Get("Content-Type"))
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
+		return fmt.Errorf("HTTP %d, content type %q", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}
-	return resp.StatusCode, nil
+	return nil
 }
 
 // devImage is built and cosign-signed by .github/workflows/dev-image.yml (ADR 0028).
