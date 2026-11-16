@@ -132,3 +132,22 @@ func TestReadCommands(t *testing.T) {
 		t.Fatal("truncated accepted")
 	}
 }
+
+func TestWidened(t *testing.T) {
+	pol := func(hosts, caps []string) *Policy {
+		p := &Policy{Capabilities: caps}
+		p.Network.Allow = hosts
+		return p
+	}
+	old := pol([]string{"a.example"}, []string{"git.read", "git.push"})
+	if w := widened(old, pol(nil, []string{"git.read"})); len(w) != 0 {
+		t.Errorf("narrowing reported as widening: %v", w)
+	}
+	if w := widened(old, pol([]string{"a.example"}, []string{"git.push", "git.read"})); len(w) != 0 {
+		t.Errorf("same policy reported as widening: %v", w)
+	}
+	w := widened(old, pol([]string{"a.example", "b.example"}, []string{"git.read", "gitlab.mr.create"}))
+	if fmt.Sprint(w) != "[network b.example capability gitlab.mr.create]" {
+		t.Errorf("widened = %v", w)
+	}
+}

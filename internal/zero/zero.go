@@ -37,6 +37,8 @@ type Sandbox struct {
 	State string // local state dir (0700)
 	Host  string // ssh host alias from `openshell sandbox ssh-config`
 	gw    string // OpenShell gateway; empty = active gateway (podman, E1)
+
+	Approve bool // --approve: accept a wider policy without asking
 }
 
 // vmGateway is the second OpenShell gateway with the MicroVM driver (E3, ADR 0015).

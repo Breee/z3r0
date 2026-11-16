@@ -1,6 +1,7 @@
 package zero
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -8,7 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"syscall"
+	"unsafe"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -85,4 +89,78 @@ func (s *Sandbox) applyProjectPolicy(p *Policy) error {
 		return fmt.Errorf("apply .zero/policy.yaml: %w", err)
 	}
 	return nil
+}
+
+// policyChange is what differs between the policy and the last approved one.
+type policyChange struct {
+	caps      bool     // capability set differs → token must be re-minted
+	newHosts  []string // hosts to open
+	goneHosts bool     // hosts removed (takes effect on recreate)
+}
+
+// widened returns the entries of p that old does not grant, as "kind value".
+func widened(old, p *Policy) []string {
+	var w []string
+	for _, h := range p.Network.Allow {
+		if !slices.Contains(old.Network.Allow, h) {
+			w = append(w, "network "+h)
+		}
+	}
+	for _, c := range p.Capabilities {
+		if !slices.Contains(old.Capabilities, c) {
+			w = append(w, "capability "+c)
+		}
+	}
+	return w
+}
+
+// approvePolicy compares p with the policy last approved for this sandbox
+// (state policy.approved; none yet = the default). A wider policy needs a yes
+// from the human at the terminal, or --approve. Narrowing needs nothing.
+func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
+	old := &Policy{Capabilities: defaultCaps}
+	if b, err := os.ReadFile(s.path("policy.approved")); err == nil {
+		if old, err = parsePolicy(b); err != nil {
+			return policyChange{}, fmt.Errorf("policy.approved: %w", err)
+		}
+	}
+	w := widened(old, p)
+	if len(w) > 0 && !s.Approve {
+		fmt.Fprintf(os.Stderr, "policy widens for %s:\n", s.Name)
+		for _, l := range w {
+			fmt.Fprintln(os.Stderr, "  + "+l)
+		}
+		var t syscall.Termios
+		if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, os.Stdin.Fd(), syscall.TCGETS, uintptr(unsafe.Pointer(&t))); e != 0 {
+			return policyChange{}, errors.New("policy widening not approved (no terminal; use `zero up --approve`)")
+		}
+		fmt.Fprint(os.Stderr, "approve? [y/N] ")
+		ans, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		if a := strings.ToLower(strings.TrimSpace(ans)); a != "y" && a != "yes" {
+			return policyChange{}, errors.New("policy widening not approved")
+		}
+	}
+	ch := policyChange{}
+	for _, l := range w {
+		if h, ok := strings.CutPrefix(l, "network "); ok {
+			ch.newHosts = append(ch.newHosts, h)
+		}
+	}
+	a, b := slices.Sorted(slices.Values(old.Capabilities)), slices.Sorted(slices.Values(p.Capabilities))
+	ch.caps = !slices.Equal(a, b)
+	for _, h := range old.Network.Allow {
+		if !slices.Contains(p.Network.Allow, h) {
+			ch.goneHosts = true
+		}
+	}
+	return ch, nil
+}
+
+// saveApproved records p as approved, once it is applied.
+func (s *Sandbox) saveApproved(p *Policy) error {
+	out, err := yaml.Marshal(p)
+	if err != nil {
+		return err
+	}
+	return s.write("policy.approved", string(out), 0o600)
 }

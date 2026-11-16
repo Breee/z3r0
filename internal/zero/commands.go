@@ -46,10 +46,28 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		ch, err := s.approvePolicy(pol)
+		if err != nil {
+			return 0, err
+		}
 		if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
 			return 0, err
 		}
-		if err := s.renewForge(pol.Capabilities); err != nil {
+		if err := s.renewForge(pol.Capabilities, ch.caps); err != nil {
+			return 0, err
+		}
+		if len(ch.newHosts) > 0 {
+			if err := s.applyProjectPolicy(pol); err != nil {
+				return 0, err
+			}
+		}
+		if ch.goneHosts {
+			fmt.Fprintln(out, "policy: removed hosts stay reachable until `zero rm` + `zero up`")
+		}
+		if err := s.saveApproved(pol); err != nil {
+			return 0, err
+		}
+		if err := s.recordPolicy(); err != nil {
 			return 0, err
 		}
 	}
@@ -130,6 +148,9 @@ func (s *Sandbox) create() error {
 	if err != nil {
 		return err
 	}
+	if _, err := s.approvePolicy(pol); err != nil {
+		return err
+	}
 	var creds, env []string
 	if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
 		return err
@@ -153,6 +174,9 @@ func (s *Sandbox) create() error {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
 	}
 	if err := s.applyProjectPolicy(pol); err != nil {
+		return err
+	}
+	if err := s.saveApproved(pol); err != nil {
 		return err
 	}
 	return s.recordPolicy()

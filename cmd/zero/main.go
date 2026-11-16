@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 
 	"github.com/Breee/z3r0/internal/zero"
 )
@@ -16,6 +17,7 @@ const usageText = `zero: per-repo OpenShell sandbox with opencode serve inside; 
 Usage (inside a git repo): zero <command>
   up            create-or-reuse sandbox, clone repo in (first time only), start serve + forward
   up --vm       same, new sandbox as MicroVM (gateway openshell-vm; or Z3R0_DRIVER=vm)
+  up --approve  accept a wider .zero/policy.yaml without the y/N question
   attach        up + opencode TUI attached to the sandbox
   run <prompt>  up + one-shot opencode run against the sandbox
   code          up + VS Code Remote-SSH on the same sandbox (Copilot runs inside)
@@ -63,7 +65,8 @@ func main() {
 
 	switch cmd {
 	case "up":
-		if (len(args) > 0 && args[0] == "--vm") || os.Getenv("Z3R0_DRIVER") == "vm" {
+		z.Approve = slices.Contains(args, "--approve")
+		if slices.Contains(args, "--vm") || os.Getenv("Z3R0_DRIVER") == "vm" {
 			if err = z.UseVM(); err != nil {
 				break
 			}

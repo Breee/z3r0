@@ -88,7 +88,7 @@ func upkeep() {
 			}
 			s.Host = rt.HostAlias(s.Name)
 			old := s.read("forge.id")
-			if err := s.renewForge(caps); err != nil {
+			if err := s.renewForge(caps, false); err != nil {
 				log.Printf("upkeep %s: renew: %v", s.Name, err)
 			} else if id := s.read("forge.id"); id != old {
 				log.Printf("upkeep %s: %s token renewed %s -> %s", s.Name, f.Name(), old, id)

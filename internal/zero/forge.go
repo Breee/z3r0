@@ -145,7 +145,7 @@ func (s *Sandbox) revokeForge() error {
 
 // renewForge re-mints the token of a running sandbox when it expires within
 // renewBefore. New processes get the new token; running ones keep the old (C44).
-func (s *Sandbox) renewForge(caps []string) error {
+func (s *Sandbox) renewForge(caps []string, force bool) error {
 	f, id, path := forgeByName(s.read("forge")), s.read("forge.id"), s.read("forge.path")
 	if f == nil || id == "" {
 		return nil
@@ -155,7 +155,7 @@ func (s *Sandbox) renewForge(caps []string) error {
 		return err
 	}
 	for _, t := range toks {
-		if t.ID == id && time.Until(t.Expires) > renewBefore {
+		if !force && t.ID == id && time.Until(t.Expires) > renewBefore {
 			return nil
 		}
 	}

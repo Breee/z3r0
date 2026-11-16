@@ -1,6 +1,6 @@
 ## 7a. Project policy: source and lifecycle
 
-Status: implemented (`internal/zero/policy.go`). Hosts are read-only egress for any sandbox binary; zero records `HEAD` SHA + dirty flag in state `policy.sha`. Not yet: approval prompt when a policy widens.
+Status: implemented (`internal/zero/policy.go`). Hosts are read-only egress for any sandbox binary; zero records `HEAD` SHA + dirty flag in state `policy.sha`. Widening (new host or capability compared to state `policy.approved`, or to the default on a new sandbox) asks `approve? [y/N]`; without a terminal `zero up` refuses unless `--approve` (#78). Narrowing never asks. A changed capability set re-mints the token; new hosts apply live; removed hosts stay reachable until `zero rm` + `zero up`.
 
 Start small. One file per project, the same shape as §7/§13.1, a fixed small capability set. No layers, bundles or live grants yet.
 
