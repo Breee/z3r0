@@ -45,6 +45,11 @@ func Doctor(out io.Writer) error {
 	}
 	check("gateway user", gatewayUser())
 	check("client key", clientKey())
+	if gateUp() {
+		check("zero serve", "")
+	} else {
+		check("zero serve", "not running: systemctl --user start zero (or zero up)")
+	}
 
 	if s, err := New(); err == nil {
 		remote, _ := sh("git", "-C", s.Top, "remote", "get-url", "origin")

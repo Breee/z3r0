@@ -37,7 +37,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-(cd "$ROOT" && go build -o bin/zero-push ./cmd/zero-push) || exit 1
+(cd "$ROOT" && go build -o bin/zero-push ./pocs/11-push-service/zero-push) || exit 1
 PID_=$(glab api "projects/$(jq -rn --arg p "$PROJECT" '$p|@uri')" | jq -r .id)
 [ -n "$PID_" ] && [ "$PID_" != null ] || { echo "project $PROJECT not found"; exit 1; }
 

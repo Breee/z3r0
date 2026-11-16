@@ -8,16 +8,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -134,6 +133,7 @@ var gateLogMu sync.Mutex
 func gateRecord(gs *gateSession, u refUpdate, decision, reason string) {
 	gateLogMu.Lock()
 	defer gateLogMu.Unlock()
+	log.Printf("gate %s: %s %s %s", gs.name, decision, u.Ref, reason)
 	f, err := os.OpenFile(filepath.Join(gs.state, "gate.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
@@ -147,7 +147,7 @@ func gateRecord(gs *gateSession, u refUpdate, decision, reason string) {
 
 func gateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/healthz" {
-		fmt.Fprintln(w, "zero gate")
+		fmt.Fprintln(w, serveGreeting)
 		return
 	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/s/")
@@ -206,11 +206,6 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ServeGate runs the push gate in the foreground (`zero gate`).
-func ServeGate() error {
-	return http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", gatePort), http.HandlerFunc(gateHandler))
-}
-
 // gateUp reports whether the gate answers on its port.
 func gateUp() bool {
 	c := http.Client{Timeout: time.Second}
@@ -220,40 +215,7 @@ func gateUp() bool {
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 32))
-	return strings.TrimSpace(string(b)) == "zero gate"
-}
-
-// ensureGate starts the shared gate detached if it is not running.
-func ensureGate() error {
-	if gateUp() {
-		return nil
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(stateRoot(), 0o700); err != nil {
-		return err
-	}
-	logf, err := os.OpenFile(filepath.Join(stateRoot(), "gate.out"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer logf.Close()
-	cmd := exec.Command(exe, "gate")
-	cmd.Stdout, cmd.Stderr = logf, logf
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start push gate: %w", err)
-	}
-	go cmd.Wait()
-	for i := 0; i < 50; i++ {
-		if gateUp() {
-			return nil
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	return fmt.Errorf("push gate not answering on 127.0.0.1:%d (see %s)", gatePort, logf.Name())
+	return strings.TrimSpace(string(b)) == serveGreeting
 }
 
 // gateURL is the sandbox's push URL; the key is created on first use.

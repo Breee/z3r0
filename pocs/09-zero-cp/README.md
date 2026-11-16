@@ -16,7 +16,7 @@ Result (2026-11-13, OpenShell 0.1.8, SPIRE 1.12.4, podman 6.2.0): **yes**. `run.
 
 ## How it works
 
-- `cmd/zero-cp` (Go, stdlib): `POST /token` verifies the JWT-SVID (signature against the SPIRE JWT bundle, audience, expiry), looks the SPIFFE ID up in an allow file, returns a random test token, logs the decision.
+- `zero-cp/` (Go, stdlib): `POST /token` verifies the JWT-SVID (signature against the SPIRE JWT bundle, audience, expiry), looks the SPIFFE ID up in an allow file, returns a random test token, logs the decision.
 - `profile.yaml`: OpenShell provider with `token_grant` (`client_credentials`, `jwt-spiffe` assertion). The supervisor fetches its SVID, asks zero-cp, injects the token into the outgoing request. Provider created with `--runtime-credentials`: nothing stored in the gateway, no placeholder in the sandbox.
 - The supervisor runs on the host network, so the token endpoint is `127.0.0.1`; the agent reaches the test service as `host.openshell.internal`.
 

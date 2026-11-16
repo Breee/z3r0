@@ -1,6 +1,6 @@
 # PoC 11: push service limits the agent to its session branch (#93)
 
-`cmd/zero-push` is a git smart-HTTP proxy on the host. The sandbox may fetch from gitlab.com directly, but `git-receive-pack` to gitlab.com is denied by the OpenShell profile. Pushes go to zero-push, which reads the ref updates and forwards only the session branch. It holds no credential: the supervisor substitutes the sandbox token as usual and zero-push passes it on.
+`zero-push/` is a git smart-HTTP proxy on the host. The sandbox may fetch from gitlab.com directly, but `git-receive-pack` to gitlab.com is denied by the OpenShell profile. Pushes go to zero-push, which reads the ref updates and forwards only the session branch. It holds no credential: the supervisor substitutes the sandbox token as usual and zero-push passes it on.
 
 Run: `BIND=127.0.0.1 pocs/11-push-service/run.sh` (OpenShell 0.1.8, podman gateway, gitlab.com).
 

@@ -10,7 +10,7 @@ requirements: [Z-INV-2, Z-INV-3]
 The sandbox token can push to every branch its role allows (C43). GitLab tokens are not branch-scoped and OpenShell rules cannot see ref names inside a git push. PoC 11 (#93) showed a small proxy on the host can check them.
 
 ## Decision
-- `zero up` starts one shared push gate (`zero gate`, 127.0.0.1:18095) for all forge sandboxes. It is always on; there is no off switch for now.
+- `zero up` starts one shared push gate (part of `zero serve`, ADR 0031; 127.0.0.1:18095) for all forge sandboxes. It is always on; there is no off switch for now.
 - The sandbox fetches directly from the forge and pushes through the gate (`remote.origin.pushurl`). Direct pushes to the forge are denied by OpenShell rules in the forge profile.
 - Allowed: `refs/heads/zero/<name>` or branches below it. Denied: every other branch, tags, deletes, and any push that mixes allowed and denied refs.
 - Each sandbox gets a random key in its push URL; the gate maps the key to that sandbox's repository and branch. `zero rm` removes the key.

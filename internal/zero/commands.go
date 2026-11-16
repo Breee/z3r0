@@ -46,6 +46,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
+			return 0, err
+		}
 		if err := s.renewForge(pol.Capabilities); err != nil {
 			return 0, err
 		}
@@ -62,7 +65,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		return 0, err
 	}
 	if s.read("forge") != "" {
-		if err := ensureGate(); err != nil {
+		if err := ensureServe(); err != nil {
 			return 0, err
 		}
 	}
@@ -128,6 +131,9 @@ func (s *Sandbox) create() error {
 		return err
 	}
 	var creds, env []string
+	if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
+		return err
+	}
 	prov, err := s.setupForge(pol.Capabilities)
 	if err != nil {
 		return err
@@ -303,7 +309,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 		if gateUp() {
 			fmt.Fprintf(out, "push gate: on (%s and below)\n", strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/"))
 		} else {
-			fmt.Fprintln(out, "push gate: off (pushes fail until the next zero up)")
+			fmt.Fprintln(out, "push gate: off (zero serve not running; pushes fail until the next zero up)")
 		}
 	}
 	if up {

@@ -18,7 +18,11 @@ func Install() error {
 	if os.Geteuid() != 0 || lu == "" || lu == "root" {
 		return fmt.Errorf("run as: sudo zero install")
 	}
-	cmd := exec.Command("sh", "-s", lu)
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("sh", "-s", lu, exe)
 	cmd.Stdin = strings.NewReader(installScript)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	return cmd.Run()

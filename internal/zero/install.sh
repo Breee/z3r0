@@ -114,4 +114,31 @@ install -o "$LU" -g "$LU" -m 600 "$S/client/tls.key" "$M/tls.key"
 i=0; until sudo -u "$LU" openshell gateway info >/dev/null 2>&1; do
   i=$((i+1)); [ $i -lt 30 ] || { echo "zero install: gateway not reachable" >&2; exit 1; }; sleep 1
 done
+
+# 6. zero serve (push gate, token upkeep) as a user unit of the login user
+if [ -n "${2:-}" ] && [ "$2" != /usr/local/bin/zero ]; then install -m 755 "$2" /usr/local/bin/zero; fi
+LUID=$(id -u "$LU")
+sudo -u "$LU" mkdir -p "$LH/.config/systemd/user"
+sudo -u "$LU" tee "$LH/.config/systemd/user/zero.service" >/dev/null <<UNIT
+[Unit]
+Description=zero serve (push gate, forge token upkeep)
+
+[Service]
+ExecStart=/usr/local/bin/zero serve
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+UNIT
+if [ -S "/run/user/$LUID/bus" ]; then
+  lu() { sudo -u "$LU" env XDG_RUNTIME_DIR="/run/user/$LUID" "$@"; }
+  # a detached serve started by an earlier zero up holds the port
+  pkill -u "$LU" -f '^[^ ]*zero serve$' 2>/dev/null || true
+  lu systemctl --user daemon-reload
+  lu systemctl --user enable zero.service
+  lu systemctl --user restart zero.service
+else
+  echo "zero install: no user session bus for $LU; zero up will start zero serve"
+fi
 echo "zero install: done (gateway as $OU, OpenShell $VER). Next: zero doctor"

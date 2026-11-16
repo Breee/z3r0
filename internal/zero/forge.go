@@ -210,9 +210,21 @@ func revokeOrphans(f Forge) error {
 		if !ok || !strings.HasPrefix(name, "zero-") {
 			continue
 		}
-		b, _ := os.ReadFile(filepath.Join(stateRoot(), name, "forge.id"))
-		if strings.TrimSpace(string(b)) == t.ID && rt.Exists(name) {
-			continue
+		dir := filepath.Join(stateRoot(), name)
+		if _, err := os.Stat(dir); err == nil {
+			// A sandbox being created or renewed holds its lock: not an orphan.
+			l, err := (&Sandbox{Name: name, State: dir}).acquireLock()
+			if err != nil {
+				continue
+			}
+			live := false
+			withGateway(readState(dir, "gateway"), func() {
+				live = readState(dir, "forge.id") == t.ID && rt.Exists(name)
+			})
+			l.release()
+			if live {
+				continue
+			}
 		}
 		if err := f.Revoke(t.ID); err != nil {
 			return fmt.Errorf("revoke orphan %s token %s (%s): %w", f.Name(), t.ID, t.Name, err)

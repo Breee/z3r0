@@ -24,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-go build -o "$W/zero-cp" "$ROOT/cmd/zero-cp" || exit 1
+go build -o "$W/zero-cp" "$ROOT/pocs/09-zero-cp/zero-cp" || exit 1
 podman exec openshell-spiffe-demo-spire-server /opt/spire/bin/spire-server bundle show \
     -format spiffe -socketPath /run/spire/server/private/api.sock > "$W/jwks.json" || exit 1
 : > "$W/allow.txt"

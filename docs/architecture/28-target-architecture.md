@@ -15,7 +15,7 @@ The agent works in a sandbox, sees no secret, can only reach what the project al
 | OpenShell (dependency) | laptop / cluster | gateway + supervisor: sandbox, egress policy, placeholder substitution |
 | optional: OpenBao, SPIRE | cluster | credential storage off the laptop, workload identity |
 
-Today `zero up` does the broker work inline (mint on create, renew on up, revoke on rm). Moving it into `zero serve` is a refactor, not a new design: the push gate (`cmd/zero-push`) and token endpoint (`cmd/zero-cp`) become handlers of `zero serve`.
+Built (#97, ADR 0031): `zero serve` hosts the push gate and the token upkeep loop (renew before expiry, revoke orphans); `zero up` starts it, `zero install` makes it a user unit. Creating and removing a sandbox still mint and revoke in the CLI. Not yet in it: the token endpoint for supervisor identities (PoC 09) and a central deployment.
 
 ```mermaid
 flowchart LR
@@ -75,5 +75,5 @@ The CLI, policy file and layers are identical; only where `zero serve` runs chan
 
 1. ~~Move push gate into zero (L4 default)~~ — done (#95).
 2. ~~OpenShell deny rules for destructive GitLab REST (L5)~~ — done (#96): no extra rules needed, `create_branch` removed from the token.
-3. `zero serve` as the single broker process (laptop) — new issue.
+3. ~~`zero serve` as the single broker process (laptop)~~ — done (#97).
 4. #78 widening prompt, #88 ADR OpenBao, #91/#92 identity decisions (open questions in `docs/scenarios/identity-broker-usecases.md`).
