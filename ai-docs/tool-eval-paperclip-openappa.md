@@ -43,3 +43,22 @@ Cost: unstable API, policy authoring, no proof yet that it survives a hostile ag
 
 - Phase 2 backlog: PoC `paperclip-plugin-zero` sandbox provider (one task end-to-end, no real creds); UI candidate.
 - Advisor/Prover work: PoC "openappa in dev image, tamper test: agent tries to remove plugin".
+
+## OpenAPPA re-evaluation (2026-11-16)
+
+Checked: README, CHANGELOG, `integrations/opencode/README.md` at v0.43.0 (2026-11-15). Nothing run.
+
+State: 1.6k stars, about nine minor releases in a month, several with breaking changes. Still "preview and an RFC — config and wire surfaces may break without shims".
+
+New since October:
+- Real opencode V2 plugin (`appa plugin install opencode`), built against `@opencode/plugin` 2.0.28. We run 2.2.6; compatibility untested.
+- Subagents are checked; file tracker; Archestra 1.4 RC implements OpenAPPA in an LLM proxy (outside the agent process). Proxy variant not evaluated.
+
+Misfits for zero:
+- No GitLab battery (Cloudflare, Notion, GitHub only). We would write and maintain the GitLab policy.
+- Human approval forms exist only in the opencode terminal UI, not the web UI → conflicts with `zero web`. Default answer is Yes.
+- Upstream docs: no OS confinement against another process of the same user; approval "is an agent instruction, not a separately authenticated human decision". Inside the sandbox it guards a confused agent, not a hostile runtime.
+
+Still useful: it is the only candidate that acts on prompt injection (after an untrusted read, hold or refuse push / MR creation). Nothing in zero does that.
+
+Verdict: not adopted now; stays a candidate (ADR 0016 unchanged). Revisit when: stable release, approval works in the web UI, and either GitHub is needed or we accept maintaining a GitLab policy. The proxy variant fits arch §15 (AI control plane) and should be looked at then.
