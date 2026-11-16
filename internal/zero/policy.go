@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"syscall"
-	"unsafe"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -134,8 +132,7 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 		for _, l := range w {
 			fmt.Fprintln(os.Stderr, "  + "+l)
 		}
-		var t syscall.Termios
-		if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, os.Stdin.Fd(), syscall.TCGETS, uintptr(unsafe.Pointer(&t))); e != 0 {
+		if !isTerminal(os.Stdin) {
 			return policyChange{}, errors.New("policy widening not approved (no terminal; use `zero up --approve`)")
 		}
 		fmt.Fprint(os.Stderr, "approve? [y/N] ")

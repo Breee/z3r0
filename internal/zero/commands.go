@@ -134,7 +134,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err := s.waitReady(port, startErr); err != nil {
 		return 0, err
 	}
-	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, s.url(port), s.Dir)
+	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, link(out, s.url(port)), s.Dir)
 	return port, nil
 }
 
@@ -288,12 +288,12 @@ func (s *Sandbox) Web(out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("pairing link: %w", err)
 	}
-	link := pairLink.FindString(text)
-	if link == "" {
+	pair := pairLink.FindString(text)
+	if pair == "" {
 		return fmt.Errorf("no pairing link in opencode pair output: %s", text)
 	}
-	fmt.Fprintf(out, "open (works once, 5 minutes): %s\n", link)
-	return exec.Command("xdg-open", link).Run()
+	fmt.Fprintf(out, "open (works once, 5 minutes): %s\n", link(out, pair))
+	return exec.Command("xdg-open", pair).Run()
 }
 
 // Attach is up + the opencode TUI attached to the sandbox.
@@ -328,7 +328,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 		fmt.Fprintf(out, "sandbox %s: none\n", s.Name)
 	}
 	if f := s.currentForward(); f != nil {
-		fmt.Fprintf(out, "forward: %s\n", s.url(f.port))
+		fmt.Fprintf(out, "forward: %s\n", link(out, s.url(f.port)))
 	} else {
 		fmt.Fprintln(out, "forward: off")
 	}

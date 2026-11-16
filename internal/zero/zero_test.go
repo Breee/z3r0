@@ -3,6 +3,7 @@ package zero
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -209,5 +210,20 @@ func TestReadCommandsLimits(t *testing.T) {
 	long := pktLine(a + " " + a + " refs/heads/zero/" + strings.Repeat("x", maxCommandLine) + "\n")
 	if _, _, err := readCommands(bufio.NewReader(strings.NewReader(long + "0000"))); err == nil {
 		t.Error("overlong command accepted")
+	}
+}
+
+func TestLinkPlainWhenNotTerminal(t *testing.T) {
+	var b strings.Builder
+	if got := link(&b, "http://127.0.0.1:1"); got != "http://127.0.0.1:1" {
+		t.Fatalf("got %q", got)
+	}
+	f, err := os.CreateTemp(t.TempDir(), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if got := link(f, "http://127.0.0.1:1"); got != "http://127.0.0.1:1" {
+		t.Fatalf("file: got %q", got)
 	}
 }
