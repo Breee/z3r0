@@ -35,10 +35,12 @@ type Forge interface {
 	Name() string
 	// Host is the https host the token is valid for, e.g. gitlab.com.
 	Host() string
-	// Match returns the project path of an origin URL on this forge.
-	Match(remote string) (path string, ok bool)
-	// Profile is the OpenShell provider profile YAML with id zero-<name>.
+	// ProfileID and Profile are the OpenShell provider profile for this host.
+	ProfileID() string
 	Profile() []byte
+	// LoggedIn is nil when the host session can mint tokens; the error says
+	// how to log in.
+	LoggedIn() error
 	// TokenEnv is the env var the sandbox sees the placeholder in.
 	TokenEnv() string
 	// GitUser is the https username git sends with the token.
@@ -62,25 +64,32 @@ type Forge interface {
 	Guardrails(path string) (missing []string, err error)
 }
 
-var forges = []Forge{gitlab{}}
-
+// forgeFor picks the forge of an origin URL: gitlab.com, or any other host
+// glab is logged in to. Other hosts have no forge.
 func forgeFor(remote string) (Forge, string) {
-	for _, f := range forges {
-		if path, ok := f.Match(strings.TrimSpace(remote)); ok {
-			return f, path
-		}
+	host, path, ok := parseRemote(strings.TrimSpace(remote))
+	if !ok {
+		return nil, ""
+	}
+	if g := (gitlab{host}); host == gitlabCom || g.LoggedIn() == nil {
+		return g, path
 	}
 	return nil, ""
 }
 
-func forgeByName(name string) Forge {
-	for _, f := range forges {
-		if f.Name() == name {
-			return f
-		}
+// forgeOf is the forge recorded in a sandbox's state dir.
+func forgeOf(dir string) Forge {
+	if readState(dir, "forge") != "gitlab" {
+		return nil
 	}
-	return nil
+	host := readState(dir, "forge.host")
+	if host == "" {
+		host = gitlabCom
+	}
+	return gitlab{host}
 }
+
+func (s *Sandbox) forge() Forge { return forgeOf(s.State) }
 
 func (s *Sandbox) forgeProvider(f Forge) string { return s.Name + "-" + f.Name() }
 
@@ -91,6 +100,9 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	f, path := forgeFor(origin)
 	if f == nil {
 		return "", nil
+	}
+	if err := f.LoggedIn(); err != nil {
+		return "", err
 	}
 	if err := importProfile(f); err != nil {
 		return "", err
@@ -110,20 +122,20 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", f.Name(), err)
 	}
-	for k, v := range map[string]string{"forge": f.Name(), "forge.id": id, "forge.path": path} {
+	for k, v := range map[string]string{"forge": f.Name(), "forge.host": f.Host(), "forge.id": id, "forge.path": path} {
 		if err := s.write(k, v, 0o600); err != nil {
 			return "", err
 		}
 	}
 	prov := s.forgeProvider(f)
-	if err := rt.BindCredential(prov, "zero-"+f.Name(), f.TokenEnv(), tok); err != nil {
+	if err := rt.BindCredential(prov, f.ProfileID(), f.TokenEnv(), tok); err != nil {
 		return "", err
 	}
 	return prov, nil
 }
 
 func importProfile(f Forge) error {
-	if err := rt.ImportCredentialType("zero-"+f.Name(), f.Profile()); err != nil {
+	if err := rt.ImportCredentialType(f.ProfileID(), f.Profile()); err != nil {
 		return fmt.Errorf("import %s profile: %w", f.Name(), err)
 	}
 	return nil
@@ -131,7 +143,7 @@ func importProfile(f Forge) error {
 
 // revokeForge revokes the stored token and deletes the provider.
 func (s *Sandbox) revokeForge() error {
-	f, id := forgeByName(s.read("forge")), s.read("forge.id")
+	f, id := s.forge(), s.read("forge.id")
 	if f == nil {
 		return nil
 	}
@@ -148,7 +160,7 @@ func (s *Sandbox) revokeForge() error {
 // pauseForge revokes the token and keeps the binding: the stopped sandbox
 // still refers to it, resumeForge fills it again.
 func (s *Sandbox) pauseForge() error {
-	f, id := forgeByName(s.read("forge")), s.read("forge.id")
+	f, id := s.forge(), s.read("forge.id")
 	if f == nil || id == "" {
 		return nil
 	}
@@ -161,7 +173,7 @@ func (s *Sandbox) pauseForge() error {
 // resumeForge mints a token for a paused sandbox. It runs before the sandbox
 // starts, so every process sees the new token (no C44).
 func (s *Sandbox) resumeForge(caps []string) error {
-	f, path := forgeByName(s.read("forge")), s.read("forge.path")
+	f, path := s.forge(), s.read("forge.path")
 	if f == nil || s.read("forge.id") != "" {
 		return nil
 	}
@@ -183,7 +195,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 // renewForge re-mints the token of a running sandbox when it expires within
 // renewBefore. New processes get the new token; running ones keep the old (C44).
 func (s *Sandbox) renewForge(caps []string, force bool) error {
-	f, id, path := forgeByName(s.read("forge")), s.read("forge.id"), s.read("forge.path")
+	f, id, path := s.forge(), s.read("forge.id"), s.read("forge.path")
 	if f == nil || id == "" {
 		return nil
 	}
@@ -274,7 +286,7 @@ func revokeOrphans(f Forge) error {
 // configureRemote points origin in the sandbox at https and makes git send
 // the placeholder from the token env; the proxy substitutes the token.
 func (s *Sandbox) configureRemote() error {
-	f, path := forgeByName(s.read("forge")), s.read("forge.path")
+	f, path := s.forge(), s.read("forge.path")
 	if f == nil || path == "" {
 		return nil
 	}

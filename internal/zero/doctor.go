@@ -53,8 +53,14 @@ func Doctor(out io.Writer) error {
 
 	if s, err := New(); err == nil {
 		remote, _ := sh("git", "-C", s.Top, "remote", "get-url", "origin")
-		if f, path := forgeFor(remote); f == nil {
-			check("forge", "origin "+remote+" is not a supported forge")
+		f, path := forgeFor(remote)
+		if g, ok := f.(gitlab); ok && g.LoggedIn() == nil && g.PlaintextLogin() {
+			fmt.Fprintf(out, "warn  glab login for %s is stored in plain text: glab auth login --hostname %s --use-keyring\n", g.host, g.host)
+		}
+		if f == nil {
+			check("forge", "origin "+strings.TrimSpace(remote)+" is not a supported forge (GitLab hosts need a glab login)")
+		} else if err := f.LoggedIn(); err != nil {
+			check("forge login", err.Error())
 		} else if missing, err := f.Guardrails(path); err != nil {
 			check("guardrails "+path, err.Error())
 		} else {

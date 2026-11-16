@@ -64,13 +64,29 @@ func TestForwardCmdlineMatch(t *testing.T) {
 	}
 }
 
+func TestGitlabHost(t *testing.T) {
+	h, p, ok := parseRemote("ssh://git@git.example.org:2222/a/b.git")
+	if !ok || h != "git.example.org" || p != "a/b" {
+		t.Fatalf("parseRemote = %q %q %v", h, p, ok)
+	}
+	g := gitlab{"git.example.org"}
+	y := string(g.Profile())
+	if g.ProfileID() != "zero-gitlab-git-example-org" || !strings.Contains(y, "id: zero-gitlab-git-example-org\n") ||
+		!strings.Contains(y, "host: git.example.org\n") || strings.Contains(y, "host: gitlab.com") {
+		t.Errorf("profile for other host wrong:\n%s", y)
+	}
+	if string(gitlab{gitlabCom}.Profile()) != string(gitlabProfileYAML) {
+		t.Error("gitlab.com profile changed")
+	}
+}
+
 func TestForgeFor(t *testing.T) {
 	for in, want := range map[string]string{
 		"git@gitlab.com:corewire/technology-and-research/developer.git": "corewire/technology-and-research/developer",
 		"https://gitlab.com/a/b.git":                                    "a/b",
 		"https://user:x@gitlab.com/a/b":                                 "a/b",
 		"ssh://git@gitlab.com/a/b.git":                                  "a/b",
-		"git@github.com:Breee/z3r0.git":                                 "",
+		"git@nope.invalid:Breee/z3r0.git":                               "",
 	} {
 		f, got := forgeFor(in)
 		if got != want || (want != "" && f.Name() != "gitlab") || (want == "" && f != nil) {

@@ -160,7 +160,7 @@ func gateLookup(key string) *gateSession {
 			b, _ := os.ReadFile(filepath.Join(dir, n))
 			return strings.TrimSpace(string(b))
 		}
-		f := forgeByName(read("forge"))
+		f := forgeOf(dir)
 		if f == nil || read("forge.path") == "" {
 			return nil
 		}

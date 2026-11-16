@@ -39,3 +39,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [35](0035-ci-skip-by-default.md) | 2026-11-16 | Agent pushes start no pipeline by default (`ci.skip`); `ci.run` opts in | Z-INV-1, Z-INV-2 |
 | [36](0036-pause-and-token-lifetime.md) | 2026-11-16 | Pause ends a session; the token expiry date is only a backstop | Z-INV-4, Z-INV-6 |
 | [37](0037-pairing-link-instead-of-password.md) | 2026-11-16 | opencode pairing link instead of a serve password | Z-INV-4 |
+| [38](0038-glab-is-the-login.md) | 2026-11-16 | glab is the login; any GitLab host glab knows | Z-INV-3, Z-INV-4 |

@@ -75,11 +75,11 @@ func upkeep() {
 	for _, p := range ids {
 		dir := filepath.Dir(p)
 		s := &Sandbox{Name: filepath.Base(dir), State: dir}
-		f := forgeByName(s.read("forge"))
+		f := s.forge()
 		if f == nil {
 			continue
 		}
-		used[f.Name()] = f
+		used[f.Name()+"@"+f.Host()] = f
 		caps := strings.Fields(s.read("caps"))
 		if len(caps) == 0 {
 			log.Printf("upkeep %s: no recorded capabilities, run zero up once", s.Name)

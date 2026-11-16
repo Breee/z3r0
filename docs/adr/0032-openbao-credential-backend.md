@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (points 2–5 superseded by ADR 0038)
 date: 2026-11-16
 deciders: bree
 requirements: [Z-INV-4, Z-INV-6]

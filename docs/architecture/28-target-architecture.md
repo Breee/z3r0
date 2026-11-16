@@ -77,4 +77,4 @@ The CLI, policy file and layers are identical; only where `zero serve` runs chan
 1. ~~Move push gate into zero (L4 default)~~ — done (#95).
 2. ~~OpenShell deny rules for destructive GitLab REST (L5)~~ — done (#96): no extra rules needed, `create_branch` removed from the token.
 3. ~~`zero serve` as the single broker process (laptop)~~ — done (#97).
-4. Done: widening prompt (#78). OpenBao decided (ADR 0032). Open: brokering through `zero serve`, #91/#92 identity decisions (open questions in `docs/scenarios/identity-broker-usecases.md`).
+4. Done: widening prompt (#78). Login decided: glab, any GitLab host glab knows (#98, ADR 0038); OpenBao stays an opt-in store (ADR 0032). Open: #91/#92 identity decisions (open questions in `docs/scenarios/identity-broker-usecases.md`).

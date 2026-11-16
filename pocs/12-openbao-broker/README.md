@@ -44,4 +44,4 @@ Interactive: opens the browser twice (OpenBao OIDC login, GitLab OAuth authorize
 - OpenBao in dev mode, no TLS, root token used for setup.
 - OIDC role bound to one subject; a real setup binds by group claim.
 - OAuth app secret is stored in the OpenBao OIDC config.
-- Not wired into zero (`zero login`, `zero serve` backend, `zero install --openbao`: still open in #98).
+- Not wired into zero and not planned: zero keeps the glab login (ADR 0038). `zero install --openbao` (gateway credential store) is not built.

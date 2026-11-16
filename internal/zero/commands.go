@@ -170,7 +170,7 @@ func (s *Sandbox) create() error {
 	}
 	if prov != "" {
 		creds = append(creds, prov)
-		env = forgeByName(s.read("forge")).Env()
+		env = s.forge().Env()
 	}
 	cp, err := s.setupCopilot()
 	if err != nil {
