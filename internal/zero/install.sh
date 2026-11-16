@@ -127,6 +127,21 @@ Description=zero serve (push gate, forge token upkeep)
 ExecStart=/usr/local/bin/zero serve
 Restart=on-failure
 RestartSec=5s
+# serve parses bytes sent by sandboxes (#100). ProtectKernelModules is not
+# possible in a user unit (it needs to drop capabilities).
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=-%h/.local/state/zero -%h/.config/glab-cli
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=default.target

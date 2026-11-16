@@ -33,7 +33,14 @@ func Serve() error {
 	}()
 	addr := fmt.Sprintf("127.0.0.1:%d", gatePort)
 	log.Printf("serve: push gate on %s, upkeep every %s", addr, upkeepEvery)
-	return http.ListenAndServe(addr, http.HandlerFunc(gateHandler))
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           http.HandlerFunc(gateHandler),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       time.Minute,
+		MaxHeaderBytes:    64 << 10,
+	}
+	return srv.ListenAndServe()
 }
 
 // withGateway runs fn with OPENSHELL_GATEWAY set as recorded for a sandbox

@@ -36,6 +36,14 @@ const (
 	zeroSHA  = "0000000000000000000000000000000000000000"
 )
 
+// Limits on what the gate parses from a sandbox (#100). A normal push names a
+// handful of refs in short lines.
+const (
+	maxRefUpdates  = 32
+	maxCommandLine = 1024
+	commandTimeout = 30 * time.Second
+)
+
 type refUpdate struct{ Old, New, Ref string }
 
 // readCommands reads the ref update commands of a receive-pack request up to
@@ -55,6 +63,12 @@ func readCommands(r *bufio.Reader) (ups []refUpdate, caps string, err error) {
 		}
 		if n < 4 {
 			return nil, "", fmt.Errorf("unsupported pkt-line")
+		}
+		if n > maxCommandLine {
+			return nil, "", fmt.Errorf("command line longer than %d bytes", maxCommandLine)
+		}
+		if len(ups) == maxRefUpdates {
+			return nil, "", fmt.Errorf("more than %d ref updates in one push", maxRefUpdates)
 		}
 		line := make([]byte, n-4)
 		if _, err := io.ReadFull(r, line); err != nil {
@@ -211,9 +225,13 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			body = zr
 			r.Header.Del("Content-Encoding")
 		}
+		// the command list must arrive promptly; the pack may take longer
+		rc := http.NewResponseController(w)
+		rc.SetReadDeadline(time.Now().Add(commandTimeout))
 		br := bufio.NewReader(body)
 		ups, caps, err := readCommands(br)
 		if err == nil {
+			rc.SetReadDeadline(time.Time{})
 			err = checkRefs(ups, sessionBranch(gs.name))
 		}
 		if err != nil {

@@ -3,6 +3,7 @@ package zero
 import (
 	"bufio"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -170,5 +171,43 @@ func TestWriteCommands(t *testing.T) {
 	got, _, err := readCommands(bufio.NewReader(strings.NewReader(writeCommands(ups, "x", true))))
 	if err != nil || len(got) != 1 || got[0] != ups[0] {
 		t.Fatalf("%v %v", got, err)
+	}
+}
+
+// FuzzGateCommands feeds arbitrary bytes to the gate's parser (#100): it must
+// not panic, and whatever it accepts must survive the rewrite unchanged.
+func FuzzGateCommands(f *testing.F) {
+	a, n := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	f.Add(pktLine(a+" "+n+" refs/heads/zero/dev\x00report-status push-options\n") + "0000PACK")
+	f.Add(pktLine(a+" "+n+" refs/heads/main\n") + pktLine(a+" "+zeroSHA+" refs/heads/zero/dev\n") + "0000")
+	f.Add("0000")
+	f.Add("ffff")
+	f.Fuzz(func(t *testing.T, in string) {
+		ups, caps, err := readCommands(bufio.NewReader(strings.NewReader(in)))
+		if err != nil {
+			return
+		}
+		if len(ups) > maxRefUpdates {
+			t.Fatalf("%d updates accepted", len(ups))
+		}
+		checkRefs(ups, "refs/heads/zero/dev")
+		for _, skip := range []bool{false, true} {
+			again, _, err := readCommands(bufio.NewReader(strings.NewReader(writeCommands(ups, caps, skip))))
+			if err != nil || !slices.Equal(again, ups) {
+				t.Fatalf("rewrite changed the commands: %v %v -> %v", err, ups, again)
+			}
+		}
+	})
+}
+
+func TestReadCommandsLimits(t *testing.T) {
+	a := strings.Repeat("a", 40)
+	one := pktLine(a + " " + a + " refs/heads/zero/dev\n")
+	if _, _, err := readCommands(bufio.NewReader(strings.NewReader(strings.Repeat(one, maxRefUpdates+1) + "0000"))); err == nil {
+		t.Error("too many ref updates accepted")
+	}
+	long := pktLine(a + " " + a + " refs/heads/zero/" + strings.Repeat("x", maxCommandLine) + "\n")
+	if _, _, err := readCommands(bufio.NewReader(strings.NewReader(long + "0000"))); err == nil {
+		t.Error("overlong command accepted")
 	}
 }
