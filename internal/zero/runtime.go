@@ -5,6 +5,8 @@ package zero
 type Runtime interface {
 	Name() string
 	Exists(name string) bool
+	// Reachable reports whether the runtime answers at all; Exists is only meaningful if it does.
+	Reachable() bool
 	// Create starts a sandbox from image with a filesystem policy file and
 	// credential bindings (ids returned by BindCredential).
 	Create(name, image, policyFile string, creds, env []string) error

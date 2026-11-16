@@ -219,7 +219,8 @@ func revokeOrphans(f Forge) error {
 			}
 			live := false
 			withGateway(readState(dir, "gateway"), func() {
-				live = readState(dir, "forge.id") == t.ID && rt.Exists(name)
+				// An unreachable gateway says nothing about the sandbox: keep the token.
+				live = readState(dir, "forge.id") == t.ID && (rt.Exists(name) || !rt.Reachable())
 			})
 			l.release()
 			if live {
