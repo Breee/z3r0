@@ -221,7 +221,7 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: first run of a
 | F7 | Uncommitted host changes silently missing in sandbox | warn on `up` |
 | F8 | Name collisions in `/sandbox` (`a/api`, `b/api`) | suffix `api-2`; shown in `up` |
 | F9 | Larger blast radius per workspace | only explicitly listed folders; docs |
-| F10 | opencode multi-folder: one serve, sessions per directory | **unverified**: test that opencode 2.2.6 serve handles several project dirs; else one serve per repo folder |
+| F10 | opencode multi-folder: one serve, sessions per directory | **verified 2026-11-16 (#73)**, opencode 2.2.6: one background service (port 4096) ran `opencode run` from two folders; each session has its own `location.directory`, each file landed in its folder. A folder without commits gets `projectID: global`. Not checked: the web UI project switcher |
 | F11 | `zero code` multi-root | generate `/sandbox/zero.code-workspace` and open it — **unverified** with Remote-SSH |
 | F12 | Config edited by hand to invalid state | strict parse (KnownFields), clear error |
 
