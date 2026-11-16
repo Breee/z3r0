@@ -25,6 +25,7 @@ Usage (inside a git repo): zero <command>
   status        show sandbox / forward / serve state
   stop          end the host port forward (sandbox keeps running)
   logs [-f]     serve.log from inside the sandbox
+  pause         stop the sandbox and revoke its token; files stay, zero up continues
   rm            stop + delete sandbox (work not pushed is lost)
   serve         run the broker in the foreground: push gate, token upkeep (zero up starts it itself)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
@@ -87,6 +88,8 @@ func main() {
 	case "logs":
 		follow := len(args) > 0 && (args[0] == "-f" || args[0] == "--follow")
 		err = z.Logs(os.Stdout, follow)
+	case "pause":
+		err = z.Pause(os.Stdout)
 	case "rm":
 		err = z.Rm(os.Stdout)
 	default:

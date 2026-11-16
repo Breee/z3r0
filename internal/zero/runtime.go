@@ -11,6 +11,11 @@ type Runtime interface {
 	// credential bindings (ids returned by BindCredential).
 	Create(name, image, policyFile string, creds, env []string) error
 	Delete(name string) error
+	// Stop halts a sandbox and keeps its files; Start brings it back with
+	// fresh processes. Stopped reports that state.
+	Stop(name string) error
+	Start(name string) error
+	Stopped(name string) bool
 	// SSHConfig returns an ssh_config snippet; HostAlias is its Host entry.
 	SSHConfig(name string) (string, error)
 	HostAlias(name string) string

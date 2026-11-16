@@ -132,7 +132,7 @@ Loop: edit → `go test` → commit → push branch → CI → read failures →
 
 ## 10. End: `zero rm`
 
-Stop forward → delete sandbox → revoke token (404/401 tolerated) → delete provider → remove state. Anything not pushed is lost (C30). Token also expires by itself after one day; long sessions need renewal (gap, roadmap core gate 4).
+Stop forward → delete sandbox → revoke token (404/401 tolerated) → delete provider → remove state. Anything not pushed is lost (C30). Token also expires by itself after 24–48 h; `zero serve` renews it, `zero pause` revokes it (ADR 0036).
 
 ## 11. Evidence (planned, §18)
 

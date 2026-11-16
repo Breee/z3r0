@@ -53,6 +53,17 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
 			return 0, err
 		}
+		if rt.Stopped(s.Name) {
+			if err := s.resumeForge(pol.Capabilities); err != nil {
+				return 0, err
+			}
+			if err := rt.Start(s.Name); err != nil {
+				return 0, fmt.Errorf("start sandbox: %w", err)
+			}
+			// Placeholders get a new version on start; the one stored in
+			// opencode's credential db is stale.
+			os.Remove(s.path("copilot-auth.done"))
+		}
 		if err := s.renewForge(pol.Capabilities, ch.caps); err != nil {
 			return 0, err
 		}
@@ -319,6 +330,10 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 // Status prints sandbox / forward / serve state.
 func (s *Sandbox) Status(out io.Writer) error {
 	up := s.exists()
+	if up && rt.Stopped(s.Name) {
+		fmt.Fprintf(out, "sandbox %s: paused (zero up continues)\n", s.Name)
+		return nil
+	}
 	if up {
 		fmt.Fprintf(out, "sandbox %s: up\n", s.Name)
 	} else {
@@ -358,6 +373,36 @@ func (s *Sandbox) Stop(out io.Writer) error {
 	}
 	defer lk.release()
 	return s.stopForward(out)
+}
+
+// Pause closes the forward, stops the sandbox and revokes its forge token.
+// Files stay; `zero up` starts it again with a new token.
+func (s *Sandbox) Pause(out io.Writer) error {
+	lk, err := s.acquireLock()
+	if err != nil {
+		return err
+	}
+	defer lk.release()
+	if !s.exists() {
+		return fmt.Errorf("sandbox %s: none", s.Name)
+	}
+	if s.gw != "" {
+		// The VM driver loses /tmp, and with it the checkout, on stop (C50).
+		return fmt.Errorf("pause is not supported with --vm: the checkout would be lost (C50)")
+	}
+	if err := s.stopForward(io.Discard); err != nil {
+		return err
+	}
+	if !rt.Stopped(s.Name) {
+		if err := rt.Stop(s.Name); err != nil {
+			return fmt.Errorf("stop sandbox: %w", err)
+		}
+	}
+	if err := s.pauseForge(); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "paused %s\n", s.Name)
+	return nil
 }
 
 // Rm stops the forward and deletes the sandbox. If the delete fails the state

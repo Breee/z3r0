@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // openshell is the Runtime backed by the NVIDIA OpenShell CLI.
@@ -37,6 +38,37 @@ func (openshell) Create(name, image, policyFile string, creds, env []string) err
 func (openshell) Delete(name string) error {
 	_, err := sh("openshell", "sandbox", "delete", name)
 	return err
+}
+
+func (openshell) Stop(name string) error {
+	_, err := sh("openshell", "sandbox", "stop", name)
+	return err
+}
+
+// Start waits until the sandbox is ready again.
+func (openshell) Start(name string) error {
+	if _, err := sh("openshell", "sandbox", "start", name); err != nil {
+		return err
+	}
+	for i := 0; i < 60; i++ {
+		if sandboxPhase(name) == "Ready" {
+			return nil
+		}
+		time.Sleep(time.Second)
+	}
+	return fmt.Errorf("sandbox %s not ready 60s after start (phase %s)", name, sandboxPhase(name))
+}
+
+func (openshell) Stopped(name string) bool { return sandboxPhase(name) == "Stopped" }
+
+func sandboxPhase(name string) string {
+	out, _ := sh("openshell", "sandbox", "get", name)
+	for _, l := range strings.Split(out, "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "Phase:"); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
 
 func (openshell) SSHConfig(name string) (string, error) {

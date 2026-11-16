@@ -28,3 +28,5 @@ zero level (podman): after `sandbox stop` + `sandbox start`, `zero up` is ready 
 ## Recommendation
 
 Build `zero pause` (close tunnel, stop sandbox, revoke token) and let `zero up` start a stopped sandbox and mint a fresh token. The token then lives only while the session is active. Before that works on the VM driver the checkout must move out of `/tmp`.
+
+Built in #105 (ADR 0036): `zero pause`, resume through `zero up`. Tested there on podman: `zero up` on a stopped sandbox, token revoke on pause and mint on resume. Found there: C51.

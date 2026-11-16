@@ -79,7 +79,7 @@ func (gitlab) Mint(label, path string, perms []string) (string, string, error) {
 	}
 	body, _ := json.Marshal(map[string]any{
 		"name":       label,
-		"expires_at": time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02"),
+		"expires_at": time.Now().UTC().AddDate(0, 0, 2).Format("2006-01-02"),
 		"granular_scopes": []map[string]any{{
 			"access":      "selected_memberships",
 			"permissions": perms,

@@ -132,15 +132,52 @@ func importProfile(f Forge) error {
 // revokeForge revokes the stored token and deletes the provider.
 func (s *Sandbox) revokeForge() error {
 	f, id := forgeByName(s.read("forge")), s.read("forge.id")
+	if f == nil {
+		return nil
+	}
+	if id != "" {
+		if err := f.Revoke(id); err != nil {
+			return fmt.Errorf("revoke %s token %s: %w", f.Name(), id, err)
+		}
+	}
+	rt.UnbindCredential(s.forgeProvider(f))
+	os.Remove(s.path("forge.id"))
+	return nil
+}
+
+// pauseForge revokes the token and keeps the binding: the stopped sandbox
+// still refers to it, resumeForge fills it again.
+func (s *Sandbox) pauseForge() error {
+	f, id := forgeByName(s.read("forge")), s.read("forge.id")
 	if f == nil || id == "" {
 		return nil
 	}
 	if err := f.Revoke(id); err != nil {
 		return fmt.Errorf("revoke %s token %s: %w", f.Name(), id, err)
 	}
-	rt.UnbindCredential(s.forgeProvider(f))
-	os.Remove(s.path("forge.id"))
-	return nil
+	return os.Remove(s.path("forge.id"))
+}
+
+// resumeForge mints a token for a paused sandbox. It runs before the sandbox
+// starts, so every process sees the new token (no C44).
+func (s *Sandbox) resumeForge(caps []string) error {
+	f, path := forgeByName(s.read("forge")), s.read("forge.path")
+	if f == nil || s.read("forge.id") != "" {
+		return nil
+	}
+	perms, err := f.Permissions(caps)
+	if err != nil {
+		return err
+	}
+	tok, id, err := f.Mint(tokenLabel(s.Name), path, perms)
+	if err != nil {
+		return fmt.Errorf("%s: %w", f.Name(), err)
+	}
+	if err := rt.RotateCredential(s.forgeProvider(f), f.TokenEnv(), tok); err != nil {
+		f.Revoke(id)
+		return err
+	}
+	return s.write("forge.id", id, 0o600)
 }
 
 // renewForge re-mints the token of a running sandbox when it expires within

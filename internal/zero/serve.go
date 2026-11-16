@@ -90,7 +90,7 @@ func upkeep() {
 			continue
 		}
 		withGateway(s.read("gateway"), func() {
-			if !rt.Exists(s.Name) {
+			if !rt.Exists(s.Name) || rt.Stopped(s.Name) {
 				return
 			}
 			s.Host = rt.HostAlias(s.Name)

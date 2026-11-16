@@ -60,6 +60,8 @@ func (s *Sandbox) setupCopilot() (string, error) {
 // inside the sandbox; opencode sends it as Bearer and the proxy substitutes it.
 func (s *Sandbox) importCopilotAuth() error {
 	script := `[ -n "$` + copilotEnv + `" ] || { echo "` + copilotEnv + ` not set in sandbox" >&2; exit 1; }; ` +
+		// import skips an existing id; after a restart the stored placeholder is stale.
+		`opencode auth logout github-copilot cred_zero0copilot0000000000 >/dev/null 2>&1; ` +
 		`printf '[{"id":"cred_zero0copilot0000000000","integrationID":"github-copilot","label":"OAuth","active":true,` +
 		`"value":{"type":"oauth","methodID":"device","refresh":"%s","access":"%s","expires":0}}]' ` +
 		`"$` + copilotEnv + `" "$` + copilotEnv + `" | opencode auth import`

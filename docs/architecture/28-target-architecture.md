@@ -39,7 +39,7 @@ Each layer is a feature. L0–L3 are always on; L4+ are switchable per project/o
 | 0 | Containment: non-root, Landlock, seccomp, no host mounts, own netns | agent touching host files/processes | Z1, Z5 | proven (PoC 01, containment 45/45) |
 | 1 | Egress allowlist: deny by default, project hosts from host checkout, per-binary rules | exfil to non-allowed hosts (not through allowed ones, C18) | Z2, Z5 | proven (PoC 03, `.zero/policy.yaml`) |
 | 2 | Placeholders: real credentials only in supervisor, injected at declared placement | secret theft from env/files/memory of agent | Z1, Z4 | proven (GitLab, Copilot #86) |
-| 3 | Scoped credentials: one fine-grained token per sandbox, project-only, ≤1 day, renewed, revoked on rm/orphan | blast radius beyond the project; leftover tokens | Z2, Z4 | proven (#70); renew window C44 |
+| 3 | Scoped credentials: one fine-grained token per sandbox, project-only, 24–48 h (ADR 0036), renewed, revoked on pause/rm/orphan | blast radius beyond the project; leftover tokens | Z2, Z4 | proven (#70); renew window C44 |
 | 4 | Git write gate: push only to session branch, no delete | overwriting/deleting other branches (C43) | Z2, Z3 | built (#95, ADR 0030); force-push on own branch open |
 | 5 | API action gate: OpenShell `read-write` preset has no DELETE; token has no branch/tag/commit create | deleting branches/tags, creating branches past the git gate via REST/GraphQL | Z2 | built (#96), `tests/attacks/forge.sh` 14/14 |
 | 5a | CI gate: push gate adds `ci.skip`; a human starts the pipeline; `ci.run` capability opts out | agent code running in CI on push (P14): CI variables, runner egress | Z1, Z2 | built (#102, ADR 0035) |
