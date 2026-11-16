@@ -32,7 +32,7 @@ No file → this default (§13.1 without containers). Unknown keys or capabiliti
 |---|---|
 | `git.read` | `read_project read_code download_code` |
 | `git.commit` | local only (see C42: committed hooks run on host after checkout) |
-| `git.push` | `push_code create_branch` |
+| `git.push` | `push_code` |
 | `gitlab.issue.read` | `read_work_item` |
 | `gitlab.mr.read` | `read_merge_request` |
 | `gitlab.mr.create` | `create_merge_request` |

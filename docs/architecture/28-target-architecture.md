@@ -41,7 +41,7 @@ Each layer is a feature. L0–L3 are always on; L4+ are switchable per project/o
 | 2 | Placeholders: real credentials only in supervisor, injected at declared placement | secret theft from env/files/memory of agent | Z1, Z4 | proven (GitLab, Copilot #86) |
 | 3 | Scoped credentials: one fine-grained token per sandbox, project-only, ≤1 day, renewed, revoked on rm/orphan | blast radius beyond the project; leftover tokens | Z2, Z4 | proven (#70); renew window C44 |
 | 4 | Git write gate: push only to session branch, no delete | overwriting/deleting other branches (C43) | Z2, Z3 | built (#95, ADR 0030); force-push on own branch open |
-| 5 | API action gate: OpenShell deny rules for destructive REST (branch/tag delete, settings, members) | REST-side destruction | Z2 | planned |
+| 5 | API action gate: OpenShell `read-write` preset has no DELETE; token has no branch/tag/commit create | deleting branches/tags, creating branches past the git gate via REST/GraphQL | Z2 | built (#96), `tests/attacks/forge.sh` 14/14 |
 | 6 | Isolation strength: VM driver per risk (`zero up --vm`) | kernel escape | Z5 | proven (#17); no container build (C48) |
 | 7 | Identity + revocation off the laptop: SPIFFE per sandbox, sessions/epochs, OpenBao storage | stolen laptop, offline revocation | Z3, Z4, Z6 | PoC 08/09/10 |
 | 8 | Evidence: decision log + OCSF per sandbox → sink | silent misuse, no attribution | Z3, Z6 | partial (local logs only) |
@@ -74,6 +74,6 @@ The CLI, policy file and layers are identical; only where `zero serve` runs chan
 ## 28.6 Next steps (issues)
 
 1. ~~Move push gate into zero (L4 default)~~ — done (#95).
-2. OpenShell deny rules for destructive GitLab REST (L5) — new issue.
+2. ~~OpenShell deny rules for destructive GitLab REST (L5)~~ — done (#96): no extra rules needed, `create_branch` removed from the token.
 3. `zero serve` as the single broker process (laptop) — new issue.
 4. #78 widening prompt, #88 ADR OpenBao, #91/#92 identity decisions (open questions in `docs/scenarios/identity-broker-usecases.md`).

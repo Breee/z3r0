@@ -21,6 +21,6 @@ The sandbox token can push to every branch its role allows (C43). GitLab tokens 
 - One fixed port, because the forge profile is shared by all sandboxes.
 - The gate is stateless: a force-push that rewrites the agent's own session branch is not detected.
 - `zero/<name>` and `zero/<name>/x` cannot exist together (git ref naming); use one form per sandbox.
-- Branch deletion through the GitLab REST API is not covered (#96).
+- Branch deletion and creation through the GitLab API are closed in #96 (preset without DELETE, token without `create_branch`).
 - Not tested with the VM driver.
 - The gate becomes a handler of `zero serve` (#97).
