@@ -44,25 +44,6 @@ const vmGateway = "openshell-vm"
 
 // New resolves the enclosing git repo into a sandbox description. zero only
 // operates inside a git work tree; the sandbox name derives from the repo name.
-func New() (*Sandbox, error) {
-	top, err := sh("git", "rev-parse", "--show-toplevel")
-	if err != nil || top == "" {
-		return nil, fmt.Errorf("not inside a git repository (run zero from a repo)")
-	}
-	repo := filepath.Base(top)
-	name := SandboxName(repo)
-	s := &Sandbox{
-		Name:  name,
-		Repo:  repo,
-		Top:   top,
-		Dir:   "/tmp/zero/" + repo,
-		State: filepath.Join(stateRoot(), name),
-		Host:  rt.HostAlias(name),
-	}
-	s.setGateway(s.read("gateway"))
-	return s, nil
-}
-
 // UseVM selects the MicroVM gateway for a new sandbox. An existing sandbox
 // keeps the gateway it was created on.
 func (s *Sandbox) UseVM() error {

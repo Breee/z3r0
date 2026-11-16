@@ -1,6 +1,6 @@
 # Spec: workspaces and contexts
 
-Status: draft (#71). No code yet.
+Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); sandbox still uses the first folder only (multi-folder #76, input folders #77, `zero ls` + rm check #79).
 
 ## 1. Concepts
 
@@ -30,7 +30,7 @@ workspaces:
       - /tmp/opencode/developer
 ```
 
-Runtime state stays per workspace: `~/.local/state/zero/<name>/` (port, password, forge tokens, policy sha, lock). Sandbox name `zero-<name>`.
+Runtime state stays per workspace: `~/.local/state/zero/zero-<name>/` (port, forge token id, policy sha, lock). Sandbox name `zero-<name>`.
 
 Names: `[a-z0-9-]{1,40}`, unique. Folder paths stored as resolved absolute paths (symlinks resolved).
 
@@ -43,6 +43,8 @@ First match wins:
 3. cwd: the workspace whose folder contains the resolved cwd
 4. `current` in config.yaml
 5. none → commands that need a workspace fail with a hint; `zero up` creates one (§5.1).
+
+Exception (built in #75): `zero up|web|code|attach|run` inside a git repo that belongs to no workspace creates a new workspace for that repo instead of acting on `current`.
 
 Every command that acts on a workspace prints its first line to stderr:
 `ctx: team (cwd)` — source is one of `flag`, `env`, `cwd`, `current`, `new`.
@@ -187,7 +189,7 @@ No silent drop.
 
 ### 5.11 Migration from today's state
 
-Existing `~/.local/state/zero/zero-<repo>/` without config entry: first run of any command registers it as workspace `<repo>` with folder from its recorded path. No sandbox recreate.
+Existing `~/.local/state/zero/zero-<repo>/` without config entry: the first command run inside that repo registers it as workspace `<repo>` with the repo as folder (state does not record the host path, so it cannot be registered from elsewhere). No sandbox recreate. Verified #75.
 
 ## 6. Folder handling
 

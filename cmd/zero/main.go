@@ -8,13 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strings"
 
 	"github.com/Breee/z3r0/internal/zero"
 )
 
 const usageText = `zero: per-repo OpenShell sandbox with opencode serve inside; host opencode attaches.
 
-Usage (inside a git repo): zero <command>
+Usage: zero [-c WORKSPACE] <command>
   up            create-or-reuse sandbox, clone repo in (first time only), start serve + forward
   up --vm       same, new sandbox as MicroVM (gateway openshell-vm; or Z3R0_DRIVER=vm)
   up --approve  accept a wider .zero/policy.yaml without the y/N question
@@ -27,9 +28,14 @@ Usage (inside a git repo): zero <command>
   logs [-f]     opencode service log from inside the sandbox
   pause         stop the sandbox and revoke its token; files stay, zero up continues
   rm            stop + delete sandbox (work not pushed is lost)
+  ctx           list workspaces (* current, + here); ctx use NAME | new NAME [PATH...] |
+                add [PATH...] | remove [PATH...] | rm NAME | --prompt
   serve         run the broker in the foreground: push gate, token upkeep (zero up starts it itself)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
+
+The workspace is picked by -c, then ZERO_CONTEXT, then the current folder, then
+zero ctx use. zero up in a git repo without a workspace creates one.
 `
 
 func main() {
@@ -37,7 +43,12 @@ func main() {
 		fmt.Fprint(os.Stderr, usageText)
 		os.Exit(2)
 	}
-	cmd, args := os.Args[1], os.Args[2:]
+	ctx, rest := contextFlag(os.Args[1:])
+	if len(rest) == 0 {
+		fmt.Fprint(os.Stderr, usageText)
+		os.Exit(2)
+	}
+	cmd, args := rest[0], rest[1:]
 	switch cmd {
 	case "-h", "--help", "help":
 		fmt.Print(usageText)
@@ -57,9 +68,15 @@ func main() {
 			fatal(err)
 		}
 		return
+	case "ctx":
+		if err := zero.Ctx(os.Stdout, ctx, args); err != nil {
+			fatal(err)
+		}
+		return
 	}
 
-	z, err := zero.New()
+	create := slices.Contains([]string{"up", "attach", "run", "code", "web"}, cmd)
+	z, err := zero.Open(ctx, create)
 	if err != nil {
 		fatal(err)
 	}
@@ -105,6 +122,26 @@ func main() {
 		}
 		fatal(err)
 	}
+}
+
+// contextFlag takes -c/--context NAME out of the arguments. Arguments after
+// `run` belong to the prompt and stay untouched.
+func contextFlag(in []string) (ctx string, rest []string) {
+	for i := 0; i < len(in); i++ {
+		a := in[i]
+		switch {
+		case len(rest) > 0 && rest[0] == "run":
+			rest = append(rest, a)
+		case (a == "-c" || a == "--context") && i+1 < len(in):
+			i++
+			ctx = in[i]
+		case strings.HasPrefix(a, "--context="):
+			ctx = strings.TrimPrefix(a, "--context=")
+		default:
+			rest = append(rest, a)
+		}
+	}
+	return ctx, rest
 }
 
 func fatal(err error) {

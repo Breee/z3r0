@@ -51,8 +51,8 @@ func Doctor(out io.Writer) error {
 		check("zero serve", "not running: systemctl --user start zero (or zero up)")
 	}
 
-	if s, err := New(); err == nil {
-		remote, _ := sh("git", "-C", s.Top, "remote", "get-url", "origin")
+	if top := gitTop(); top != "" {
+		remote, _ := sh("git", "-C", top, "remote", "get-url", "origin")
 		f, path := forgeFor(remote)
 		if g, ok := f.(gitlab); ok && g.LoggedIn() == nil && g.PlaintextLogin() {
 			fmt.Fprintf(out, "warn  glab login for %s is stored in plain text: glab auth login --hostname %s --use-keyring\n", g.host, g.host)

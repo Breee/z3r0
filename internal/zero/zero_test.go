@@ -243,3 +243,42 @@ func TestLinkPlainWhenNotTerminal(t *testing.T) {
 		t.Fatalf("file: got %q", got)
 	}
 }
+
+func TestResolveContext(t *testing.T) {
+	c := &Config{Current: "team", Workspaces: map[string]*Workspace{
+		"api":    {Folders: []string{"/src/api"}},
+		"team":   {Folders: []string{"/src/web", "/src/shared"}},
+		"hotfix": {Folders: []string{"/src/shared"}},
+		"other":  {Folders: []string{"/src/api2"}},
+	}}
+	cases := []struct{ flag, env, cwd, name, source string }{
+		{"api", "team", "/src/web", "api", "flag"},
+		{"", "hotfix", "/src/api", "hotfix", "env"},
+		{"", "", "/src/api/cmd", "api", "cwd"},
+		{"", "", "/src/api2", "other", "cwd"},
+		{"", "", "/src/shared", "team", "current"},
+		{"", "", "/elsewhere", "team", "current"},
+	}
+	for _, tc := range cases {
+		name, source, err := c.resolve(tc.flag, tc.env, tc.cwd)
+		if err != nil || name != tc.name || source != tc.source {
+			t.Errorf("resolve(%q,%q,%q) = %q %q %v, want %q %q", tc.flag, tc.env, tc.cwd, name, source, err, tc.name, tc.source)
+		}
+	}
+	if _, _, err := c.resolve("nope", "", "/src/api"); err == nil {
+		t.Error("unknown -c accepted")
+	}
+	c.Current = "api"
+	if _, _, err := c.resolve("", "", "/src/shared"); err == nil || !strings.Contains(err.Error(), "hotfix, team") {
+		t.Errorf("ambiguous cwd: %v", err)
+	}
+	c.Current = ""
+	if name, _, err := c.resolve("", "", "/elsewhere"); name != "" || err != nil {
+		t.Errorf("no context: %q %v", name, err)
+	}
+	for in, want := range map[string]string{"developer": "developer", "My_Repo.go": "my-repo-go", "---": ""} {
+		if got := wsName(in); got != want {
+			t.Errorf("wsName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
