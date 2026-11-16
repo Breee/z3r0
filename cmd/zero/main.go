@@ -24,6 +24,7 @@ Usage (inside a git repo): zero <command>
   stop          end the host port forward (sandbox keeps running)
   logs [-f]     serve.log from inside the sandbox
   rm            stop + delete sandbox (work not pushed is lost)
+  gate          run the push gate in the foreground (zero up starts it itself)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
 `
@@ -40,6 +41,11 @@ func main() {
 		return
 	case "install":
 		if err := zero.Install(); err != nil {
+			fatal(err)
+		}
+		return
+	case "gate":
+		if err := zero.ServeGate(); err != nil {
 			fatal(err)
 		}
 		return

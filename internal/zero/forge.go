@@ -229,8 +229,13 @@ func (s *Sandbox) configureRemote() error {
 		return nil
 	}
 	helper := fmt.Sprintf(`!f() { echo username=%s; echo "password=$%s"; }; f`, f.GitUser(), f.TokenEnv())
+	push, err := s.gateURL()
+	if err != nil {
+		return err
+	}
 	script := "cd " + shellQuote(s.Dir) + " && " +
 		"git remote set-url origin " + shellQuote("https://"+f.Host()+"/"+path+".git") + " && " +
+		"git config remote.origin.pushurl " + shellQuote(push) + " && " +
 		"git config credential.helper " + shellQuote(helper)
 	for _, k := range []string{"user.name", "user.email"} {
 		if v, err := sh("git", "-C", s.Top, "config", k); err == nil && strings.TrimSpace(v) != "" {

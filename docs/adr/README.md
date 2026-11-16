@@ -31,3 +31,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [27](0027-no-sync-back.md) | 2026-11-11 | No sync-back: git push is the only exit | Z-INV-1 |
 | [28](0028-dev-image-digest-pin.md) | 2026-11-11 | Dev image CI-signed, pinned by digest, no host signature check yet | Z-INV-5 |
 | [29](0029-copilot-in-sandbox.md) | 2026-11-13 | Host Copilot login bound as placeholder credential for opencode in the sandbox | Z-INV-1 |
+| [30](0030-push-gate.md) | 2026-11-16 | Push gate: agent can only push its session branch | Z-INV-2, Z-INV-3 |

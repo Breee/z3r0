@@ -61,6 +61,11 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err := s.writeSSHConfig(); err != nil {
 		return 0, err
 	}
+	if s.read("forge") != "" {
+		if err := ensureGate(); err != nil {
+			return 0, err
+		}
+	}
 	if err := s.ensureCheckout(); err != nil {
 		return 0, err
 	}
@@ -293,6 +298,13 @@ func (s *Sandbox) Status(out io.Writer) error {
 		fmt.Fprintf(out, "forward: %s\n", s.url(f.port))
 	} else {
 		fmt.Fprintln(out, "forward: off")
+	}
+	if s.read("gate.key") != "" {
+		if gateUp() {
+			fmt.Fprintf(out, "push gate: on (%s and below)\n", strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/"))
+		} else {
+			fmt.Fprintln(out, "push gate: off (pushes fail until the next zero up)")
+		}
 	}
 	if up {
 		running, err := s.serveRunning()

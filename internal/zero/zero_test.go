@@ -1,6 +1,11 @@
 package zero
 
-import "testing"
+import (
+	"bufio"
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestSandboxName(t *testing.T) {
 	cases := map[string]string{
@@ -84,5 +89,46 @@ func TestParsePolicy(t *testing.T) {
 	}
 	if _, err := (gitlab{}).Permissions([]string{"container.build"}); err == nil {
 		t.Error("unknown capability accepted")
+	}
+}
+
+func TestCheckRefs(t *testing.T) {
+	b := sessionBranch("zero-dev")
+	a, n := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	ok := [][]refUpdate{
+		{{a, n, "refs/heads/zero/dev"}},
+		{{zeroSHA, n, "refs/heads/zero/dev/fix"}, {a, n, "refs/heads/zero/dev"}},
+	}
+	bad := [][]refUpdate{
+		nil,
+		{{a, n, "refs/heads/main"}},
+		{{a, n, "refs/heads/zero/developer"}},
+		{{a, n, "refs/heads/zero/other"}},
+		{{a, n, "refs/tags/v1"}},
+		{{a, zeroSHA, "refs/heads/zero/dev"}},
+		{{a, n, "refs/heads/zero/dev"}, {a, n, "refs/heads/main"}},
+	}
+	for _, u := range ok {
+		if err := checkRefs(u, b); err != nil {
+			t.Errorf("%v: %v", u, err)
+		}
+	}
+	for _, u := range bad {
+		if checkRefs(u, b) == nil {
+			t.Errorf("%v allowed", u)
+		}
+	}
+}
+
+func TestReadCommands(t *testing.T) {
+	a, n := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	line := a + " " + n + " refs/heads/x\x00report-status\n"
+	in := fmt.Sprintf("%04x%s0000PACK", len(line)+4, line)
+	ups, err := readCommands(bufio.NewReader(strings.NewReader(in)))
+	if err != nil || len(ups) != 1 || ups[0].Ref != "refs/heads/x" {
+		t.Fatalf("%v %v", ups, err)
+	}
+	if _, err := readCommands(bufio.NewReader(strings.NewReader("0005"))); err == nil {
+		t.Fatal("truncated accepted")
 	}
 }

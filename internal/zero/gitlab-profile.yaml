@@ -19,4 +19,17 @@ endpoints:
     access: read-write
     enforcement: enforce
     allow_encoded_slash: true
+    # Pushes must go through the push gate (#95), never straight to the forge.
+    deny_rules:
+      - method: "*"
+        path: /**/git-receive-pack
+      - method: GET
+        path: /**/info/refs
+        query:
+          service: git-receive-pack
+  - host: host.openshell.internal
+    port: 18095
+    protocol: rest
+    access: read-write
+    enforcement: enforce
 binaries: [/usr/bin/git, /usr/lib/git-core/git-remote-https, /usr/bin/curl, /usr/local/bin/glab, /usr/local/libexec/opencode/node_modules/@opencode/cli/bin/opencode.exe]
