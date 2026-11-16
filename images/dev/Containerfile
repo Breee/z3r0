@@ -13,5 +13,22 @@ COPY --from=ripgrep / /usr/local/
 RUN opencode --version && glab --version && rg --version
 # C09: `sandbox exec` login shell resets PATH; re-add go. GOPATH under writable HOME (/sandbox).
 RUN printf 'export PATH=/usr/local/go/bin:$PATH\nexport GOPATH=$HOME/go\n' > /etc/profile.d/z3r0-go.sh
+# VS Code server for `zero code` (#107), where Remote-SSH looks for it in the
+# sandbox HOME (/go, uid 1000). Must equal the local VS Code commit
+# (`code --version`, second line); otherwise VS Code downloads its own as before.
+# Bump: curl https://update.code.visualstudio.com/api/versions/commit:<commit>/{server-linux-x64,cli-alpine-x64}/stable
+ARG VSCODE_COMMIT=c4453f8ea430795f941c1b2ff6c9321135a74a02
+ARG VSCODE_SERVER_SHA256=86a64e07f25c25e52e0d702d9d5fad4927cca86380f55283f4ef87e87772f0c3
+ARG VSCODE_CLI_SHA256=14686fb8f61038097d5d65af0c1a50449f3d34817c3e2724971916a9be27b55d
+RUN set -eu; d=/go/.vscode-server; s=$d/cli/servers/Stable-$VSCODE_COMMIT; \
+    u=https://vscode.download.prss.microsoft.com/dbazure/download/stable/$VSCODE_COMMIT; \
+    mkdir -p $s/server; \
+    curl -fsSL -o /tmp/server.tgz $u/vscode-server-linux-x64.tar.gz; \
+    curl -fsSL -o /tmp/cli.tgz $u/vscode_cli_alpine_x64_cli.tar.gz; \
+    printf '%s  /tmp/server.tgz\n%s  /tmp/cli.tgz\n' $VSCODE_SERVER_SHA256 $VSCODE_CLI_SHA256 | sha256sum -c; \
+    tar -xzf /tmp/server.tgz -C $s/server --strip-components=1; \
+    tar -xzf /tmp/cli.tgz -C /tmp code; mv /tmp/code $d/code-$VSCODE_COMMIT; \
+    printf '["Stable-%s"]' $VSCODE_COMMIT > $d/cli/servers/lru.json; \
+    rm /tmp/server.tgz /tmp/cli.tgz; chown -R 1000:1000 $d
 # C12: no setuid/setgid binaries.
 RUN find / -xdev -perm /6000 -type f -exec chmod ug-s {} + ; test -z "$(find / -xdev -perm /6000 -type f)"
