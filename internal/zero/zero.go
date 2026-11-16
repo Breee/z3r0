@@ -263,4 +263,4 @@ func probeServe(port int) error {
 }
 
 // devImage is built and cosign-signed by .github/workflows/dev-image.yml (ADR 0028).
-const devImage = "ghcr.io/breee/z3r0-dev@sha256:a279d03ce95e34d75f71a082c1e85f9b59611fcad2fd4871614403396d8064b0"
+const devImage = "ghcr.io/breee/z3r0-dev@sha256:f2e120fbb984ff6efbc157226a82a050e269c333930d50664c58f92820dbb504"
