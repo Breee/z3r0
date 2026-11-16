@@ -21,6 +21,7 @@ var gitlabCaps = map[string][]string{
 	"git.read":             {"read_project", "read_code", "download_code"},
 	"git.commit":           {},
 	"git.push":             {"push_code"},
+	capCIRun:               {},
 	"gitlab.issue.read":    {"read_work_item"},
 	"gitlab.mr.read":       {"read_merge_request"},
 	"gitlab.mr.create":     {"create_merge_request"},
@@ -177,6 +178,20 @@ func (gitlab) Guardrails(path string) ([]string, error) {
 	}
 	if b.AllowForcePush {
 		missing = append(missing, p.DefaultBranch+" allows force push")
+	}
+	// A pipeline on an agent branch can read every CI variable that is not protected (P14).
+	if out, err = sh("glab", "api", "--paginate", "projects/"+url.PathEscape(path)+"/variables"); err == nil {
+		var vars []struct {
+			Key       string `json:"key"`
+			Protected bool   `json:"protected"`
+		}
+		if json.Unmarshal([]byte(out), &vars) == nil {
+			for _, v := range vars {
+				if !v.Protected {
+					missing = append(missing, "CI variable "+v.Key+" not protected")
+				}
+			}
+		}
 	}
 	return missing, nil
 }

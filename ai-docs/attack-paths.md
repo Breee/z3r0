@@ -82,7 +82,9 @@ Not tested; from GitLab documentation and reasoning.
 
 Not reachable: protected variables, protected environments, merge.
 
-**Candidate layers (none built).**
+**Tested 2026-11-16 (#102, gitlab.com, self-hosted group runner):** a push without `ci.skip` ran the agent's job automatically; it read an unprotected CI variable, not a protected one, had `CI_JOB_TOKEN` and open internet. With `ci.skip` the pipeline is recorded as `skipped`; the agent token cannot start one (REST create/retry/trigger/schedule/MR pipeline, GraphQL: all refused). Built: push gate adds `ci.skip` unless capability `ci.run` is approved (ADR 0035); `zero doctor` fails on unprotected project CI variables. Not built: check of inherited group variables and runner scope.
+
+**Candidate layers (status before #102).**
 
 | Layer | Closes | Status |
 |---|---|---|

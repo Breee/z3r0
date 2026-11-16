@@ -124,11 +124,11 @@ func TestReadCommands(t *testing.T) {
 	a, n := strings.Repeat("a", 40), strings.Repeat("b", 40)
 	line := a + " " + n + " refs/heads/x\x00report-status\n"
 	in := fmt.Sprintf("%04x%s0000PACK", len(line)+4, line)
-	ups, err := readCommands(bufio.NewReader(strings.NewReader(in)))
+	ups, _, err := readCommands(bufio.NewReader(strings.NewReader(in)))
 	if err != nil || len(ups) != 1 || ups[0].Ref != "refs/heads/x" {
 		t.Fatalf("%v %v", ups, err)
 	}
-	if _, err := readCommands(bufio.NewReader(strings.NewReader("0005"))); err == nil {
+	if _, _, err := readCommands(bufio.NewReader(strings.NewReader("0005"))); err == nil {
 		t.Fatal("truncated accepted")
 	}
 }
@@ -149,5 +149,26 @@ func TestWidened(t *testing.T) {
 	w := widened(old, pol([]string{"a.example", "b.example"}, []string{"git.read", "gitlab.mr.create"}))
 	if fmt.Sprint(w) != "[network b.example capability gitlab.mr.create]" {
 		t.Errorf("widened = %v", w)
+	}
+}
+
+func TestWriteCommands(t *testing.T) {
+	a, n := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	ups := []refUpdate{{a, n, "refs/heads/zero/x"}}
+	cmd := func(caps string) string { return pktLine(a + " " + n + " refs/heads/zero/x\x00" + caps + "\n") }
+	skip := pktLine("ci.skip\n")
+	for _, c := range []struct{ caps, skipCI, want string }{
+		{"report-status", "n", cmd("report-status") + "0000"},
+		{"report-status", "y", cmd("report-status push-options") + "0000" + skip + "0000"},
+		{"report-status push-options", "y", cmd("report-status push-options") + "0000" + skip},
+	} {
+		if got := writeCommands(ups, c.caps, c.skipCI == "y"); got != c.want {
+			t.Errorf("caps %q skip %s:\n got %q\nwant %q", c.caps, c.skipCI, got, c.want)
+		}
+	}
+	// what was written parses back to the same updates
+	got, _, err := readCommands(bufio.NewReader(strings.NewReader(writeCommands(ups, "x", true))))
+	if err != nil || len(got) != 1 || got[0] != ups[0] {
+		t.Fatalf("%v %v", got, err)
 	}
 }

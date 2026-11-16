@@ -42,12 +42,13 @@ Each layer is a feature. L0–L3 are always on; L4+ are switchable per project/o
 | 3 | Scoped credentials: one fine-grained token per sandbox, project-only, ≤1 day, renewed, revoked on rm/orphan | blast radius beyond the project; leftover tokens | Z2, Z4 | proven (#70); renew window C44 |
 | 4 | Git write gate: push only to session branch, no delete | overwriting/deleting other branches (C43) | Z2, Z3 | built (#95, ADR 0030); force-push on own branch open |
 | 5 | API action gate: OpenShell `read-write` preset has no DELETE; token has no branch/tag/commit create | deleting branches/tags, creating branches past the git gate via REST/GraphQL | Z2 | built (#96), `tests/attacks/forge.sh` 14/14 |
+| 5a | CI gate: push gate adds `ci.skip`; a human starts the pipeline; `ci.run` capability opts out | agent code running in CI on push (P14): CI variables, runner egress | Z1, Z2 | built (#102, ADR 0035) |
 | 6 | Isolation strength: VM driver per risk (`zero up --vm`) | kernel escape | Z5 | proven (#17); no container build (C48) |
 | 7 | Identity + revocation off the laptop: SPIFFE per sandbox, sessions/epochs, OpenBao storage | stolen laptop, offline revocation | Z3, Z4, Z6 | PoC 08/09/10 |
 | 8 | Evidence: decision log + OCSF per sandbox → sink | silent misuse, no attribution | Z3, Z6 | partial (local logs only) |
 | — | DevOps backbone: protected branches, MR review, CI, GitOps | merging agent work unreviewed | — | not zero (ADR 0024) |
 
-Known holes no layer closes today (L0 also assumes the host follows `docs/host-recommendations.md`, e.g. no docker group): foreign credentials in requests (C18, #14), spam MRs (accepted as reversible), agent-committed hooks run on host checkout (C42), CI runs agent code outside the sandbox on every push (P14, [ADR 0034](../adr/0034-agent-is-untrusted-pusher.md), #101), model traffic content. What zero trusts and what it mitigates: [ADR 0033](../adr/0033-trust-assumption-and-review.md).
+Known holes no layer closes today (L0 also assumes the host follows `docs/host-recommendations.md`, e.g. no docker group): foreign credentials in requests (C18, #14), spam MRs (accepted as reversible), agent-committed hooks run on host checkout (C42), CI runs agent code once a human starts the pipeline or `ci.run` is approved (P14, [ADR 0034](../adr/0034-agent-is-untrusted-pusher.md), [ADR 0035](../adr/0035-ci-skip-by-default.md)), model traffic content. What zero trusts and what it mitigates: [ADR 0033](../adr/0033-trust-assumption-and-review.md).
 
 ## 28.4 Use (what a developer types)
 

@@ -37,6 +37,7 @@ No file → this default (§13.1 without containers). Unknown keys or capabiliti
 | `gitlab.mr.read` | `read_merge_request` |
 | `gitlab.mr.create` | `create_merge_request` |
 | `gitlab.pipeline.read` | `read_pipeline read_job` |
+| `ci.run` | no token permission; without it the push gate adds `ci.skip` to every push (ADR 0035). Not in the default set |
 | `container.*` | needs E3 (§6.2), not available yet |
 | `network.allow` host | egress rule host:443 read-only (enforce) |
 

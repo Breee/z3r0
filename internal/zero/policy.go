@@ -30,6 +30,10 @@ var defaultCaps = []string{
 	"gitlab.issue.read", "gitlab.mr.read", "gitlab.mr.create", "gitlab.pipeline.read",
 }
 
+// capCIRun lets pipelines start on the agent's pushes. Without it (default)
+// the push gate adds ci.skip and a human starts the pipeline (ADR 0035).
+const capCIRun = "ci.run"
+
 var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
 // loadPolicy reads .zero/policy.yaml from the host checkout, never from the

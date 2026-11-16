@@ -30,6 +30,14 @@ for r in refs/heads/main refs/heads/zero-attack refs/tags/zero-attack; do
 done
 O=$(sbx "cd /tmp/zero/$REPO && git push https://gitlab.com/$P.git HEAD:refs/heads/zero-attack")
 case $O in *403*) echo "PASS direct git push to forge (policy)";; *) echo "FAIL direct git push: $O"; FAILS=$((FAILS+1));; esac
+want "REST start pipeline"          "$(code POST '/pipeline?ref=main')" 403
+if grep -qw ci.run "$ST/caps"; then echo "SKIP ci.skip check (ci.run approved for this sandbox)"; else
+  B=zero/${N#zero-}
+  O=$(sbx "cd /tmp/zero/$REPO && git commit -q --allow-empty -m 'forge.sh ci probe' && git push origin HEAD:refs/heads/$B && git rev-parse HEAD")
+  SHA=$(printf %s "$O" | tail -1); sleep 5
+  S=$(glab api "projects/$ID/pipelines?sha=$SHA" | jq -r '.[0].status // "none"')
+  case $S in skipped|none) echo "PASS push starts no pipeline ($S)";; *) echo "FAIL push started a pipeline ($S)"; FAILS=$((FAILS+1));; esac
+fi
 want "control: read MRs works"     "$(code GET /merge_requests)" 200
 glab api "projects/$ID/repository/branches" | jq -r '.[].name' | grep -q zero-attack && { echo "FAIL branch zero-attack exists on forge"; FAILS=$((FAILS+1)); }
 echo "fails: $FAILS"; [ "$FAILS" = 0 ]

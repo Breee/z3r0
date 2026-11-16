@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,35 +39,67 @@ const (
 type refUpdate struct{ Old, New, Ref string }
 
 // readCommands reads the ref update commands of a receive-pack request up to
-// the first flush packet.
-func readCommands(r *bufio.Reader) ([]refUpdate, error) {
-	var ups []refUpdate
+// the first flush packet. caps is the capability list of the first command.
+func readCommands(r *bufio.Reader) (ups []refUpdate, caps string, err error) {
 	for {
 		head := make([]byte, 4)
 		if _, err := io.ReadFull(r, head); err != nil {
-			return nil, fmt.Errorf("truncated request")
+			return nil, "", fmt.Errorf("truncated request")
 		}
 		n, err := strconv.ParseUint(string(head), 16, 16)
 		if err != nil {
-			return nil, fmt.Errorf("bad pkt-line")
+			return nil, "", fmt.Errorf("bad pkt-line")
 		}
 		if n == 0 {
-			return ups, nil
+			return ups, caps, nil
 		}
 		if n < 4 {
-			return nil, fmt.Errorf("unsupported pkt-line")
+			return nil, "", fmt.Errorf("unsupported pkt-line")
 		}
 		line := make([]byte, n-4)
 		if _, err := io.ReadFull(r, line); err != nil {
-			return nil, fmt.Errorf("truncated request")
+			return nil, "", fmt.Errorf("truncated request")
 		}
-		s, _, _ := strings.Cut(string(line), "\x00")
+		s, c, _ := strings.Cut(string(line), "\x00")
+		if len(ups) == 0 {
+			caps = strings.TrimSpace(c)
+		}
 		f := strings.Fields(s)
 		if len(f) != 3 || len(f[0]) != 40 || len(f[1]) != 40 {
-			return nil, fmt.Errorf("unsupported command %q", s)
+			return nil, "", fmt.Errorf("unsupported command %q", s)
 		}
 		ups = append(ups, refUpdate{f[0], f[1], f[2]})
 	}
+}
+
+func pktLine(s string) string { return fmt.Sprintf("%04x%s", len(s)+4, s) }
+
+// writeCommands is the command section of a receive-pack request for ups.
+// With skipCI the push option ci.skip is added (#102): the forge records the
+// pipeline as skipped, so agent-written CI code runs only when a human starts
+// it. The rest of the request must follow: the client's own push options if
+// it sent any, then the pack.
+func writeCommands(ups []refUpdate, caps string, skipCI bool) string {
+	hadOpts := slices.Contains(strings.Fields(caps), "push-options")
+	if skipCI && !hadOpts {
+		caps = strings.TrimSpace(caps + " push-options")
+	}
+	var b strings.Builder
+	for i, u := range ups {
+		l := u.Old + " " + u.New + " " + u.Ref
+		if i == 0 {
+			l += "\x00" + caps
+		}
+		b.WriteString(pktLine(l + "\n"))
+	}
+	b.WriteString("0000")
+	if skipCI {
+		b.WriteString(pktLine("ci.skip\n"))
+		if !hadOpts {
+			b.WriteString("0000")
+		}
+	}
+	return b.String()
 }
 
 // checkRefs allows only updates of branch (refs/heads/zero/<name>) and
@@ -93,6 +126,7 @@ func sessionBranch(sandbox string) string {
 
 type gateSession struct {
 	name, state, upstream, repo string
+	ciRun                       bool // capability ci.run: pipelines start on push
 }
 
 // gateLookup finds the sandbox owning key by scanning the state dirs, so a
@@ -116,7 +150,8 @@ func gateLookup(key string) *gateSession {
 		if f == nil || read("forge.path") == "" {
 			return nil
 		}
-		return &gateSession{filepath.Base(dir), dir, "https://" + f.Host(), "/" + read("forge.path") + ".git"}
+		return &gateSession{filepath.Base(dir), dir, "https://" + f.Host(), "/" + read("forge.path") + ".git",
+			slices.Contains(strings.Fields(read("caps")), capCIRun)}
 	}
 	return nil
 }
@@ -177,8 +212,7 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			r.Header.Del("Content-Encoding")
 		}
 		br := bufio.NewReader(body)
-		var seen strings.Builder
-		ups, err := readCommands(bufio.NewReader(io.TeeReader(br, &seen)))
+		ups, caps, err := readCommands(br)
 		if err == nil {
 			err = checkRefs(ups, sessionBranch(gs.name))
 		}
@@ -192,12 +226,15 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			gateDeny(w, err.Error())
 			return
 		}
-		for _, u := range ups {
-			gateRecord(gs, u, "allow", "")
+		note := "ci.skip added"
+		if gs.ciRun {
+			note = ""
 		}
-		// The tee'd reader may have buffered past the commands: replay
-		// everything read so far, then the rest.
-		r.Body = io.NopCloser(io.MultiReader(strings.NewReader(seen.String()), br))
+		cmds := writeCommands(ups, caps, !gs.ciRun)
+		for _, u := range ups {
+			gateRecord(gs, u, "allow", note)
+		}
+		r.Body = io.NopCloser(io.MultiReader(strings.NewReader(cmds), br))
 		r.ContentLength = -1
 		r.Header.Del("Content-Length")
 		proxy.ServeHTTP(w, r)
