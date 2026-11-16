@@ -83,12 +83,16 @@ func (openshell) Upload(name, src, dst string) error {
 }
 
 func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) error {
-	for _, h := range hosts {
-		if _, err := sh("openshell", "policy", "update", name,
+	// One endpoint per call; each --wait costs seconds, so only the last waits.
+	for i, h := range hosts {
+		args := []string{"policy", "update", name,
 			"--rule-name", rule,
 			"--binary", binary,
-			"--add-endpoint", h+":443:"+access+":rest:enforce",
-			"--wait"); err != nil {
+			"--add-endpoint", h + ":443:" + access + ":rest:enforce"}
+		if i == len(hosts)-1 {
+			args = append(args, "--wait")
+		}
+		if _, err := sh("openshell", args...); err != nil {
 			return fmt.Errorf("%s: %w", h, err)
 		}
 	}
