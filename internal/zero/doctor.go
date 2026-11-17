@@ -38,10 +38,14 @@ func Doctor(out io.Writer) error {
 
 	if _, err := exec.LookPath("openshell"); err != nil {
 		check("openshell cli", "not on PATH")
-	} else if _, err := sh("openshell", "gateway", "info"); err != nil {
-		check("openshell gateway", "unreachable: "+err.Error())
 	} else {
-		check("openshell gateway", "")
+		withGateway("", func() {
+			if _, err := sh("openshell", "gateway", "info"); err != nil {
+				check("openshell gateway", "unreachable: "+err.Error())
+			} else {
+				check("openshell gateway", "")
+			}
+		})
 	}
 	check("gateway user", gatewayUser())
 	check("client key", clientKey())
