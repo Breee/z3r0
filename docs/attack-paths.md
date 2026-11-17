@@ -20,43 +20,56 @@ Contents:
 Severity: high, medium, low, inherent (cannot be closed, only narrowed), origin (where corruption comes from, section 6).
 Evidence: proven = reproduced by a test or run; reasoning = not tested.
 
-| # | Severity | Path | Evidence | Section |
-|---|---|---|---|---|
-| P01 | high | Sandbox-written `.git/config` executes on host after `sandbox download` | proven | 2 |
-| P02 | high | Foreign API key sent to an allowed endpoint | proven | 3 |
-| P03 | high | Sandbox breakout to the gateway user | proven (blast radius) | 2 |
-| P04 | high | Placeholder laundering on a bound endpoint | proven | 3 |
-| P05 | medium | Absolute symlink survives `sandbox download` | proven | 2 |
-| P06 | medium | Disk fill, no quota | proven | 2 |
-| P07 | inherent | Data in query/path/body of an allowed endpoint | proven | 3 |
-| P08 | low | Memory hog kills the sandbox | proven | 2 |
-| P09 | low | Info leaks from /proc, /etc/hosts, kernel | proven | 2 |
-| P10 | low | Non-HTTP / `tls: skip` endpoints uninspected | docs only | 3 |
-| P11 | low | Unsigned image from an allowed registry | policy review | 2 |
-| P12 | low | Same-name sandbox recreate right after delete | observed | 2 |
-| P13 | high | Agent-committed hook/tool configs run on host checkout | reasoning | 4 |
-| P14 | high | Agent code runs in CI on push | proven (#102) | 4, 7 |
-| P15 | high | Prompt injection via forge content or dependencies | reasoning | 4 |
-| P16 | medium | Agent widens `.zero/policy.yaml`, approval fatigue | reasoning | 4 |
-| P17 | medium | Malicious Go module runs on host or CI | reasoning | 4 |
-| P18 | medium | Agent content rendered in host browser / VS Code | reasoning | 2 |
-| P19 | medium | GitLab MCP tool ignores project scope | unverified | 4 |
-| P20 | medium | Token inherits the developer's role | accepted | 4 |
-| P21 | low | Token not revoked after crash or host loss | by design | 3 |
-| P22 | low | Local process connects to the forward port | reasoning | 2 |
-| P23 | low | Resource abuse (branches, MRs, pipelines, quota) | inherent | 4 |
-| P24 | low | Supply chain of zero itself | accepted | 2 |
-| P25 | high | Agent changes branches other than its session branch | open | 4 |
-| P26 | origin | Untrusted text the agent reads | reasoning | 6 |
-| P27 | origin | Poisoned instructions in the repo | reasoning | 6 |
-| P28 | origin | Tool and plugin supply chain | reasoning | 6 |
-| P29 | origin | Model or provider | reasoning | 6 |
-| P30 | origin | The human | reasoning | 6 |
-| P31 | origin | Plain model error | reasoning | 6 |
-| P32 | medium | Gateway client key holder bind-mounts gateway user files | reasoning | 5 |
-| P33 | medium | Gateway client key holder attaches any podman volume | reasoning | 5 |
-| P34 | low | Secret in an input folder under an unknown name | by design | 5 |
-| P35 | low | Input folder content carries instructions | reasoning | 5 |
+Effort: what it takes to exploit the path, from least to most. Classified by judgement on 2026-11-17, not measured.
+
+| Effort | Needs | Example |
+|---|---|---|
+| E1 | a user mistake, no attacker | secret left in an input folder |
+| E2 | a corrupted agent only (one injected prompt), using what it is allowed to do | data in the query of an allowed endpoint |
+| E3 | a corrupted agent plus a normal step by the developer (check out, approve, download, start a pipeline, allow an endpoint) | committed hook config runs on the host |
+| E4 | a foothold or preparation outside the sandbox (process on the host, published package or image, tampered provider) | malicious Go module |
+| E5 | an exploit or a bug in a dependency (kernel/container CVE, forge permission bug) | sandbox breakout |
+
+By effort: E1 P12 P30 P31 P34 P35 · E2 P02 P04 P06 P07 P08 P09 P15 P23 P25 P26 P27 · E3 P01 P05 P10 P13 P14 P16 P18 · E4 P11 P17 P21 P22 P24 P28 P29 P32 P33 · E5 P03 P19 P20.
+P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci.run` is approved.
+
+| # | Severity | Effort | Path | Evidence | Section |
+|---|---|---|---|---|---|
+| P01 | high | E3 | Sandbox-written `.git/config` executes on host after `sandbox download` | proven | 2 |
+| P02 | high | E2 | Foreign API key sent to an allowed endpoint | proven | 3 |
+| P03 | high | E5 | Sandbox breakout to the gateway user | proven (blast radius) | 2 |
+| P04 | high | E2 | Placeholder laundering on a bound endpoint | proven | 3 |
+| P05 | medium | E3 | Absolute symlink survives `sandbox download` | proven | 2 |
+| P06 | medium | E2 | Disk fill, no quota | proven | 2 |
+| P07 | inherent | E2 | Data in query/path/body of an allowed endpoint | proven | 3 |
+| P08 | low | E2 | Memory hog kills the sandbox | proven | 2 |
+| P09 | low | E2 | Info leaks from /proc, /etc/hosts, kernel | proven | 2 |
+| P10 | low | E3 | Non-HTTP / `tls: skip` endpoints uninspected | docs only | 3 |
+| P11 | low | E4 | Unsigned image from an allowed registry | policy review | 2 |
+| P12 | low | E1 | Same-name sandbox recreate right after delete | observed | 2 |
+| P13 | high | E3 | Agent-committed hook/tool configs run on host checkout | reasoning | 4 |
+| P14 | high | E3 | Agent code runs in CI on push | proven (#102) | 4, 7 |
+| P15 | high | E2 | Prompt injection via forge content or dependencies | reasoning | 4 |
+| P16 | medium | E3 | Agent widens `.zero/policy.yaml`, approval fatigue | reasoning | 4 |
+| P17 | medium | E4 | Malicious Go module runs on host or CI | reasoning | 4 |
+| P18 | medium | E3 | Agent content rendered in host browser / VS Code | reasoning | 2 |
+| P19 | medium | E5 | GitLab MCP tool ignores project scope | unverified | 4 |
+| P20 | medium | E5 | Token inherits the developer's role | accepted | 4 |
+| P21 | low | E4 | Token not revoked after crash or host loss | by design | 3 |
+| P22 | low | E4 | Local process connects to the forward port | reasoning | 2 |
+| P23 | low | E2 | Resource abuse (branches, MRs, pipelines, quota) | inherent | 4 |
+| P24 | low | E4 | Supply chain of zero itself | accepted | 2 |
+| P25 | high | E2 | Agent changes branches other than its session branch | open | 4 |
+| P26 | origin | E2 | Untrusted text the agent reads | reasoning | 6 |
+| P27 | origin | E2 | Poisoned instructions in the repo | reasoning | 6 |
+| P28 | origin | E4 | Tool and plugin supply chain | reasoning | 6 |
+| P29 | origin | E4 | Model or provider | reasoning | 6 |
+| P30 | origin | E1 | The human | reasoning | 6 |
+| P31 | origin | E1 | Plain model error | reasoning | 6 |
+| P32 | medium | E4 | Gateway client key holder bind-mounts gateway user files | reasoning | 5 |
+| P33 | medium | E4 | Gateway client key holder attaches any podman volume | reasoning | 5 |
+| P34 | low | E1 | Secret in an input folder under an unknown name | by design | 5 |
+| P35 | low | E1 | Input folder content carries instructions | reasoning | 5 |
 
 ## 2. Sandbox runtime and host
 
