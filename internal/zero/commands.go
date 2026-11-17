@@ -253,6 +253,15 @@ func (s *Sandbox) dirs() []string {
 // ensureCheckout clones every folder that is not in the sandbox yet from a
 // git bundle (bundles avoid copying a raw .git from the host trust domain).
 // A folder removed from the workspace keeps its checkout in the sandbox.
+// uncommitted counts changed and untracked files of a host repo; ignored files do not count.
+func uncommitted(top string) int {
+	out, err := sh("git", "-C", top, "status", "--porcelain")
+	if err != nil || out == "" {
+		return 0
+	}
+	return strings.Count(out, "\n") + 1
+}
+
 func (s *Sandbox) ensureCheckout(w io.Writer) error {
 	var paths map[string]string
 	for _, top := range s.repos() {
@@ -273,6 +282,9 @@ func (s *Sandbox) ensureCheckout(w io.Writer) error {
 			return err
 		}
 		s.noteSessionBranch(w, dir, paths[top])
+		if n := uncommitted(top); n > 0 {
+			fmt.Fprintf(w, "note: %s has %d uncommitted or untracked files; they are not in %s (the sandbox gets commits only)\n", top, n, dir)
+		}
 	}
 	return nil
 }
@@ -416,6 +428,9 @@ func (s *Sandbox) Status(out io.Writer) error {
 		fmt.Fprintf(out, "forward: %s\n", link(out, s.url(f.port)))
 	} else {
 		fmt.Fprintln(out, "forward: off")
+	}
+	if f := s.forge(); f != nil && s.read("forge.id") != "" {
+		fmt.Fprintf(out, "%s token: %s; capabilities: %s\n", f.Name(), strings.Join(s.forgePaths(), ", "), strings.Join(strings.Fields(s.read("caps")), ", "))
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {

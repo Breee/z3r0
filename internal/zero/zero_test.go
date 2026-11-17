@@ -556,3 +556,27 @@ func TestUntil(t *testing.T) {
 		}
 	}
 }
+
+func TestUncommitted(t *testing.T) {
+	top := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		if out, err := sh("git", append([]string{"-C", top, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...); err != nil {
+			t.Fatal(out, err)
+		}
+	}
+	git("init", "-q")
+	os.WriteFile(filepath.Join(top, "a"), []byte("1"), 0o644)
+	os.WriteFile(filepath.Join(top, ".gitignore"), []byte("ignored\n"), 0o644)
+	git("add", ".")
+	git("commit", "-qm", "one")
+	if n := uncommitted(top); n != 0 {
+		t.Fatalf("clean repo: %d", n)
+	}
+	os.WriteFile(filepath.Join(top, "a"), []byte("2"), 0o644)
+	os.WriteFile(filepath.Join(top, "new"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(top, "ignored"), []byte("x"), 0o644)
+	if n := uncommitted(top); n != 2 {
+		t.Fatalf("changed + untracked: %d, want 2", n)
+	}
+}

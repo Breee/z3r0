@@ -242,10 +242,10 @@ Decisions:
 | F1 | Hidden current context → wrong `rm` | cwd first, `ctx:` line, type-name confirm (5.7) |
 | F2 | Folder in several workspaces | ambiguity error unless current matches (5.8) |
 | F3 | Input folders leak host secrets (`.env`) into sandbox | **decided**: secret patterns (`.env*` etc.) never copied, not overridable; extra excludes via `.zeroignore`; file summary on `up` (5.3) |
-| F4 | Permission union: capability for repo A applies to repo B | **decided**: accepted, one token per forge per workspace; shown in status |
+| F4 | Permission union: capability for repo A applies to repo B | **decided**: accepted, one token per forge per workspace; `zero status` prints its projects and capabilities (#117) |
 | F5 | Egress narrowing not live | print "until recreate" (5.5) |
 | F6 | Removed repo keeps unpushed work in sandbox | warn; token no longer covers it (5.5) |
-| F7 | Uncommitted host changes silently missing in sandbox | warn on `up` |
+| F7 | Uncommitted host changes silently missing in sandbox | built in #117: `zero up` prints a note with the file count when it makes a fresh checkout of a folder with uncommitted or untracked files |
 | F8 | Name collisions in `/sandbox` (`a/api`, `b/api`) | built in #76: error, a workspace needs distinct folder names (no suffix) |
 | F9 | Larger blast radius per workspace | only explicitly listed folders; docs |
 | F10 | opencode multi-folder: one serve, sessions per directory | **verified 2026-11-16 (#73)**, opencode 2.2.6: one background service (port 4096) ran `opencode run` from two folders; each session has its own `location.directory`, each file landed in its folder. A folder without commits gets `projectID: global`. Not checked: the web UI project switcher |
