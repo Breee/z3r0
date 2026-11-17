@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSandboxName(t *testing.T) {
@@ -437,5 +438,44 @@ func TestSyncInputs(t *testing.T) {
 	}
 	if fileExists(stage) {
 		t.Fatal("copy of a removed folder kept")
+	}
+}
+
+func TestUnpushedScript(t *testing.T) {
+	dir := t.TempDir()
+	run := func(script string) string {
+		t.Helper()
+		out, err := sh("sh", "-c", "cd "+shellQuote(dir)+" && "+script)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.TrimSpace(out)
+	}
+	run("git init -q -b main . && git config user.email t@t && git config user.name t && " +
+		"git commit -q --allow-empty -m base && git update-ref refs/remotes/origin/main HEAD")
+	if got := run(unpushedScript); got != "" {
+		t.Errorf("clean checkout: %q, want nothing", got)
+	}
+	run("git checkout -q -b feat/login && git commit -q --allow-empty -m a && git commit -q --allow-empty -m b && echo x > new.txt")
+	want := "feat/login (2 commits)\nuncommitted changes (1 files)"
+	if got := run(unpushedScript); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	// A pushed branch has a remote branch at the same commit.
+	run("git update-ref refs/remotes/origin/zero/x HEAD && rm new.txt")
+	if got := run(unpushedScript); got != "" {
+		t.Errorf("after push: %q, want nothing", got)
+	}
+}
+
+func TestUntil(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		-time.Hour:                   "expired",
+		20*time.Hour + time.Minute:   "20h",
+		72*time.Hour + 5*time.Minute: "3d",
+	} {
+		if got := until(time.Now().Add(d)); got != want {
+			t.Errorf("until(%v) = %q, want %q", d, got, want)
+		}
 	}
 }

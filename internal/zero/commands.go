@@ -468,14 +468,21 @@ func (s *Sandbox) Pause(out io.Writer) error {
 	return nil
 }
 
-// Rm stops the forward and deletes the sandbox. If the delete fails the state
+// Rm stops the forward and deletes the sandbox, after it printed what only
+// the sandbox holds and the user typed the workspace name (yes skips that). If the delete fails the state
 // dir is kept so the command can be retried.
-func (s *Sandbox) Rm(out io.Writer) error {
+func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 	lk, err := s.acquireLock()
 	if err != nil {
 		return err
 	}
 	defer lk.release()
+	fmt.Fprintf(out, "unpushed: %s\n", s.unpushed())
+	if !yes {
+		if err := confirmName(strings.TrimPrefix(s.Name, "zero-")); err != nil {
+			return err
+		}
+	}
 	if err := s.stopForward(io.Discard); err != nil {
 		return err
 	}

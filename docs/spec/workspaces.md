@@ -1,6 +1,6 @@
 # Spec: workspaces and contexts
 
-Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039). Open: `zero ls` + rm check #79.
+Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039); `zero ls`, unpushed check and typed name on `rm` (#79).
 
 ## 1. Concepts
 
@@ -75,6 +75,8 @@ NAME        STATUS   FOLDERS  TOKEN      POLICY
 orphans: token 29481100 zero-old@io (no sandbox)
 ```
 
+Built in #79. STATUS is `running`, `stopped` (paused), `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is the commit of the first repo folder's policy file, `dirty` if any folder had uncommitted policy changes. One `orphans:` line per leftover: a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy without a workspace. `zero ls` only lists; `zero serve` revokes tokens without a sandbox.
+
 ## 5. Examples
 
 ### 5.1 First use, single repo (today's flow, unchanged)
@@ -137,10 +139,10 @@ $ zero up
 ctx: team (current)
 gitlab token: rotated (api, web)
 network rules for infra remain until recreate (zero rm && zero up)
-/sandbox/infra: unpushed branches: feat/x  → kept in sandbox, not reachable via token
+/tmp/zero/infra: unpushed: feat/x (1 commits) -> kept in sandbox, not reachable via token
 ```
 
-Token narrowing is immediate; the push gate refuses the removed repo at once. Egress narrowing needs recreate (OpenShell rules are additive). Built in #76: the checkout of a removed folder stays in the sandbox; the unpushed-branches line is not printed yet (#79). All repo folders of a workspace must be on the same forge host.
+Token narrowing is immediate; the push gate refuses the removed repo at once. Egress narrowing needs recreate (OpenShell rules are additive). Built in #76: the checkout of a removed folder stays in the sandbox; the unpushed line is printed if the sandbox is running (#79). All repo folders of a workspace must be on the same forge host.
 
 ### 5.6 cwd wins over current
 
@@ -157,12 +159,12 @@ ctx: developer (cwd)
 $ cd ~
 $ zero rm
 ctx: team (current)
-unpushed: api feat/login (2 commits), web: none
+unpushed: api: feat/login (2 commits), uncommitted changes (1 files); web: none
 type workspace name to delete: team
-removed team
+removed zero-team
 ```
 
-`-y` skips the prompt but still prints unpushed branches.
+`-y` skips the prompt but still prints the unpushed line. Built in #79, also for `zero ctx rm [-y] NAME`. Unpushed = branches with commits that are on no remote branch of the checkout (as of its last fetch or push; commits of the host checkout count as safe), and uncommitted files. A paused or unreachable sandbox shows `unknown`. Any other answer than the name ends the command without a change.
 
 A sandbox created again starts from the host checkout. If the forge still has `zero/<name>` with commits that are not in it, `zero up` prints a note per repo; a push is rejected until the agent pulls that branch or the user deletes it on the forge (the gate allows no delete). Built in #115.
 

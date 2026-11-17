@@ -350,6 +350,11 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			case sub == "remove" && i < 0:
 				return fmt.Errorf("%s is not in workspace %s", p, name)
 			case sub == "remove":
+				if !isInput(p) {
+					if s := c.sandbox(name); s.exists() {
+						fmt.Fprintf(out, "%s: unpushed: %s -> kept in sandbox, not reachable via token\n", sandboxDir(p), s.unpushedIn(p))
+					}
+				}
 				w.Folders = slices.Delete(w.Folders, i, i+1)
 			}
 		}
@@ -358,21 +363,21 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		}
 		fmt.Fprintf(out, "%s: %s\n", name, strings.Join(w.Folders, " "))
 	case "rm":
+		yes := slices.Contains(args, "-y")
+		args = slices.DeleteFunc(args, func(a string) bool { return a == "-y" })
 		if len(args) != 1 || c.Workspaces[args[0]] == nil {
-			return fmt.Errorf("usage: zero ctx rm NAME (zero ctx lists them)")
+			return fmt.Errorf("usage: zero ctx rm [-y] NAME (zero ctx lists them)")
 		}
 		s := c.sandbox(args[0])
-		if _, err := os.Stat(s.State); err == nil || rt.Exists(s.Name) {
-			if err := s.Rm(out); err != nil {
-				return err
-			}
+		if err := s.Rm(out, yes); err != nil {
+			return err
 		}
 		delete(c.Workspaces, args[0])
 		if c.Current == args[0] {
 			c.Current = ""
 		}
 	default:
-		return fmt.Errorf("usage: zero ctx [use NAME | new NAME [PATH...] | add [PATH...] | remove [PATH...] | rm NAME | --prompt]")
+		return fmt.Errorf("usage: zero ctx [use NAME | new NAME [PATH...] | add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt]")
 	}
 	return c.save()
 }

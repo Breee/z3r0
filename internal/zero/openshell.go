@@ -24,6 +24,14 @@ func (openshell) Reachable() bool {
 	return err == nil
 }
 
+func (openshell) List() ([]string, error) {
+	out, err := sh("openshell", "sandbox", "list", "--names", "--page-size", "1000")
+	if err != nil {
+		return nil, fmt.Errorf("list sandboxes: %w", err)
+	}
+	return strings.Fields(out), nil
+}
+
 func (openshell) Create(name, image, policyFile string, creds, env []string, mountSrc, mountDst string) error {
 	args := []string{"sandbox", "create", "--name", name, "--from", image, "--policy", policyFile, "--detach"}
 	for _, c := range creds {

@@ -29,9 +29,10 @@ Usage: zero [-c WORKSPACE] <command>
   stop          end the host port forward (sandbox keeps running)
   logs [-f]     opencode service log from inside the sandbox
   pause         stop the sandbox and revoke its token; files stay, zero up continues
-  rm            stop + delete sandbox (work not pushed is lost)
+  rm [-y]       stop + delete sandbox; lists work not pushed, asks for the workspace name
+  ls            all workspaces with status, token, policy; leftovers without a workspace
   ctx           list workspaces (* current, + here); ctx use NAME | new NAME [PATH...] |
-                add [PATH...] | remove [PATH...] | rm NAME | --prompt
+                add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt
   serve         run the broker in the foreground: push gate, token upkeep (zero up starts it itself)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
@@ -67,6 +68,11 @@ func main() {
 		return
 	case "doctor":
 		if err := zero.Doctor(os.Stdout); err != nil {
+			fatal(err)
+		}
+		return
+	case "ls":
+		if err := zero.Ls(os.Stdout); err != nil {
 			fatal(err)
 		}
 		return
@@ -120,7 +126,7 @@ func main() {
 	case "pause":
 		err = z.Pause(os.Stdout)
 	case "rm":
-		err = z.Rm(os.Stdout)
+		err = z.Rm(os.Stdout, slices.Contains(args, "-y"))
 	default:
 		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
 		fmt.Fprint(os.Stderr, usageText)

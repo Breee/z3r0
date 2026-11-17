@@ -7,6 +7,8 @@ type Runtime interface {
 	Exists(name string) bool
 	// Reachable reports whether the runtime answers at all; Exists is only meaningful if it does.
 	Reachable() bool
+	// List returns the names of all sandboxes.
+	List() ([]string, error)
 	// Create starts a sandbox from image with a filesystem policy file and
 	// credential bindings (ids returned by BindCredential). A non-empty
 	// mountSrc (host directory) is mounted read-only at mountDst.
