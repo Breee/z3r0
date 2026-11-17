@@ -580,3 +580,20 @@ func TestUncommitted(t *testing.T) {
 		t.Fatalf("changed + untracked: %d, want 2", n)
 	}
 }
+
+func TestGatewayPinned(t *testing.T) {
+	t.Setenv("OPENSHELL_GATEWAY", "other")
+	s := &Sandbox{State: t.TempDir()}
+	s.setGateway("")
+	if got := os.Getenv("OPENSHELL_GATEWAY"); got != podmanGateway || s.gw != "" {
+		t.Fatalf("setGateway(\"\"): env %q, gw %q", got, s.gw)
+	}
+	os.Setenv("OPENSHELL_GATEWAY", "other")
+	var in []string
+	for _, gw := range []string{"", vmGateway} {
+		withGateway(gw, func() { in = append(in, os.Getenv("OPENSHELL_GATEWAY")) })
+	}
+	if !slices.Equal(in, []string{podmanGateway, vmGateway}) || os.Getenv("OPENSHELL_GATEWAY") != "other" {
+		t.Fatalf("withGateway: %v, after %q", in, os.Getenv("OPENSHELL_GATEWAY"))
+	}
+}

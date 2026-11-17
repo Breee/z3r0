@@ -44,14 +44,10 @@ func Serve() error {
 }
 
 // withGateway runs fn with OPENSHELL_GATEWAY set as recorded for a sandbox
-// ("" = the default gateway) and restores the environment afterwards.
+// ("" = the podman gateway) and restores the environment afterwards.
 func withGateway(gw string, fn func()) {
 	old, had := os.LookupEnv("OPENSHELL_GATEWAY")
-	if gw != "" {
-		os.Setenv("OPENSHELL_GATEWAY", gw)
-	} else {
-		os.Unsetenv("OPENSHELL_GATEWAY")
-	}
+	os.Setenv("OPENSHELL_GATEWAY", gatewayName(gw))
 	defer func() {
 		if had {
 			os.Setenv("OPENSHELL_GATEWAY", old)

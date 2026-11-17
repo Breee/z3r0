@@ -45,6 +45,19 @@ type Sandbox struct {
 // vmGateway is the second OpenShell gateway with the MicroVM driver (E3, ADR 0015).
 const vmGateway = "openshell-vm"
 
+// podmanGateway is the gateway `zero install` registers. State records it as "".
+const podmanGateway = "openshell"
+
+// gatewayName is the openshell gateway for a recorded state value. zero always
+// names the gateway, so OPENSHELL_GATEWAY of the caller and `openshell gateway
+// select` do not decide where a sandbox is looked up.
+func gatewayName(gw string) string {
+	if gw == "" {
+		return podmanGateway
+	}
+	return gw
+}
+
 // New resolves the enclosing git repo into a sandbox description. zero only
 // operates inside a git work tree; the sandbox name derives from the repo name.
 // UseVM selects the MicroVM gateway for a new sandbox. An existing sandbox
@@ -59,11 +72,8 @@ func (s *Sandbox) UseVM() error {
 
 // setGateway routes every openshell call (and ssh ProxyCommand) to gw.
 func (s *Sandbox) setGateway(gw string) {
-	if gw == "" {
-		return
-	}
 	s.gw = gw
-	os.Setenv("OPENSHELL_GATEWAY", gw)
+	os.Setenv("OPENSHELL_GATEWAY", gatewayName(gw))
 }
 
 // SandboxName maps a repo basename to the sandbox name: lowercase, every
