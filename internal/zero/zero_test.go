@@ -386,6 +386,51 @@ func TestScanInputExcludes(t *testing.T) {
 	}
 }
 
+func TestSecretPatterns(t *testing.T) {
+	files := []string{".env", ".envrc", ".env.local", "prod.env", "ca.pem", "tls.key", "cert.p12", "cert.pfx", "app.jks", "release.keystore",
+		"host.ppk", "pw.kdbx", "private.asc", "office.ovpn", "id_rsa", "id_ed25519.pub", "deploy_rsa", "old_dsa", "host_ecdsa", "ci_ed25519",
+		".git-credentials", ".netrc", "_netrc", ".npmrc", ".pypirc", ".pgpass", ".htpasswd", ".dockercfg", ".s3cfg",
+		"kubeconfig", "prod.kubeconfig", "terraform.tfstate", "terraform.tfstate.backup", "prod.tfvars", "prod.tfvars.json",
+		".terraformrc", "terraform.rc", ".bash_history", ".psql_history"}
+	if len(files) < len(secretFiles) {
+		t.Fatalf("%d examples for %d patterns", len(files), len(secretFiles))
+	}
+	for _, p := range secretFiles {
+		if !slices.ContainsFunc(files, func(f string) bool { ok, _ := filepath.Match(p, f); return ok }) {
+			t.Errorf("pattern %s has no example", p)
+		}
+	}
+	dirs := []string{".ssh", ".aws", ".kube", ".gnupg", ".docker", ".azure", ".terraform", ".git"}
+	if !slices.Equal(dirs, secretDirs) {
+		t.Fatalf("examples %v, patterns %v", dirs, secretDirs)
+	}
+	top := t.TempDir()
+	tree := map[string]string{"openapi.yaml": "a", "environment.md": "b", "keys.md": "c", "history.txt": "d", "docker/compose.yaml": "e"}
+	for _, f := range files {
+		tree["sub/"+strings.ToUpper(f)] = "secret"
+		tree[f] = "secret"
+	}
+	for _, d := range dirs {
+		tree["sub/"+d+"/config"] = "secret"
+	}
+	writeTree(t, top, tree)
+	got, skip, err := scanInput(top)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range got {
+		names = append(names, f.rel)
+	}
+	slices.Sort(names)
+	if want := []string{"docker/compose.yaml", "environment.md", "history.txt", "keys.md", "openapi.yaml"}; !slices.Equal(names, want) {
+		t.Fatalf("copied %v, want %v", names, want)
+	}
+	if want := 2*len(files) + len(dirs); len(skip) != want {
+		t.Fatalf("%d skipped, want %d", len(skip), want)
+	}
+}
+
 func TestSyncInputs(t *testing.T) {
 	old := inputRoot
 	inputRoot = t.TempDir()

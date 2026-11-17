@@ -24,9 +24,19 @@ const (
 )
 
 // secretFiles and secretDirs are never copied; .zeroignore cannot allow them.
+// Matched on the lower-cased base name at any depth. Sources per pattern:
+// docs/spec/workspaces.md section 6.1.
 var (
-	secretFiles = []string{".env*", "*.pem", "*.key", "id_*", ".git-credentials", ".netrc"}
-	secretDirs  = []string{".ssh", ".aws", ".kube"}
+	secretFiles = []string{
+		".env*", "*.env",
+		"*.pem", "*.key", "*.p12", "*.pfx", "*.jks", "*.keystore", "*.ppk", "*.kdbx", "*.asc", "*.ovpn",
+		"id_*", "*_rsa", "*_dsa", "*_ecdsa", "*_ed25519",
+		".git-credentials", ".netrc", "_netrc", ".npmrc", ".pypirc", ".pgpass", ".htpasswd", ".dockercfg", ".s3cfg",
+		"kubeconfig", "*.kubeconfig",
+		"*.tfstate", "*.tfstate.*", "*.tfvars", "*.tfvars.json", ".terraformrc", "terraform.rc",
+		".*_history",
+	}
+	secretDirs = []string{".ssh", ".aws", ".kube", ".gnupg", ".docker", ".azure", ".terraform", ".git"}
 )
 
 func isInput(top string) bool { return !fileExists(filepath.Join(top, ".git")) }

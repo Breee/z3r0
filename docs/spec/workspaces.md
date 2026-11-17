@@ -202,10 +202,31 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: the first comm
 | Detect | folder has `.git` (without a forge remote: checkout, no token, no push) | no `.git` |
 | Into sandbox | git bundle of host commits, current branch checked out | filtered host copy, read-only bind mount at `/tmp/zero-input/<name>` |
 | Uncommitted host changes | not included (warn) | included |
-| Excluded | gitignored by nature | always (not overridable): `.env*`, `*.pem`, `*.key`, `id_*`, `.git-credentials`, `.netrc`, `.ssh/`, `.aws/`, `.kube/`, symlinks, special files; plus `.zeroignore` (one pattern per line: file name or path relative to the folder, shell wildcards) |
+| Excluded | gitignored by nature | always (not overridable): the secret patterns of 6.1, symlinks, special files; plus `.zeroignore` (one pattern per line: file name or path relative to the folder, shell wildcards) |
 | Exit | `git push` via forge token | none |
 | Policy source | `<folder>/.zero/policy.yaml` on host | none (no network grants) |
 | Size limit | — | 100 MiB for all input folders together, override `zero up --max-input <MiB>` |
+
+### 6.1 Secret patterns (#72)
+
+Never copied from an input folder. Matched on the base name, any case, at any depth. `.zeroignore` can add patterns, it cannot allow one of these.
+
+| What | Patterns | Source |
+|---|---|---|
+| Environment files | `.env*`, `*.env` | gitrob `^\.?env$`; github/gitignore (Node, Python: `.env`, `.env.*`, `.envrc`) |
+| Private keys, key stores | `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `*.kdbx`, `*.asc`, `*.ovpn` | gitleaks rule `pkcs12-file` (`.p12`, `.pfx`); gitrob extensions `pem`, `key`, `pkcs12`, `pfx`, `p12`, `asc`, `ovpn`, `jks`, `kdbx`, `keystore`; `.ppk` = PuTTY private key |
+| SSH keys | `id_*`, `*_rsa`, `*_dsa`, `*_ecdsa`, `*_ed25519`, `.ssh/` | gitrob `^.*_rsa$`, `^.*_dsa$`, `^.*_ed25519$`, `^.*_ecdsa$`, `\.?ssh/config$` |
+| Tool credentials | `.git-credentials`, `.netrc`, `_netrc`, `.npmrc`, `.pypirc`, `.pgpass`, `.htpasswd`, `.dockercfg`, `.s3cfg`, `.docker/`, `.gnupg/` | gitrob (`git-credentials`, `netrc`, `npmrc`, `pgpass`, `htpasswd`, `dockercfg`, `s3cfg`); `.pypirc` holds the PyPI token; `.docker/config.json` holds registry logins |
+| Cloud and cluster | `.aws/`, `.azure/`, `.kube/`, `kubeconfig`, `*.kubeconfig` | gitrob `\.?aws/credentials$`; kubeconfig holds client keys and tokens |
+| Terraform | `*.tfstate`, `*.tfstate.*`, `*.tfvars`, `*.tfvars.json`, `.terraformrc`, `terraform.rc`, `.terraform/` | github/gitignore Terraform.gitignore ("likely to contain sensitive data") |
+| Shell and database history | `.*_history` | gitrob `^\.?(bash_|zsh_|sh_|z)?history$`, `mysql_history`, `psql_history` |
+| Nested git data | `.git/` | `.git/config` can hold tokens in remote URLs |
+
+Decisions:
+
+- **Names only, no content scan.** trufflehog and GitHub secret scanning match content (token formats), gitleaks mostly content; none of them offers a name list beyond the above. zero does not scan content: a scan of its own would cover a few formats and suggest more safety than it gives, a full scan means running gitleaks as a dependency on every `zero up`. Left out names stay a known path (P34 in `docs/attack-paths.md`): `secrets.yaml`, `credentials.json`, a key inside a `.txt`. The summary on `zero up` and `.zeroignore` are the user's means.
+- **Not on the list on purpose**: `credentials*`, `*password*`, `*secret*`, `config.*`, `*.sql`, `*.sqlite`, `*.log` (gitrob has them) — too many harmless files in spec folders.
+- **Repo folders are not filtered.** They reach the sandbox as a git bundle: only committed content, so untracked and gitignored files (`.env`) stay on the host. A committed secret is already on the forge, where the sandbox token can read it.
 
 ## 7. Policy and credentials
 

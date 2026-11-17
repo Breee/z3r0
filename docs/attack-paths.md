@@ -123,7 +123,7 @@ Added 2026-11-17 (#77, ADR 0039). Not proven unless noted. The agent itself gain
 |---|---|---|---|---|---|---|
 | P32 | medium | A host process with the user's gateway client key creates a sandbox with a bind mount of any path the gateway user can read (`--driver-config-json`), also read-write | Reads the gateway user's home: gateway TLS keys, stored GitLab and Copilot credentials. Before ADR 0039 the user could not read them | not run; follows from `enable_bind_mounts = true` | Upstream read-only upload (#112), then turn the three settings off again (#111) | C52, ADR 0039, #113 |
 | P33 | medium | Same process attaches any existing podman volume (`resource_admission.enabled = false`) | Reads or changes another sandbox's workspace | not run | as P32 | C52, ADR 0039, #113 |
-| P34 | low | Secret in an input folder under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | `.zeroignore`; summary on `zero up`; #72 evaluates the list and a content scan | #72, spec §6 |
+| P34 | low | Secret in an input folder under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | `.zeroignore`; summary on `zero up`; list widened and content scan decided against in #72 | #72, spec §6.1 |
 | P35 | low | Input content (specs, notes) carries instructions for the agent | Prompt injection, as P26 | not run | none; input folders are chosen by the developer | P26 |
 
 ## 6. Origins of agent corruption
