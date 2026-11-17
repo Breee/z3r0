@@ -25,16 +25,17 @@ want "REST commit to branch"       "$(code POST /repository/commits '{"branch":"
 G=$(sbx "curl -s -X POST -H \"Authorization: Bearer \$GITLAB_TOKEN\" -H 'Content-Type: application/json' -d '{\"query\":\"mutation{createBranch(input:{projectPath:\\\"$P\\\",name:\\\"zero-attack\\\",ref:\\\"main\\\"}){errors}}\"}' https://gitlab.com/api/graphql")
 case $G in *"Access denied"*) echo "PASS GraphQL create branch (token)";; *) echo "FAIL GraphQL create branch: $G"; FAILS=$((FAILS+1));; esac
 for r in refs/heads/main refs/heads/zero-attack refs/tags/zero-attack; do
-  O=$(sbx "cd /tmp/zero/$REPO && git push origin HEAD:$r")
+  O=$(sbx "cd /tmp/zero/$REPO && git push origin \$(git commit-tree -p HEAD -m 'forge.sh attack' HEAD^{tree}):$r")
   case $O in *"push denied"*) echo "PASS git push $r (gate)";; *) echo "FAIL git push $r: $O"; FAILS=$((FAILS+1));; esac
 done
-O=$(sbx "cd /tmp/zero/$REPO && git push https://gitlab.com/$P.git HEAD:refs/heads/zero-attack")
+O=$(sbx "cd /tmp/zero/$REPO && git push https://gitlab.com/$P.git \$(git commit-tree -p HEAD -m 'forge.sh attack' HEAD^{tree}):refs/heads/zero-attack")
 case $O in *403*) echo "PASS direct git push to forge (policy)";; *) echo "FAIL direct git push: $O"; FAILS=$((FAILS+1));; esac
 want "REST start pipeline"          "$(code POST '/pipeline?ref=main')" 403
 if grep -qw ci.run "$ST/caps"; then echo "SKIP ci.skip check (ci.run approved for this sandbox)"; else
   B=zero/${N#zero-}
-  O=$(sbx "cd /tmp/zero/$REPO && git commit -q --allow-empty -m 'forge.sh ci probe' && git push origin HEAD:refs/heads/$B && git rev-parse HEAD")
-  SHA=$(printf %s "$O" | tail -1); sleep 5
+  O=$(sbx "cd /tmp/zero/$REPO && { git fetch -q origin $B 2>/dev/null && T=FETCH_HEAD || T=HEAD; } && C=\$(git commit-tree -p \$T -m 'forge.sh ci probe' \$T^{tree}) && git push -q origin \$C:refs/heads/$B && echo sha \$C")
+  SHA=$(printf %s "$O" | sed -n 's/^sha //p'); sleep 5
+  [ -n "$SHA" ] || { echo "FAIL probe push to $B: $O"; FAILS=$((FAILS+1)); }
   S=$(glab api "projects/$ID/pipelines?sha=$SHA" | jq -r '.[0].status // "none"')
   case $S in skipped|none) echo "PASS push starts no pipeline ($S)";; *) echo "FAIL push started a pipeline ($S)"; FAILS=$((FAILS+1));; esac
 fi

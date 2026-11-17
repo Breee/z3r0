@@ -164,6 +164,8 @@ removed team
 
 `-y` skips the prompt but still prints unpushed branches.
 
+A sandbox created again starts from the host checkout. If the forge still has `zero/<name>` with commits that are not in it, `zero up` prints a note per repo; a push is rejected until the agent pulls that branch or the user deletes it on the forge (the gate allows no delete). Built in #115.
+
 ### 5.8 Ambiguous cwd
 
 ```

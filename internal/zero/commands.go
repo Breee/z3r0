@@ -116,7 +116,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	if err := s.ensureCheckout(); err != nil {
+	if err := s.ensureCheckout(out); err != nil {
 		return 0, err
 	}
 	if s.read("copilot") != "" && !fileExists(s.path("copilot-auth.done")) {
@@ -253,7 +253,7 @@ func (s *Sandbox) dirs() []string {
 // ensureCheckout clones every folder that is not in the sandbox yet from a
 // git bundle (bundles avoid copying a raw .git from the host trust domain).
 // A folder removed from the workspace keeps its checkout in the sandbox.
-func (s *Sandbox) ensureCheckout() error {
+func (s *Sandbox) ensureCheckout(w io.Writer) error {
 	var paths map[string]string
 	for _, top := range s.repos() {
 		dir := sandboxDir(top)
@@ -272,6 +272,7 @@ func (s *Sandbox) ensureCheckout() error {
 		if err := s.checkout(top, dir, paths[top]); err != nil {
 			return err
 		}
+		s.noteSessionBranch(w, dir, paths[top])
 	}
 	return nil
 }
@@ -290,6 +291,23 @@ func (s *Sandbox) checkout(top, dir, path string) error {
 		return fmt.Errorf("clone in sandbox: %w", err)
 	}
 	return s.configureRemote(top, path)
+}
+
+// noteSessionBranch tells the user when the forge still has the session
+// branch of an earlier sandbox with commits the new checkout lacks: a push
+// is then rejected (the gate allows no delete), the old work stays.
+func (s *Sandbox) noteSessionBranch(out io.Writer, dir, path string) {
+	if path == "" {
+		return
+	}
+	branch := strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/")
+	n, err := s.ssh("cd " + shellQuote(dir) + " && git fetch -q origin " + shellQuote(branch) +
+		" 2>/dev/null && git rev-list --count HEAD..FETCH_HEAD")
+	if err != nil || n == "" || n == "0" {
+		return
+	}
+	fmt.Fprintf(out, "note: %s has branch %s with %s commits that are not in this checkout; in %s: git pull origin %s, or delete the branch on the forge\n",
+		path, branch, n, dir, branch)
 }
 
 func (s *Sandbox) serveRunning() (bool, error) {
