@@ -209,8 +209,15 @@ func Open(flag string, create bool) (*Sandbox, error) {
 	}
 	fmt.Fprintf(os.Stderr, "ctx: %s (%s)\n", name, source)
 	s := c.sandbox(name)
-	if _, err := os.Stat(s.Top); err != nil {
-		return nil, fmt.Errorf("folder %s missing; zero ctx remove it or restore it", s.Top)
+	seen := map[string]string{}
+	for _, f := range s.Folders {
+		if _, err := os.Stat(f); err != nil {
+			return nil, fmt.Errorf("folder %s missing; zero ctx remove it or restore it", f)
+		}
+		if other, ok := seen[filepath.Base(f)]; ok {
+			return nil, fmt.Errorf("folders %s and %s have the same name; a workspace needs distinct folder names", other, f)
+		}
+		seen[filepath.Base(f)] = f
 	}
 	return s, nil
 }
@@ -219,16 +226,20 @@ func (c *Config) sandbox(name string) *Sandbox {
 	top := c.Workspaces[name].Folders[0]
 	repo := filepath.Base(top)
 	s := &Sandbox{
-		Name:  "zero-" + name,
-		Repo:  repo,
-		Top:   top,
-		Dir:   "/tmp/zero/" + repo,
-		State: filepath.Join(stateRoot(), "zero-"+name),
-		Host:  rt.HostAlias("zero-" + name),
+		Name:    "zero-" + name,
+		Folders: c.Workspaces[name].Folders,
+		Repo:    repo,
+		Top:     top,
+		Dir:     sandboxDir(top),
+		State:   filepath.Join(stateRoot(), "zero-"+name),
+		Host:    rt.HostAlias("zero-" + name),
 	}
 	s.setGateway(s.read("gateway"))
 	return s
 }
+
+// sandboxDir is where a host folder lives inside the sandbox.
+func sandboxDir(top string) string { return "/tmp/zero/" + filepath.Base(top) }
 
 // paths resolves the given folders, or cwd when none are given.
 func paths(args []string) ([]string, error) {

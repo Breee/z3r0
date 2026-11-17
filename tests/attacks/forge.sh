@@ -1,12 +1,12 @@
 #!/bin/sh
 # Forge attack checks against a running zero sandbox (GitLab). PASS=blocked.
-# usage: tests/attacks/forge.sh <sandbox-name>     e.g. zero-developer
+# usage: tests/attacks/forge.sh <sandbox-name> [repo-number]   e.g. zero-developer 2
 set -u
 N=${1:?sandbox name}
 ST=${XDG_STATE_HOME:-$HOME/.local/state}/zero/$N
 C=$ST/ssh.conf
 H=$(awk '/^Host /{print $2;exit}' "$C")
-P=$(cat "$ST/forge.path")
+P=$(sed -n "${2:-1}p" "$ST/forge.path")
 REPO=$(basename "$P")
 ID=$(glab api "projects/$(printf %s "$P" | sed 's#/#%2F#g')" | jq -r .id)
 FAILS=0

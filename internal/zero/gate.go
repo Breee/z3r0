@@ -139,8 +139,9 @@ func sessionBranch(sandbox string) string {
 }
 
 type gateSession struct {
-	name, state, upstream, repo string
-	ciRun                       bool // capability ci.run: pipelines start on push
+	name, state, upstream string
+	repos                 []string // /<group/project>.git of every workspace repo
+	ciRun                 bool     // capability ci.run: pipelines start on push
 }
 
 // gateLookup finds the sandbox owning key by scanning the state dirs, so a
@@ -161,10 +162,14 @@ func gateLookup(key string) *gateSession {
 			return strings.TrimSpace(string(b))
 		}
 		f := forgeOf(dir)
-		if f == nil || read("forge.path") == "" {
+		var repos []string
+		for _, p := range strings.Fields(read("forge.path")) {
+			repos = append(repos, "/"+p+".git")
+		}
+		if f == nil || len(repos) == 0 {
 			return nil
 		}
-		return &gateSession{filepath.Base(dir), dir, "https://" + f.Host(), "/" + read("forge.path") + ".git",
+		return &gateSession{filepath.Base(dir), dir, "https://" + f.Host(), repos,
 			slices.Contains(strings.Fields(read("caps")), capCIRun)}
 	}
 	return nil
@@ -211,10 +216,14 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	r.URL.Path, r.URL.RawPath, r.Host = rest, "", target.Host
 
+	repo, op, _ := strings.Cut(rest, ".git/")
+	if repo += ".git"; !slices.Contains(gs.repos, repo) {
+		op = ""
+	}
 	switch {
-	case r.Method == http.MethodGet && rest == gs.repo+"/info/refs" && r.URL.Query().Get("service") == "git-receive-pack":
+	case r.Method == http.MethodGet && op == "info/refs" && r.URL.Query().Get("service") == "git-receive-pack":
 		proxy.ServeHTTP(w, r)
-	case r.Method == http.MethodPost && rest == gs.repo+"/git-receive-pack":
+	case r.Method == http.MethodPost && op == "git-receive-pack":
 		body := io.Reader(r.Body)
 		if r.Header.Get("Content-Encoding") == "gzip" {
 			zr, err := gzip.NewReader(r.Body)
@@ -257,7 +266,7 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 		r.Header.Del("Content-Length")
 		proxy.ServeHTTP(w, r)
 	default:
-		http.Error(w, "zero: the gate only serves pushes to "+gs.repo, http.StatusForbidden)
+		http.Error(w, "zero: the gate only serves pushes to "+strings.Join(gs.repos, ", "), http.StatusForbidden)
 	}
 }
 
@@ -274,7 +283,7 @@ func gateUp() bool {
 }
 
 // gateURL is the sandbox's push URL; the key is created on first use.
-func (s *Sandbox) gateURL() (string, error) {
+func (s *Sandbox) gateURL(path string) (string, error) {
 	key := s.read("gate.key")
 	if key == "" {
 		b := make([]byte, 16)
@@ -286,5 +295,5 @@ func (s *Sandbox) gateURL() (string, error) {
 			return "", err
 		}
 	}
-	return fmt.Sprintf("http://%s:%d/s/%s/%s.git", gateHost, gatePort, key, s.read("forge.path")), nil
+	return fmt.Sprintf("http://%s:%d/s/%s/%s.git", gateHost, gatePort, key, path), nil
 }

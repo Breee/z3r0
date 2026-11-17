@@ -119,14 +119,21 @@ func (gitlab) Permissions(caps []string) ([]string, error) {
 	return perms, nil
 }
 
-func (g gitlab) Mint(label, path string, perms []string) (string, string, error) {
-	out, err := g.glab("api", "projects/"+url.PathEscape(path))
-	if err != nil {
-		return "", "", fmt.Errorf("project %s: %w", path, err)
+func (g gitlab) Mint(label string, paths []string, perms []string) (string, string, error) {
+	var ids []int64
+	for _, path := range paths {
+		out, err := g.glab("api", "projects/"+url.PathEscape(path))
+		if err != nil {
+			return "", "", fmt.Errorf("project %s: %w", path, err)
+		}
+		var proj struct{ ID int64 }
+		if err := json.Unmarshal([]byte(out), &proj); err != nil || proj.ID == 0 {
+			return "", "", fmt.Errorf("project %s: bad response", path)
+		}
+		ids = append(ids, proj.ID)
 	}
-	var proj struct{ ID int64 }
-	if err := json.Unmarshal([]byte(out), &proj); err != nil || proj.ID == 0 {
-		return "", "", fmt.Errorf("project %s: bad response", path)
+	if len(ids) == 0 {
+		return "", "", fmt.Errorf("mint token: no project")
 	}
 	body, _ := json.Marshal(map[string]any{
 		"name":       label,
@@ -134,7 +141,7 @@ func (g gitlab) Mint(label, path string, perms []string) (string, string, error)
 		"granular_scopes": []map[string]any{{
 			"access":      "selected_memberships",
 			"permissions": perms,
-			"project_ids": []int64{proj.ID},
+			"project_ids": ids,
 		}, {
 			"access":      "user",
 			"permissions": []string{"execute_mcp_tool"},

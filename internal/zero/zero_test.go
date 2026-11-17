@@ -3,7 +3,10 @@ package zero
 import (
 	"bufio"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -279,6 +282,46 @@ func TestResolveContext(t *testing.T) {
 	for in, want := range map[string]string{"developer": "developer", "My_Repo.go": "my-repo-go", "---": ""} {
 		if got := wsName(in); got != want {
 			t.Errorf("wsName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestLoadPolicyUnion(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	os.MkdirAll(filepath.Join(a, ".zero"), 0o700)
+	os.WriteFile(filepath.Join(a, ".zero", "policy.yaml"),
+		[]byte("network:\n  allow: [proxy.golang.org]\ncapabilities: [git.read, ci.run]\n"), 0o600)
+	p, err := (&Sandbox{Folders: []string{a, b}}).loadPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Network.Allow, []string{"proxy.golang.org"}) {
+		t.Errorf("allow = %v", p.Network.Allow)
+	}
+	// a's file plus the default of b, which has no file
+	if want := append([]string{"git.read", "ci.run"}, defaultCaps[1:]...); !slices.Equal(p.Capabilities, want) {
+		t.Errorf("caps = %v, want %v", p.Capabilities, want)
+	}
+}
+
+func TestGateSeveralRepos(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dir := filepath.Join(stateRoot(), "zero-team")
+	os.MkdirAll(dir, 0o700)
+	key := strings.Repeat("ab", 16)
+	for k, v := range map[string]string{"gate.key": key, "forge": "gitlab", "forge.path": "g/api\ng/web\n"} {
+		os.WriteFile(filepath.Join(dir, k), []byte(v), 0o600)
+	}
+	gs := gateLookup(key)
+	if gs == nil || !slices.Equal(gs.repos, []string{"/g/api.git", "/g/web.git"}) {
+		t.Fatalf("gateLookup = %+v", gs)
+	}
+	// a repo outside the workspace is refused before anything is forwarded
+	for _, path := range []string{"/g/other.git/info/refs?service=git-receive-pack", "/g/api.git.git/info/refs?service=git-receive-pack", "/g/api.git/info/refs?service=git-upload-pack"} {
+		w := httptest.NewRecorder()
+		gateHandler(w, httptest.NewRequest("GET", "/s/"+key+path, nil))
+		if w.Code != http.StatusForbidden {
+			t.Errorf("%s: status %d, want 403", path, w.Code)
 		}
 	}
 }

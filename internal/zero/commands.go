@@ -2,6 +2,7 @@ package zero
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -54,7 +55,14 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
 			return 0, err
 		}
+		repaths, err := s.syncForgePaths()
+		if err != nil {
+			return 0, err
+		}
 		if rt.Stopped(s.Name) {
+			if s.read("forge.id") == "" {
+				repaths = false // resumeForge mints for the new paths
+			}
 			if err := s.resumeForge(pol.Capabilities); err != nil {
 				return 0, err
 			}
@@ -65,8 +73,11 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			// opencode's credential db is stale.
 			os.Remove(s.path("copilot-auth.done"))
 		}
-		if err := s.renewForge(pol.Capabilities, ch.caps); err != nil {
+		if err := s.renewForge(pol.Capabilities, ch.caps || repaths); err != nil {
 			return 0, err
+		}
+		if repaths {
+			fmt.Fprintf(out, "%s token: rotated (%s)\n", s.forge().Name(), strings.Join(s.forgePaths(), ", "))
 		}
 		if len(ch.newHosts) > 0 {
 			if err := s.applyProjectPolicy(pol); err != nil {
@@ -134,7 +145,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err := s.waitReady(port, startErr); err != nil {
 		return 0, err
 	}
-	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, link(out, s.url(port)), s.Dir)
+	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, link(out, s.url(port)), strings.Join(s.dirs(), " "))
 	return port, nil
 }
 
@@ -212,29 +223,55 @@ func (s *Sandbox) writeSSHConfig() error {
 	return s.write("ssh.conf", conf+"\n", 0o600)
 }
 
-// ensureCheckout clones the repo into the sandbox from a git bundle on first
-// use (bundles avoid copying a raw .git from the host trust domain).
+// dirs are the checkout paths of all folders inside the sandbox.
+func (s *Sandbox) dirs() []string {
+	var out []string
+	for _, top := range s.Folders {
+		out = append(out, sandboxDir(top))
+	}
+	return out
+}
+
+// ensureCheckout clones every folder that is not in the sandbox yet from a
+// git bundle (bundles avoid copying a raw .git from the host trust domain).
+// A folder removed from the workspace keeps its checkout in the sandbox.
 func (s *Sandbox) ensureCheckout() error {
-	out, err := s.ssh("if test -d " + shellQuote(s.Dir) + "; then echo yes; else echo no; fi")
-	if err != nil {
-		return fmt.Errorf("sandbox unreachable: %w", err)
+	var paths map[string]string
+	for _, top := range s.Folders {
+		dir := sandboxDir(top)
+		out, err := s.ssh("if test -d " + shellQuote(dir) + "; then echo yes; else echo no; fi")
+		if err != nil {
+			return fmt.Errorf("sandbox unreachable: %w", err)
+		}
+		if out == "yes" {
+			continue
+		}
+		if paths == nil {
+			if _, paths, err = s.folderForge(); err != nil {
+				return err
+			}
+		}
+		if err := s.checkout(top, dir, paths[top]); err != nil {
+			return err
+		}
 	}
-	if out == "yes" {
-		return nil
-	}
+	return nil
+}
+
+func (s *Sandbox) checkout(top, dir, path string) error {
 	bundle := s.path("repo.bundle")
-	if _, err := sh("git", "-C", s.Top, "bundle", "create", bundle, "--all"); err != nil {
-		return fmt.Errorf("git bundle: %w", err)
+	if _, err := sh("git", "-C", top, "bundle", "create", bundle, "--all"); err != nil {
+		return fmt.Errorf("git bundle %s: %w", top, err)
 	}
 	defer os.Remove(bundle)
 	if err := rt.Upload(s.Name, bundle, "/tmp/.zero.bundle"); err != nil {
 		return fmt.Errorf("upload bundle: %w", err)
 	}
-	script := "mkdir -p /tmp/zero && git clone -q /tmp/.zero.bundle " + shellQuote(s.Dir) + " && rm -f /tmp/.zero.bundle"
+	script := "mkdir -p /tmp/zero && git clone -q /tmp/.zero.bundle " + shellQuote(dir) + " && rm -f /tmp/.zero.bundle"
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("clone in sandbox: %w", err)
 	}
-	return s.configureRemote()
+	return s.configureRemote(top, path)
 }
 
 func (s *Sandbox) serveRunning() (bool, error) {
@@ -438,7 +475,26 @@ func (s *Sandbox) Code(out io.Writer) error {
 	if err := s.ensureHostSSHConfig(); err != nil {
 		return err
 	}
-	return passthrough("code", "--folder-uri", "vscode-remote://ssh-remote+"+s.Host+s.Dir)
+	remote := "vscode-remote://ssh-remote+" + s.Host
+	if len(s.Folders) == 1 {
+		return passthrough("code", "--folder-uri", remote+s.Dir)
+	}
+	// Several folders open as a multi-root workspace (spec F11).
+	type folder struct {
+		Path string `json:"path"`
+	}
+	var ws struct {
+		Folders []folder `json:"folders"`
+	}
+	for _, d := range s.dirs() {
+		ws.Folders = append(ws.Folders, folder{filepath.Base(d)})
+	}
+	b, _ := json.Marshal(ws)
+	const file = "/tmp/zero/zero.code-workspace"
+	if _, err := s.ssh("printf '%s' " + shellQuote(string(b)) + " > " + file); err != nil {
+		return fmt.Errorf("write %s: %w", file, err)
+	}
+	return passthrough("code", "--file-uri", remote+file)
 }
 
 // ensureHostSSHConfig appends our Host entry to the openshell ssh_config the

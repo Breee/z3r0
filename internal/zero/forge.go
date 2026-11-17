@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -48,8 +49,8 @@ type Forge interface {
 	// Permissions maps policy capabilities to token permissions; unknown
 	// capabilities are an error.
 	Permissions(caps []string) ([]string, error)
-	// Mint creates a short-lived token scoped to path; id is used to revoke.
-	Mint(label, path string, perms []string) (token, id string, err error)
+	// Mint creates a short-lived token scoped to paths; id is used to revoke.
+	Mint(label string, paths []string, perms []string) (token, id string, err error)
 	// Revoke revokes a token by id; an expired or revoked token is not an error.
 	Revoke(id string) error
 	// Tokens lists the user's active tokens.
@@ -91,16 +92,71 @@ func forgeOf(dir string) Forge {
 
 func (s *Sandbox) forge() Forge { return forgeOf(s.State) }
 
+// forgePaths are the project paths the token covers (state forge.path, one
+// per line).
+func (s *Sandbox) forgePaths() []string { return strings.Fields(s.read("forge.path")) }
+
+// folderForge finds the forge and the project path of every folder; a folder
+// on no forge has path "". One workspace has one forge host.
+func (s *Sandbox) folderForge() (Forge, map[string]string, error) {
+	var forge Forge
+	paths := map[string]string{}
+	for _, top := range s.Folders {
+		origin, _ := sh("git", "-C", top, "remote", "get-url", "origin")
+		f, path := forgeFor(origin)
+		if f == nil {
+			continue
+		}
+		if forge != nil && f.Host() != forge.Host() {
+			return nil, nil, fmt.Errorf("folders are on %s and %s; a workspace has one forge host", forge.Host(), f.Host())
+		}
+		forge, paths[top] = f, path
+	}
+	return forge, paths, nil
+}
+
+// orderedPaths lists the project paths in folder order.
+func (s *Sandbox) orderedPaths(paths map[string]string) []string {
+	var out []string
+	for _, top := range s.Folders {
+		if p := paths[top]; p != "" && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// syncForgePaths records the workspace's project paths and reports whether
+// they changed, so the token is minted anew for the new set.
+func (s *Sandbox) syncForgePaths() (bool, error) {
+	f, byTop, err := s.folderForge()
+	if err != nil {
+		return false, err
+	}
+	paths, old := s.orderedPaths(byTop), s.forgePaths()
+	if slices.Equal(paths, old) {
+		return false, nil
+	}
+	cur := s.forge()
+	if cur == nil || len(paths) == 0 || f.Host() != cur.Host() {
+		return false, fmt.Errorf("the forge of %s changed (was %v, now %v); recreate: zero rm && zero up", s.Name, old, paths)
+	}
+	return true, s.write("forge.path", strings.Join(paths, "\n"), 0o600)
+}
+
 func (s *Sandbox) forgeProvider(f Forge) string { return s.Name + "-" + f.Name() }
 
 // setupForge mints a token for origin's forge and stores it as an OpenShell
 // provider. It returns the provider name, or "" when origin is on no known forge.
 func (s *Sandbox) setupForge(caps []string) (string, error) {
-	origin, _ := sh("git", "-C", s.Top, "remote", "get-url", "origin")
-	f, path := forgeFor(origin)
+	f, byTop, err := s.folderForge()
+	if err != nil {
+		return "", err
+	}
 	if f == nil {
 		return "", nil
 	}
+	paths := s.orderedPaths(byTop)
 	if err := f.LoggedIn(); err != nil {
 		return "", err
 	}
@@ -118,11 +174,11 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tok, id, err := f.Mint(tokenLabel(s.Name), path, perms)
+	tok, id, err := f.Mint(tokenLabel(s.Name), paths, perms)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", f.Name(), err)
 	}
-	for k, v := range map[string]string{"forge": f.Name(), "forge.host": f.Host(), "forge.id": id, "forge.path": path} {
+	for k, v := range map[string]string{"forge": f.Name(), "forge.host": f.Host(), "forge.id": id, "forge.path": strings.Join(paths, "\n")} {
 		if err := s.write(k, v, 0o600); err != nil {
 			return "", err
 		}
@@ -173,7 +229,7 @@ func (s *Sandbox) pauseForge() error {
 // resumeForge mints a token for a paused sandbox. It runs before the sandbox
 // starts, so every process sees the new token (no C44).
 func (s *Sandbox) resumeForge(caps []string) error {
-	f, path := s.forge(), s.read("forge.path")
+	f, paths := s.forge(), s.forgePaths()
 	if f == nil || s.read("forge.id") != "" {
 		return nil
 	}
@@ -181,7 +237,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 	if err != nil {
 		return err
 	}
-	tok, id, err := f.Mint(tokenLabel(s.Name), path, perms)
+	tok, id, err := f.Mint(tokenLabel(s.Name), paths, perms)
 	if err != nil {
 		return fmt.Errorf("%s: %w", f.Name(), err)
 	}
@@ -195,7 +251,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 // renewForge re-mints the token of a running sandbox when it expires within
 // renewBefore. New processes get the new token; running ones keep the old (C44).
 func (s *Sandbox) renewForge(caps []string, force bool) error {
-	f, id, path := s.forge(), s.read("forge.id"), s.read("forge.path")
+	f, id, paths := s.forge(), s.read("forge.id"), s.forgePaths()
 	if f == nil || id == "" {
 		return nil
 	}
@@ -212,7 +268,7 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 	if err != nil {
 		return err
 	}
-	tok, nid, err := f.Mint(tokenLabel(s.Name), path, perms)
+	tok, nid, err := f.Mint(tokenLabel(s.Name), paths, perms)
 	if err != nil {
 		return fmt.Errorf("%s: %w", f.Name(), err)
 	}
@@ -283,24 +339,24 @@ func revokeOrphans(f Forge) error {
 	return nil
 }
 
-// configureRemote points origin in the sandbox at https and makes git send
-// the placeholder from the token env; the proxy substitutes the token.
-func (s *Sandbox) configureRemote() error {
-	f, path := s.forge(), s.read("forge.path")
+// configureRemote points origin of the checkout of top at https and makes git
+// send the placeholder from the token env; the proxy substitutes the token.
+func (s *Sandbox) configureRemote(top, path string) error {
+	f := s.forge()
 	if f == nil || path == "" {
 		return nil
 	}
 	helper := fmt.Sprintf(`!f() { echo username=%s; echo "password=$%s"; }; f`, f.GitUser(), f.TokenEnv())
-	push, err := s.gateURL()
+	push, err := s.gateURL(path)
 	if err != nil {
 		return err
 	}
-	script := "cd " + shellQuote(s.Dir) + " && " +
+	script := "cd " + shellQuote(sandboxDir(top)) + " && " +
 		"git remote set-url origin " + shellQuote("https://"+f.Host()+"/"+path+".git") + " && " +
 		"git config remote.origin.pushurl " + shellQuote(push) + " && " +
 		"git config credential.helper " + shellQuote(helper)
 	for _, k := range []string{"user.name", "user.email"} {
-		if v, err := sh("git", "-C", s.Top, "config", k); err == nil && strings.TrimSpace(v) != "" {
+		if v, err := sh("git", "-C", top, "config", k); err == nil && strings.TrimSpace(v) != "" {
 			script += " && git config " + k + " " + shellQuote(strings.TrimSpace(v))
 		}
 	}

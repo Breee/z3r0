@@ -34,11 +34,33 @@ const capCIRun = "ci.run"
 
 var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
-// loadPolicy reads .zero/policy.yaml from the host checkout, never from the
+// loadPolicy reads .zero/policy.yaml from the host folders, never from the
 // sandbox, so the agent cannot change its own policy. Missing file → default.
-// Any error refuses; there is no fallback to something broader.
+// Several folders give the union: the token has one permission set for all
+// projects. Any error refuses; there is no fallback to something broader.
 func (s *Sandbox) loadPolicy() (*Policy, error) {
-	file := filepath.Join(s.Top, ".zero", "policy.yaml")
+	u := &Policy{}
+	for _, top := range s.Folders {
+		p, err := loadFolderPolicy(top)
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range p.Network.Allow {
+			if !slices.Contains(u.Network.Allow, h) {
+				u.Network.Allow = append(u.Network.Allow, h)
+			}
+		}
+		for _, c := range p.Capabilities {
+			if !slices.Contains(u.Capabilities, c) {
+				u.Capabilities = append(u.Capabilities, c)
+			}
+		}
+	}
+	return u, nil
+}
+
+func loadFolderPolicy(top string) (*Policy, error) {
+	file := filepath.Join(top, ".zero", "policy.yaml")
 	b, err := os.ReadFile(file)
 	if errors.Is(err, os.ErrNotExist) {
 		return &Policy{Capabilities: defaultCaps}, nil
@@ -68,15 +90,23 @@ func parsePolicy(b []byte) (*Policy, error) {
 	return &p, nil
 }
 
-// recordPolicy stores which policy the sandbox was created with.
+// recordPolicy stores which policy the sandbox was created with: one line
+// per folder, "<HEAD sha> [dirty]"; further folders add their name.
 func (s *Sandbox) recordPolicy() error {
-	sha, _ := sh("git", "-C", s.Top, "rev-parse", "HEAD")
-	dirty, _ := sh("git", "-C", s.Top, "status", "--porcelain", "--", ".zero/policy.yaml")
-	v := strings.TrimSpace(sha)
-	if strings.TrimSpace(dirty) != "" {
-		v += " dirty"
+	var lines []string
+	for i, top := range s.Folders {
+		sha, _ := sh("git", "-C", top, "rev-parse", "HEAD")
+		dirty, _ := sh("git", "-C", top, "status", "--porcelain", "--", ".zero/policy.yaml")
+		v := strings.TrimSpace(sha)
+		if strings.TrimSpace(dirty) != "" {
+			v += " dirty"
+		}
+		if i > 0 {
+			v += " " + filepath.Base(top)
+		}
+		lines = append(lines, v)
 	}
-	return s.write("policy.sha", v, 0o600)
+	return s.write("policy.sha", strings.Join(lines, "\n"), 0o600)
 }
 
 // projectBinary is the binary scope for network.allow hosts: any process in
