@@ -1,13 +1,13 @@
 # Spec: workspaces and contexts
 
-Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). Open: input folders #77, `zero ls` + rm check #79.
+Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039). Open: `zero ls` + rm check #79.
 
 ## 1. Concepts
 
 | Term | Meaning |
 |---|---|
 | Workspace | One sandbox. Named. Holds 1..n folders. Like a VS Code multi-root workspace. |
-| Folder | A host directory in a workspace. Kind `repo` (git, forge remote) or `input` (anything else). |
+| Folder | A host directory in a workspace. Kind `repo` (git) or `input` (no git repo). |
 | Context | The workspace a command acts on. kubectl-style. |
 | Current context | Stored fallback, set by `zero ctx use`. |
 
@@ -108,11 +108,11 @@ $ zero ctx add ~/notes/specs
 $ zero up
 ctx: team (current)
 input specs: 14 files, 220 KiB, read-only
-excluded: .env (secret pattern)
+  excluded: .env (secret pattern)
 policy unchanged
 ```
 
-Copied to `/sandbox/specs`, read-only. Refreshed on every `up`. Agent edits impossible → nothing to lose.
+zero copies the folder, filtered, to `/var/lib/zero/input/<sandbox>/specs` on the host. The sandbox sees it at `/tmp/zero-input/specs` through a read-only bind mount (ADR 0039). Refreshed on every `up`; a folder added later needs no new sandbox. Agent edits impossible → nothing to lose. A sandbox created before #77 has no mount: `zero rm && zero up` once. Podman gateway only.
 
 ### 5.4 Add a repo to a running workspace (widening)
 
@@ -195,13 +195,13 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: the first comm
 
 | | repo | input |
 |---|---|---|
-| Detect | git repo + remote matches a forge (`Forge.Match`) | everything else (incl. git without forge remote) |
-| Into sandbox | git bundle of host commits, current branch checked out | copy, read-only (filesystem policy) |
+| Detect | folder has `.git` (without a forge remote: checkout, no token, no push) | no `.git` |
+| Into sandbox | git bundle of host commits, current branch checked out | filtered host copy, read-only bind mount at `/tmp/zero-input/<name>` |
 | Uncommitted host changes | not included (warn) | included |
-| Excluded | gitignored by nature | always (not overridable): `.env*`, `*.pem`, `*.key`, `id_*`, `.git-credentials`, `.netrc`, `.ssh/`, `.aws/`, `.kube/`; plus `.zeroignore` |
+| Excluded | gitignored by nature | always (not overridable): `.env*`, `*.pem`, `*.key`, `id_*`, `.git-credentials`, `.netrc`, `.ssh/`, `.aws/`, `.kube/`, symlinks, special files; plus `.zeroignore` (one pattern per line: file name or path relative to the folder, shell wildcards) |
 | Exit | `git push` via forge token | none |
 | Policy source | `<folder>/.zero/policy.yaml` on host | none (no network grants) |
-| Size limit | — | 100 MiB, override `--max-input` |
+| Size limit | — | 100 MiB for all input folders together, override `zero up --max-input <MiB>` |
 
 ## 7. Policy and credentials
 
