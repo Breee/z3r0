@@ -85,7 +85,7 @@ Built in #79. STATUS is `running`, `stopped` (paused), `none` or `unknown` (gate
 $ cd ~/src/api
 $ zero up
 ctx: api (new)
-api ready: http://127.0.0.1:31234 dir /sandbox/api
+zero-api ready: http://127.0.0.1:31234 dir /tmp/zero/api
 ```
 
 No context matched → workspace `api` created from cwd, set current. Same as today.
@@ -96,12 +96,13 @@ No context matched → workspace `api` created from cwd, set current. Same as to
 $ zero ctx new team ~/src/api ~/src/web
 $ zero up
 ctx: team (current)
-policy: api(.zero/policy.yaml@4f1a) + web(default)
-gitlab token: projects api, web
-team ready: http://127.0.0.1:31240 dir /sandbox
+zero-team ready: http://127.0.0.1:31240 dir /tmp/zero/api /tmp/zero/web
+$ zero status
+...
+gitlab token: group/api, group/web; capabilities: git.read, git.commit, git.push, ...
 ```
 
-Sandbox layout: `/sandbox/api`, `/sandbox/web`. One GitLab token with `project_ids: [api, web]`.
+Sandbox layout: `/tmp/zero/api`, `/tmp/zero/web`. One GitLab token with `project_ids: [api, web]`. The policy is the union of the `.zero/policy.yaml` of every repo folder (default where a folder has none); `zero ls` shows its hash.
 
 ### 5.3 Add an input folder
 
@@ -111,7 +112,7 @@ $ zero up
 ctx: team (current)
 input specs: 14 files, 220 KiB, read-only
   excluded: .env (secret pattern)
-policy unchanged
+zero-team ready: http://127.0.0.1:31240 dir /tmp/zero/api /tmp/zero/web /tmp/zero-input/specs
 ```
 
 zero copies the folder, filtered, to `/var/lib/zero/input/<sandbox>/specs` on the host. The sandbox sees it at `/tmp/zero-input/specs` through a read-only bind mount (ADR 0039). Refreshed on every `up`; a folder added later needs no new sandbox. Agent edits impossible → nothing to lose. A sandbox created before #77 has no mount: `zero rm && zero up` once. Podman gateway only.
@@ -122,14 +123,14 @@ zero copies the folder, filtered, to `/var/lib/zero/input/<sandbox>/specs` on th
 $ zero ctx add ~/src/infra
 $ zero up
 ctx: team (current)
-policy widens:
+policy widens for zero-team:
   + network registry.terraform.io
-  + gitlab project infra (git.push, gitlab.mr.create)
+  + capability gitlab.mr.create
 approve? [y/N] y
 gitlab token: rotated (api, web, infra)
 ```
 
-Live: clone, new token (#70 rotate flow), egress added. Non-interactive (`up` from script) refuses widening unless `--approve`.
+Live: clone, new token (#70 rotate flow), egress added. The prompt lists new hosts and capabilities of the union policy; the added project itself is not asked for again, `zero ctx add` is the user's decision. Non-interactive (`up` from script) refuses widening unless `--approve`.
 
 ### 5.5 Remove a repo (narrowing)
 
@@ -246,7 +247,7 @@ Decisions:
 | F5 | Egress narrowing not live | print "until recreate" (5.5) |
 | F6 | Removed repo keeps unpushed work in sandbox | warn; token no longer covers it (5.5) |
 | F7 | Uncommitted host changes silently missing in sandbox | built in #117: `zero up` prints a note with the file count when it makes a fresh checkout of a folder with uncommitted or untracked files |
-| F8 | Name collisions in `/sandbox` (`a/api`, `b/api`) | built in #76: error, a workspace needs distinct folder names (no suffix) |
+| F8 | Name collisions in `/tmp/zero` (`a/api`, `b/api`) | built in #76: error, a workspace needs distinct folder names (no suffix) |
 | F9 | Larger blast radius per workspace | only explicitly listed folders; docs |
 | F10 | opencode multi-folder: one serve, sessions per directory | **verified 2026-11-16 (#73)**, opencode 2.2.6: one background service (port 4096) ran `opencode run` from two folders; each session has its own `location.directory`, each file landed in its folder. A folder without commits gets `projectID: global`. Not checked: the web UI project switcher |
 | F11 | `zero code` multi-root | **verified 2026-11-16 (#74)**, VS Code 1.145.2: a generated `/tmp/zero/zero.code-workspace` with relative folder paths, opened with `code --file-uri vscode-remote://ssh-remote+<host>/tmp/zero/zero.code-workspace`; the git extension in the sandbox opened both repositories. Not checked: the Explorer by eye |
