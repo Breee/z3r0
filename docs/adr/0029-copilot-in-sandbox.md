@@ -17,6 +17,6 @@ The agent in the sandbox needs a model. The host's opencode is logged in to GitH
 
 ## Consequences
 - The token is the user's long-lived Copilot OAuth token (`gho_`), stored in the OpenShell gateway like forge tokens. It is not minted per sandbox and not revoked on `rm`; GitHub offers no narrower Copilot token.
-- The agent can spend the user's Copilot quota and send repo content to Copilot models (same exfil class as any model API, P-paths in `ai-docs/attack-paths.md`).
+- The agent can spend the user's Copilot quota and send repo content to Copilot models (same exfil class as any model API, P-paths in `docs/attack-paths.md`).
 - Host token change (re-login) is picked up only on sandbox recreate.
 - Provider profile `binaries` must be the real executable path, not the `/usr/local/bin/opencode` symlink (OpenShell 0.1.8); `zero-gitlab` fixed the same way.

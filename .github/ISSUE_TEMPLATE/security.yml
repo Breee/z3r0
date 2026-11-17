@@ -6,7 +6,7 @@ projects: ["Breee/2"]
 body:
   - type: textarea
     id: path
-    attributes: {label: Attack path, description: "Attacker, entry, steps, impact. Link ai-docs/attack-paths.md / caveat C-number."}
+    attributes: {label: Attack path, description: "Attacker, entry, steps, impact. Link docs/attack-paths.md / caveat C-number."}
     validations: {required: true}
   - type: dropdown
     id: sev

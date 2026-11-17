@@ -12,4 +12,4 @@
 | Prompt injection contained (except C27) | pocs/04 attack.sh | F04 |
 | VS Code Copilot full loop via Remote-SSH | pocs/05-vscode-remote/run.sh + manual | F05, D09 |
 
-Open high gaps: P01 (C20), P02 (C18), P03 residual (C13, C25, C26), P04 (C17, C27). See attack-paths.md.
+Open high gaps: P01 (C20), P02 (C18), P03 residual (C13, C25, C26), P04 (C17, C27). See `docs/attack-paths.md`.

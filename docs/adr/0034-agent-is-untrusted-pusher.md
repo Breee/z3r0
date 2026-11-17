@@ -15,7 +15,7 @@ The agent pushes with a token of the developer, so the forge sees a developer. F
 - Whatever the agent pushes is untrusted input for everything that runs it automatically (CI, bots, webhooks), like a merge request from an unknown fork.
 - Accountability stays with the developer (ADR 0020, 0033); trust does not follow from it.
 - Controls that are sufficient for humans are not assumed sufficient for the agent. Each automatic consumer of agent pushes needs its own layer or a recorded acceptance.
-- Mitigation for CI is not decided here; candidates are listed in `ai-docs/attack-paths.md` (P14 in depth) and tracked in #102.
+- Mitigation for CI is not decided here; candidates are listed in `docs/attack-paths.md` (P14 in depth) and tracked in #102.
 
 ## Consequences
 

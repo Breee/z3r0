@@ -9,7 +9,7 @@ ai-docs/
 ├── AGENTS.md                 # this file
 ├── decisions.md              # moved → ../docs/adr/ (MADR)
 ├── caveats.md                # known gaps, risks, gotchas
-├── attack-paths.md           # all unblocked attack paths found (P01…)
+├── attack-paths.md           # moved → ../docs/attack-paths.md
 └── sprints/NN-<slug>/
     ├── README.md             # sprint goal, feature list, status table
     └── FNN-<slug>/
@@ -24,7 +24,7 @@ ai-docs/
 - Work in sprints. One sprint = one directory. One feature = one directory.
 - Keep everything short. No fluff. Bullets over prose.
 - Update feature `Status` + `Log` on every meaningful change.
-- New decision → new `../docs/adr/NNNN-<slug>.md` (MADR, front matter `requirements:` IDs). New gap/risk → append to `caveats.md`; new unblocked attack path → `attack-paths.md`.
+- New decision → new `../docs/adr/NNNN-<slug>.md` (MADR, front matter `requirements:` IDs). New gap/risk → append to `caveats.md`; new unblocked attack path → `../docs/attack-paths.md` (next P-number, row in index + area).
 - Feature is DONE only when every `Proof` step passed and its result is logged.
 - Do not rebuild OpenShell/GitLab/K8s. Evaluate and compose.
 - Work step by step: one Plan step at a time, then stop for user review.

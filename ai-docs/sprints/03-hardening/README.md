@@ -1,7 +1,7 @@
 # Sprint 03 — Hardening
 
 Goal: close Sprint 01 high gaps.
-Exit: all high paths in attack-paths.md mitigated or accepted with a decision.
+Exit: all high paths in `docs/attack-paths.md` mitigated or accepted with a decision.
 
 | ID | Feature | Gap | Status |
 |---|---|---|---|
