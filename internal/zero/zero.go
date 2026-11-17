@@ -37,7 +37,9 @@ type Sandbox struct {
 	Host    string   // ssh host alias from `openshell sandbox ssh-config`
 	gw      string   // OpenShell gateway; empty = active gateway (podman, E1)
 
-	Approve bool // --approve: accept a wider policy without asking
+	Approve bool
+	// MaxInput is the size limit for input folders in bytes; 0 means the default.
+	MaxInput int64 // --approve: accept a wider policy without asking
 }
 
 // vmGateway is the second OpenShell gateway with the MicroVM driver (E3, ADR 0015).

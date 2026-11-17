@@ -8,8 +8,9 @@ type Runtime interface {
 	// Reachable reports whether the runtime answers at all; Exists is only meaningful if it does.
 	Reachable() bool
 	// Create starts a sandbox from image with a filesystem policy file and
-	// credential bindings (ids returned by BindCredential).
-	Create(name, image, policyFile string, creds, env []string) error
+	// credential bindings (ids returned by BindCredential). A non-empty
+	// mountSrc (host directory) is mounted read-only at mountDst.
+	Create(name, image, policyFile string, creds, env []string, mountSrc, mountDst string) error
 	Delete(name string) error
 	// Stop halts a sandbox and keeps its files; Start brings it back with
 	// fresh processes. Stopped reports that state.

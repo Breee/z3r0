@@ -1,6 +1,7 @@
 package zero
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,13 +24,23 @@ func (openshell) Reachable() bool {
 	return err == nil
 }
 
-func (openshell) Create(name, image, policyFile string, creds, env []string) error {
+func (openshell) Create(name, image, policyFile string, creds, env []string, mountSrc, mountDst string) error {
 	args := []string{"sandbox", "create", "--name", name, "--from", image, "--policy", policyFile, "--detach"}
 	for _, c := range creds {
 		args = append(args, "--provider", c)
 	}
 	for _, e := range env {
 		args = append(args, "--env", e)
+	}
+	if mountSrc != "" {
+		type mount struct {
+			Type     string `json:"type"`
+			Source   string `json:"source"`
+			Target   string `json:"target"`
+			ReadOnly bool   `json:"read_only"`
+		}
+		b, _ := json.Marshal(map[string]any{"podman": map[string]any{"mounts": []mount{{"bind", mountSrc, mountDst, true}}}})
+		args = append(args, "--driver-config-json", string(b))
 	}
 	_, err := sh("openshell", args...)
 	return err

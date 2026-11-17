@@ -61,7 +61,9 @@ as tee "$OH/.config/containers/policy.json" >/dev/null <<'JSON'
 JSON
 as systemctl --user enable --now podman.socket
 
-# 4. gateway: podman driver, fail closed, no bind mounts, telemetry off
+# 4. gateway: podman driver, fail closed, telemetry off. Bind mounts are on
+# for the read-only input mount (ADR 0039); they need driver config and
+# resource admission off.
 as tee "$OH/.config/openshell/gateway.toml" >/dev/null <<TOML
 [openshell]
 version = 2
@@ -72,8 +74,15 @@ policy_validation_failure_mode = "fail_closed"
 
 [openshell.drivers.podman]
 socket_path = "/run/user/$OUID/podman/podman.sock"
-enable_bind_mounts = false
+allow_driver_config = true
+enable_bind_mounts = true
+
+[openshell.drivers.podman.resource_admission]
+enabled = false
 TOML
+# staging for input folders: written by the login user, read by the gateway user
+install -d -m 0755 /var/lib/zero
+install -d -o "$LU" -g "$(id -gn "$OU")" -m 0750 /var/lib/zero/input
 as tee "$OH/.config/systemd/user/openshell-gateway.service" >/dev/null <<UNIT
 [Unit]
 Description=OpenShell Gateway (zero)

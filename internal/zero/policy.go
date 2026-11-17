@@ -40,7 +40,8 @@ var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9
 // projects. Any error refuses; there is no fallback to something broader.
 func (s *Sandbox) loadPolicy() (*Policy, error) {
 	u := &Policy{}
-	for _, top := range s.Folders {
+	// Input folders are no policy source (spec §6).
+	for _, top := range s.repos() {
 		p, err := loadFolderPolicy(top)
 		if err != nil {
 			return nil, err
@@ -94,7 +95,7 @@ func parsePolicy(b []byte) (*Policy, error) {
 // per folder, "<HEAD sha> [dirty]"; further folders add their name.
 func (s *Sandbox) recordPolicy() error {
 	var lines []string
-	for i, top := range s.Folders {
+	for i, top := range s.repos() {
 		sha, _ := sh("git", "-C", top, "rev-parse", "HEAD")
 		dirty, _ := sh("git", "-C", top, "status", "--porcelain", "--", ".zero/policy.yaml")
 		v := strings.TrimSpace(sha)

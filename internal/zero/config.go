@@ -225,12 +225,21 @@ func Open(flag string, create bool) (*Sandbox, error) {
 func (c *Config) sandbox(name string) *Sandbox {
 	top := c.Workspaces[name].Folders[0]
 	repo := filepath.Base(top)
+	// The agent works in the first repo; a workspace of input folders only
+	// has no checkout.
+	dir := "/tmp/zero"
+	for _, f := range c.Workspaces[name].Folders {
+		if !isInput(f) {
+			dir = sandboxDir(f)
+			break
+		}
+	}
 	s := &Sandbox{
 		Name:    "zero-" + name,
 		Folders: c.Workspaces[name].Folders,
 		Repo:    repo,
 		Top:     top,
-		Dir:     sandboxDir(top),
+		Dir:     dir,
 		State:   filepath.Join(stateRoot(), "zero-"+name),
 		Host:    rt.HostAlias("zero-" + name),
 	}
@@ -239,7 +248,12 @@ func (c *Config) sandbox(name string) *Sandbox {
 }
 
 // sandboxDir is where a host folder lives inside the sandbox.
-func sandboxDir(top string) string { return "/tmp/zero/" + filepath.Base(top) }
+func sandboxDir(top string) string {
+	if isInput(top) {
+		return inputMount + "/" + filepath.Base(top)
+	}
+	return "/tmp/zero/" + filepath.Base(top)
+}
 
 // paths resolves the given folders, or cwd when none are given.
 func paths(args []string) ([]string, error) {

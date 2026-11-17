@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Breee/z3r0/internal/zero"
@@ -19,6 +20,7 @@ Usage: zero [-c WORKSPACE] <command>
   up            create-or-reuse sandbox, clone repo in (first time only), start serve + forward
   up --vm       same, new sandbox as MicroVM (gateway openshell-vm; or Z3R0_DRIVER=vm)
   up --approve  accept a wider .zero/policy.yaml without the y/N question
+  up --max-input MiB  size limit for input folders (default 100)
   attach        up + opencode TUI attached to the sandbox
   run <prompt>  up + one-shot opencode run against the sandbox
   code          up + VS Code Remote-SSH on the same sandbox (Copilot runs inside)
@@ -84,6 +86,16 @@ func main() {
 	switch cmd {
 	case "up":
 		z.Approve = slices.Contains(args, "--approve")
+		if i := slices.Index(args, "--max-input"); i >= 0 {
+			mib := 0
+			if i+1 < len(args) {
+				mib, _ = strconv.Atoi(args[i+1])
+			}
+			if mib <= 0 {
+				fatal(fmt.Errorf("--max-input needs a size in MiB"))
+			}
+			z.MaxInput = int64(mib) << 20
+		}
 		if slices.Contains(args, "--vm") || os.Getenv("Z3R0_DRIVER") == "vm" {
 			if err = z.UseVM(); err != nil {
 				break

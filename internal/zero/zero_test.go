@@ -291,7 +291,13 @@ func TestLoadPolicyUnion(t *testing.T) {
 	os.MkdirAll(filepath.Join(a, ".zero"), 0o700)
 	os.WriteFile(filepath.Join(a, ".zero", "policy.yaml"),
 		[]byte("network:\n  allow: [proxy.golang.org]\ncapabilities: [git.read, ci.run]\n"), 0o600)
-	p, err := (&Sandbox{Folders: []string{a, b}}).loadPolicy()
+	// The input folder c is no policy source.
+	c := t.TempDir()
+	os.MkdirAll(filepath.Join(a, ".git"), 0o700)
+	os.MkdirAll(filepath.Join(b, ".git"), 0o700)
+	os.MkdirAll(filepath.Join(c, ".zero"), 0o700)
+	os.WriteFile(filepath.Join(c, ".zero", "policy.yaml"), []byte("network:\n  allow: [evil.example]\ncapabilities: [git.read]\n"), 0o600)
+	p, err := (&Sandbox{Folders: []string{a, b, c}}).loadPolicy()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,5 +329,113 @@ func TestGateSeveralRepos(t *testing.T) {
 		if w.Code != http.StatusForbidden {
 			t.Errorf("%s: status %d, want 403", path, w.Code)
 		}
+	}
+}
+
+func writeTree(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for name, body := range files {
+		p := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Every forbidden pattern of spec §6 is left out; .zeroignore and symlinks too.
+func TestScanInputExcludes(t *testing.T) {
+	top := t.TempDir()
+	secret := []string{".env", ".env.local", "sub/.env.prod", "tls/server.pem", "tls/server.key", "id_rsa", "id_ed25519.pub",
+		".git-credentials", ".netrc", ".ssh/config", ".aws/credentials", ".kube/config", "deep/.ssh/known_hosts"}
+	files := map[string]string{"openapi.yaml": "a", "docs/README.md": "b", "draft.txt": "c", "private/x.txt": "d",
+		".zeroignore": "# comment\ndraft.txt\nprivate/\n.env\n"}
+	for _, f := range secret {
+		files[f] = "secret"
+	}
+	writeTree(t, top, files)
+	if err := os.Symlink("/etc/passwd", filepath.Join(top, "link")); err != nil {
+		t.Fatal(err)
+	}
+	got, skip, err := scanInput(top)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range got {
+		names = append(names, f.rel)
+	}
+	slices.Sort(names)
+	if want := []string{".zeroignore", "docs/README.md", "openapi.yaml"}; !slices.Equal(names, want) {
+		t.Fatalf("copied %v, want %v", names, want)
+	}
+	why := map[string]string{}
+	for _, k := range skip {
+		why[k.rel] = k.why
+	}
+	for rel, want := range map[string]string{".env": "secret pattern", ".env.local": "secret pattern", "sub/.env.prod": "secret pattern",
+		"tls/server.pem": "secret pattern", "tls/server.key": "secret pattern", "id_rsa": "secret pattern", "id_ed25519.pub": "secret pattern",
+		".git-credentials": "secret pattern", ".netrc": "secret pattern", ".ssh": "secret pattern", ".aws": "secret pattern",
+		".kube": "secret pattern", "deep/.ssh": "secret pattern", "draft.txt": ".zeroignore", "private": ".zeroignore", "link": "symlink"} {
+		if why[rel] != want {
+			t.Errorf("%s: skipped as %q, want %q", rel, why[rel], want)
+		}
+	}
+}
+
+func TestSyncInputs(t *testing.T) {
+	old := inputRoot
+	inputRoot = t.TempDir()
+	defer func() { inputRoot = old }()
+	specs := filepath.Join(t.TempDir(), "specs")
+	writeTree(t, specs, map[string]string{"openapi.yaml": "openapi", ".env": "DB_PASSWORD=x", "bin/run.sh": "#!/bin/sh"})
+	os.Chmod(filepath.Join(specs, "bin/run.sh"), 0o700)
+	s := &Sandbox{Name: "zero-t", Folders: []string{specs}, State: t.TempDir()}
+	var out strings.Builder
+	if err := s.syncInputs(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "input specs: 2 files, 1 KiB, read-only") || !strings.Contains(out.String(), "excluded: .env (secret pattern)") {
+		t.Fatalf("summary: %q", out.String())
+	}
+	stage := filepath.Join(inputRoot, "zero-t", "specs")
+	if fileExists(filepath.Join(stage, ".env")) {
+		t.Fatal(".env was copied")
+	}
+	for name, mode := range map[string]os.FileMode{"openapi.yaml": 0o644, "bin/run.sh": 0o755, "bin": 0o755} {
+		fi, err := os.Stat(filepath.Join(stage, name))
+		if err != nil || fi.Mode().Perm() != mode {
+			t.Fatalf("%s: %v %v, want mode %o", name, fi, err, mode)
+		}
+	}
+
+	// A file deleted on the host is gone after the next sync.
+	os.Remove(filepath.Join(specs, "openapi.yaml"))
+	if err := s.syncInputs(&out); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(filepath.Join(stage, "openapi.yaml")) {
+		t.Fatal("deleted file still staged")
+	}
+
+	// Over the limit: error, the staged copy stays as it was.
+	writeTree(t, specs, map[string]string{"big.bin": strings.Repeat("x", 4096)})
+	s.MaxInput = 1024
+	if err := s.syncInputs(&out); err == nil || !strings.Contains(err.Error(), "limit is 1 KiB") {
+		t.Fatalf("limit: %v", err)
+	}
+	if fileExists(filepath.Join(stage, "big.bin")) {
+		t.Fatal("copied despite the limit")
+	}
+
+	// A folder that left the workspace loses its copy.
+	s.Folders, s.MaxInput = nil, 0
+	if err := s.syncInputs(&out); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(stage) {
+		t.Fatal("copy of a removed folder kept")
 	}
 }

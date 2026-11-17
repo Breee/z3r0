@@ -35,6 +35,9 @@ func (s *Sandbox) Up(out io.Writer) (int, error) {
 }
 
 func (s *Sandbox) up(out io.Writer) (int, error) {
+	if err := s.syncInputs(out); err != nil {
+		return 0, err
+	}
 	if !s.exists() {
 		if err := s.create(); err != nil {
 			return 0, err
@@ -193,8 +196,20 @@ func (s *Sandbox) create() error {
 	if cp != "" {
 		creds = append(creds, cp)
 	}
-	if err := rt.Create(s.Name, image(), policy, creds, env); err != nil {
+	// The staging directory is mounted even when it is empty, so input
+	// folders can be added later without a new sandbox. The VM driver has
+	// no input mount (ADR 0039).
+	mount := ""
+	if s.gw == "" && fileExists(s.stage()) {
+		mount = s.stage()
+	}
+	if err := rt.Create(s.Name, image(), policy, creds, env, mount, inputMount); err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
+	}
+	if mount != "" {
+		if err := s.write("input.mount", mount, 0o600); err != nil {
+			return err
+		}
 	}
 	if err := s.applyProjectPolicy(pol); err != nil {
 		return err
@@ -240,7 +255,7 @@ func (s *Sandbox) dirs() []string {
 // A folder removed from the workspace keeps its checkout in the sandbox.
 func (s *Sandbox) ensureCheckout() error {
 	var paths map[string]string
-	for _, top := range s.Folders {
+	for _, top := range s.repos() {
 		dir := sandboxDir(top)
 		out, err := s.ssh("if test -d " + shellQuote(dir) + "; then echo yes; else echo no; fi")
 		if err != nil {
@@ -291,7 +306,7 @@ func (s *Sandbox) serveRunning() (bool, error) {
 // the forwarded port. It has no password: browsers get in with a one-time
 // pairing link (zero web). A leftover password-mode serve is stopped first.
 func (s *Sandbox) startServe() error {
-	_, err := s.ssh("pkill -f '[s]erve --hostname' ; cd " + shellQuote(s.Dir) + " || exit 1; " +
+	_, err := s.ssh("pkill -f '[s]erve --hostname' ; mkdir -p /tmp/zero; cd " + shellQuote(s.Dir) + " || exit 1; " +
 		"opencode service set hostname 127.0.0.1 >/dev/null && " +
 		"opencode service set port " + fmt.Sprint(servePort) + " >/dev/null && " +
 		"{ opencode service stop >/dev/null 2>&1; opencode service start >/dev/null; }")
@@ -455,6 +470,9 @@ func (s *Sandbox) Rm(out io.Writer) error {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	rt.UnbindCredential(s.copilotProvider())
+	if err := os.RemoveAll(s.stage()); err != nil {
+		return fmt.Errorf("remove input copy: %w", err)
+	}
 	if err := os.RemoveAll(s.State); err != nil {
 		return fmt.Errorf("remove state: %w", err)
 	}
@@ -480,7 +498,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 	}
 	remote := "vscode-remote://ssh-remote+" + s.Host
 	if len(s.Folders) == 1 {
-		return passthrough("code", "--folder-uri", remote+s.Dir)
+		return passthrough("code", "--folder-uri", remote+sandboxDir(s.Folders[0]))
 	}
 	// Several folders open as a multi-root workspace (spec F11).
 	type folder struct {
@@ -490,7 +508,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 		Folders []folder `json:"folders"`
 	}
 	for _, d := range s.dirs() {
-		ws.Folders = append(ws.Folders, folder{filepath.Base(d)})
+		ws.Folders = append(ws.Folders, folder{d})
 	}
 	b, _ := json.Marshal(ws)
 	const file = "/tmp/zero/zero.code-workspace"
