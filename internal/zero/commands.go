@@ -60,11 +60,13 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 		if rt.Stopped(s.Name) {
-			if s.read("forge.id") == "" {
-				repaths = false // resumeForge mints for the new paths
-			}
+			resumes := s.read("forge.id") == ""
 			if err := s.resumeForge(pol.Capabilities); err != nil {
 				return 0, err
+			}
+			if resumes {
+				s.forgeSynced() // minted for the new paths
+				repaths = false
 			}
 			if err := rt.Start(s.Name); err != nil {
 				return 0, fmt.Errorf("start sandbox: %w", err)
@@ -77,6 +79,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 		if repaths {
+			s.forgeSynced()
 			fmt.Fprintf(out, "%s token: rotated (%s)\n", s.forge().Name(), strings.Join(s.forgePaths(), ", "))
 		}
 		if len(ch.newHosts) > 0 {

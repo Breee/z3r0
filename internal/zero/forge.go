@@ -127,7 +127,8 @@ func (s *Sandbox) orderedPaths(paths map[string]string) []string {
 }
 
 // syncForgePaths records the workspace's project paths and reports whether
-// they changed, so the token is minted anew for the new set.
+// the token must be minted anew for them. The marker forge.stale stays until
+// forgeSynced, so a failed mint is retried on the next zero up.
 func (s *Sandbox) syncForgePaths() (bool, error) {
 	f, byTop, err := s.folderForge()
 	if err != nil {
@@ -135,14 +136,20 @@ func (s *Sandbox) syncForgePaths() (bool, error) {
 	}
 	paths, old := s.orderedPaths(byTop), s.forgePaths()
 	if slices.Equal(paths, old) {
-		return false, nil
+		return fileExists(s.path("forge.stale")), nil
 	}
 	cur := s.forge()
 	if cur == nil || len(paths) == 0 || f.Host() != cur.Host() {
 		return false, fmt.Errorf("the forge of %s changed (was %v, now %v); recreate: zero rm && zero up", s.Name, old, paths)
 	}
+	if err := s.write("forge.stale", "1", 0o600); err != nil {
+		return false, err
+	}
 	return true, s.write("forge.path", strings.Join(paths, "\n"), 0o600)
 }
+
+// forgeSynced marks the token as minted for the recorded paths.
+func (s *Sandbox) forgeSynced() { os.Remove(s.path("forge.stale")) }
 
 func (s *Sandbox) forgeProvider(f Forge) string { return s.Name + "-" + f.Name() }
 
