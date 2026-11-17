@@ -1,6 +1,6 @@
 # Spec: workspaces and contexts
 
-Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); sandbox still uses the first folder only (multi-folder #76, input folders #77, `zero ls` + rm check #79).
+Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). Open: input folders #77, `zero ls` + rm check #79.
 
 ## 1. Concepts
 
@@ -140,7 +140,7 @@ network rules for infra remain until recreate (zero rm && zero up)
 /sandbox/infra: unpushed branches: feat/x  → kept in sandbox, not reachable via token
 ```
 
-Token narrowing is immediate. Egress narrowing needs recreate (OpenShell rules are additive).
+Token narrowing is immediate; the push gate refuses the removed repo at once. Egress narrowing needs recreate (OpenShell rules are additive). Built in #76: the checkout of a removed folder stays in the sandbox; the unpushed-branches line is not printed yet (#79). All repo folders of a workspace must be on the same forge host.
 
 ### 5.6 cwd wins over current
 
@@ -221,7 +221,7 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: the first comm
 | F5 | Egress narrowing not live | print "until recreate" (5.5) |
 | F6 | Removed repo keeps unpushed work in sandbox | warn; token no longer covers it (5.5) |
 | F7 | Uncommitted host changes silently missing in sandbox | warn on `up` |
-| F8 | Name collisions in `/sandbox` (`a/api`, `b/api`) | suffix `api-2`; shown in `up` |
+| F8 | Name collisions in `/sandbox` (`a/api`, `b/api`) | built in #76: error, a workspace needs distinct folder names (no suffix) |
 | F9 | Larger blast radius per workspace | only explicitly listed folders; docs |
 | F10 | opencode multi-folder: one serve, sessions per directory | **verified 2026-11-16 (#73)**, opencode 2.2.6: one background service (port 4096) ran `opencode run` from two folders; each session has its own `location.directory`, each file landed in its folder. A folder without commits gets `projectID: global`. Not checked: the web UI project switcher |
 | F11 | `zero code` multi-root | **verified 2026-11-16 (#74)**, VS Code 1.145.2: a generated `/tmp/zero/zero.code-workspace` with relative folder paths, opened with `code --file-uri vscode-remote://ssh-remote+<host>/tmp/zero/zero.code-workspace`; the git extension in the sandbox opened both repositories. Not checked: the Explorer by eye |
