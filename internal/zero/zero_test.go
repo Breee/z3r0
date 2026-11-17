@@ -386,6 +386,38 @@ func TestScanInputExcludes(t *testing.T) {
 	}
 }
 
+func TestBundleRepoWithoutStash(t *testing.T) {
+	top := t.TempDir()
+	git := func(args ...string) string {
+		t.Helper()
+		out, err := sh("git", append([]string{"-C", top, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		if err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+		return out
+	}
+	git("init", "-q", "-b", "main")
+	git("commit", "-q", "--allow-empty", "-m", "a")
+	git("branch", "feat")
+	git("tag", "v1")
+	os.WriteFile(filepath.Join(top, ".env"), []byte("TOKEN=x"), 0o600)
+	git("stash", "-u", "-q")
+	git("checkout", "-q", "--detach")
+	file := filepath.Join(t.TempDir(), "b")
+	if err := bundleRepo(top, file); err != nil {
+		t.Fatal(err)
+	}
+	heads := git("bundle", "list-heads", file)
+	for _, want := range []string{"refs/heads/main", "refs/heads/feat", "refs/tags/v1", "HEAD"} {
+		if !strings.Contains(heads, want) {
+			t.Errorf("bundle lacks %s: %s", want, heads)
+		}
+	}
+	if strings.Contains(heads, "stash") {
+		t.Errorf("bundle carries the stash: %s", heads)
+	}
+}
+
 func TestSecretPatterns(t *testing.T) {
 	files := []string{".env", ".envrc", ".env.local", "prod.env", "ca.pem", "tls.key", "cert.p12", "cert.pfx", "app.jks", "release.keystore",
 		"host.ppk", "pw.kdbx", "private.asc", "office.ovpn", "id_rsa", "id_ed25519.pub", "deploy_rsa", "old_dsa", "host_ecdsa", "ci_ed25519",

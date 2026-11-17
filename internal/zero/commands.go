@@ -277,10 +277,20 @@ func (s *Sandbox) ensureCheckout(w io.Writer) error {
 	return nil
 }
 
+// bundleRepo writes branches, tags and HEAD of a host repo into a bundle.
+// Not --all: that would also carry refs/stash, which can hold untracked
+// files, and other private refs.
+func bundleRepo(top, file string) error {
+	if _, err := sh("git", "-C", top, "bundle", "create", file, "--branches", "--tags", "HEAD"); err != nil {
+		return fmt.Errorf("git bundle %s: %w", top, err)
+	}
+	return nil
+}
+
 func (s *Sandbox) checkout(top, dir, path string) error {
 	bundle := s.path("repo.bundle")
-	if _, err := sh("git", "-C", top, "bundle", "create", bundle, "--all"); err != nil {
-		return fmt.Errorf("git bundle %s: %w", top, err)
+	if err := bundleRepo(top, bundle); err != nil {
+		return err
 	}
 	defer os.Remove(bundle)
 	if err := rt.Upload(s.Name, bundle, "/tmp/.zero.bundle"); err != nil {

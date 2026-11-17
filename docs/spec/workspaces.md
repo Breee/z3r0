@@ -200,7 +200,7 @@ Existing `~/.local/state/zero/zero-<repo>/` without config entry: the first comm
 | | repo | input |
 |---|---|---|
 | Detect | folder has `.git` (without a forge remote: checkout, no token, no push) | no `.git` |
-| Into sandbox | git bundle of host commits, current branch checked out | filtered host copy, read-only bind mount at `/tmp/zero-input/<name>` |
+| Into sandbox | git bundle of host branches, tags and HEAD (no stash, #116), current branch checked out | filtered host copy, read-only bind mount at `/tmp/zero-input/<name>` |
 | Uncommitted host changes | not included (warn) | included |
 | Excluded | gitignored by nature | always (not overridable): the secret patterns of 6.1, symlinks, special files; plus `.zeroignore` (one pattern per line: file name or path relative to the folder, shell wildcards) |
 | Exit | `git push` via forge token | none |
@@ -226,7 +226,7 @@ Decisions:
 
 - **Names only, no content scan.** trufflehog and GitHub secret scanning match content (token formats), gitleaks mostly content; none of them offers a name list beyond the above. zero does not scan content: a scan of its own would cover a few formats and suggest more safety than it gives, a full scan means running gitleaks as a dependency on every `zero up`. Left out names stay a known path (P34 in `docs/attack-paths.md`): `secrets.yaml`, `credentials.json`, a key inside a `.txt`. The summary on `zero up` and `.zeroignore` are the user's means.
 - **Not on the list on purpose**: `credentials*`, `*password*`, `*secret*`, `config.*`, `*.sql`, `*.sqlite`, `*.log` (gitrob has them) — too many harmless files in spec folders.
-- **Repo folders are not filtered.** They reach the sandbox as a git bundle: only committed content, so untracked and gitignored files (`.env`) stay on the host. A committed secret is already on the forge, where the sandbox token can read it.
+- **Repo folders are not filtered.** They reach the sandbox as a git bundle of branches, tags and HEAD: only committed content, so untracked and gitignored files (`.env`) stay on the host, stashes too (#116). A secret committed on a pushed branch is already on the forge, where the sandbox token can read it; one committed on a local branch reaches the sandbox.
 
 ## 7. Policy and credentials
 

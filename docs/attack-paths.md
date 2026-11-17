@@ -30,7 +30,7 @@ Effort: what it takes to exploit the path, from least to most. Classified by jud
 | E4 | a foothold or preparation outside the sandbox (process on the host, published package or image, tampered provider) | malicious Go module |
 | E5 | an exploit or a bug in a dependency (kernel/container CVE, forge permission bug) | sandbox breakout |
 
-By effort: E1 P12 P30 P31 P34 P35 · E2 P02 P04 P06 P07 P08 P09 P15 P23 P25 P26 P27 · E3 P01 P05 P10 P13 P14 P16 P18 · E4 P11 P17 P21 P22 P24 P28 P29 P32 P33 · E5 P03 P19 P20.
+By effort: E1 P12 P30 P31 P34 P35 · E2 P02 P04 P06 P07 P08 P09 P15 P23 P25 P26 P27 · E3 P01 P05 P10 P13 P14 P16 P18 P36 · E4 P11 P17 P21 P22 P24 P28 P29 P32 P33 · E5 P03 P19 P20.
 P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci.run` is approved.
 
 | # | Severity | Effort | Path | Evidence | Section |
@@ -70,6 +70,7 @@ P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci
 | P33 | medium | E4 | Gateway client key holder attaches any podman volume | reasoning | 5 |
 | P34 | low | E1 | Secret in an input folder under an unknown name | by design | 5 |
 | P35 | low | E1 | Input folder content carries instructions | reasoning | 5 |
+| P36 | low | E3 | Repo bundle carries the stash into the sandbox | fixed #116 | 4 |
 
 ## 2. Sandbox runtime and host
 
@@ -114,6 +115,7 @@ Recorded 2026-11-10 for the zero workflow, not proven unless noted. Recorded, no
 | P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | — | ADR 0020 |
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — | — |
 | P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | open, TODO (C43) | — | C43 |
+| P36 | low | A repo folder is added while the agent runs; the bundle in `/tmp/.zero.bundle` was built with `--all` and carried `refs/stash` (a `git stash -u` holds untracked files such as `.env`); the agent copies the bundle before it is deleted | Stashed secrets readable by the agent | bundle content shown on the host (#116), sandbox side not run | fixed #116: bundle holds branches, tags and HEAD only | #116, spec §6.1 |
 
 ## 5. Gateway bind mounts and input folders
 
