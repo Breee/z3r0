@@ -348,7 +348,7 @@ func writeTree(t *testing.T, root string, files map[string]string) {
 // Every forbidden pattern of spec §6 is left out; .zeroignore and symlinks too.
 func TestScanInputExcludes(t *testing.T) {
 	top := t.TempDir()
-	secret := []string{".env", ".env.local", "sub/.env.prod", "tls/server.pem", "tls/server.key", "id_rsa", "id_ed25519.pub",
+	secret := []string{".env", ".ENV", "ID_RSA", "Server.PEM", ".AWS/credentials", ".env.local", "sub/.env.prod", "tls/server.pem", "tls/server.key", "id_rsa", "id_ed25519.pub",
 		".git-credentials", ".netrc", ".ssh/config", ".aws/credentials", ".kube/config", "deep/.ssh/known_hosts"}
 	files := map[string]string{"openapi.yaml": "a", "docs/README.md": "b", "draft.txt": "c", "private/x.txt": "d",
 		".zeroignore": "# comment\ndraft.txt\nprivate/\n.env\n"}

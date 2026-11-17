@@ -120,7 +120,7 @@ func scanInput(top string) ([]inputFile, []skipped, error) {
 		rel, _ := filepath.Rel(top, p)
 		why := ""
 		switch {
-		case d.IsDir() && matchAny(secretDirs, d.Name(), ""), !d.IsDir() && matchAny(secretFiles, d.Name(), ""):
+		case d.IsDir() && matchAny(secretDirs, strings.ToLower(d.Name()), ""), !d.IsDir() && matchAny(secretFiles, strings.ToLower(d.Name()), ""):
 			why = "secret pattern"
 		case matchAny(ignore, d.Name(), rel):
 			why = ".zeroignore"
@@ -165,7 +165,7 @@ func copyInput(top, dst string, files []inputFile) error {
 		if f.mode&0o111 != 0 {
 			mode = 0o755
 		}
-		if err := copyFile(filepath.Join(top, f.rel), to, mode); err != nil {
+		if err := copyFile(filepath.Join(top, f.rel), to, mode, f.size); err != nil {
 			return err
 		}
 	}
@@ -181,7 +181,7 @@ func copyInput(top, dst string, files []inputFile) error {
 	})
 }
 
-func copyFile(from, to string, mode fs.FileMode) error {
+func copyFile(from, to string, mode fs.FileMode, size int64) error {
 	// O_NOFOLLOW: a file swapped for a symlink after the scan is not followed.
 	in, err := os.OpenFile(from, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
@@ -192,7 +192,8 @@ func copyFile(from, to string, mode fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
+	// At most the scanned size: a file that grew after the scan cannot pass the size limit.
+	if _, err := io.Copy(out, io.LimitReader(in, size)); err != nil {
 		out.Close()
 		return err
 	}
