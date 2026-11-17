@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-17
 deciders: bree
 requirements: [Z-INV-1, Z-INV-4]
