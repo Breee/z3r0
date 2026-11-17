@@ -121,3 +121,14 @@ Neither is built. Decision 2026-11-16: record them, build later; follow-up issue
 - Mechanism: a filter between the agent and the forge API/MCP that looks up the author of each issue, comment and MR description and drops or labels content from non-members.
 - Unknowns: where the filter runs (OpenShell rules cannot rewrite response bodies; it would be a proxy in `zero serve` or an MCP wrapper); whether labelling changes model behaviour at all; cost of the membership lookups. OpenAPPA covers part of this inside the sandbox (see `tool-eval-paperclip-openappa.md`, not adopted).
 - Cost: another parser of forge responses on the host; does nothing for web pages, dependencies or logs.
+
+## Input folders and gateway bind mounts (2026-11-17, #77, ADR 0039)
+
+Not proven unless noted. The agent itself gains no path: the mount is read-only for a non-root user (proven: write, delete, chmod, remount fail) and it cannot ask for mounts without the gateway client key.
+
+| # | Severity | Path | Impact | Proof | Ref | Mitigation |
+|---|---|---|---|---|---|---|
+| P32 | medium | A host process with the user's gateway client key creates a sandbox with a bind mount of any path the gateway user can read (`--driver-config-json`), also read-write | Reads the gateway user's home: gateway TLS keys, stored GitLab and Copilot credentials. Before ADR 0039 the user could not read them | not run; follows from `enable_bind_mounts = true` | C52, ADR 0039 | Upstream read-only upload (#112), then turn the three settings off again (#111) |
+| P33 | medium | Same process attaches any existing podman volume (`resource_admission.enabled = false`) | Reads or changes another sandbox's workspace | not run | C52, ADR 0039 | as P32 |
+| P34 | low | Secret in an input folder under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | #72, spec §6 | `.zeroignore`; summary on `zero up`; #72 evaluates the list and a content scan |
+| P35 | low | Input content (specs, notes) carries instructions for the agent | Prompt injection, as P26 | not run | P26 | none; input folders are chosen by the developer |
