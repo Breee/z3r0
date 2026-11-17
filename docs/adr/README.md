@@ -40,3 +40,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [36](0036-pause-and-token-lifetime.md) | 2026-11-16 | Pause ends a session; the token expiry date is only a backstop | Z-INV-4, Z-INV-6 |
 | [37](0037-pairing-link-instead-of-password.md) | 2026-11-16 | opencode pairing link instead of a serve password | Z-INV-4 |
 | [38](0038-glab-is-the-login.md) | 2026-11-16 | glab is the login; any GitLab host glab knows | Z-INV-3, Z-INV-4 |
+| [39](0039-input-folders-read-only-bind-mount.md) | 2026-11-17 | Input folders are a filtered host copy, bind-mounted read-only (proposed) | Z-INV-1, Z-INV-4 |
