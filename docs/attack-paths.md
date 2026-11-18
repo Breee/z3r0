@@ -61,7 +61,7 @@ P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci
 | P24 | low | E4 | Supply chain of zero itself | accepted | 2 |
 | P25 | high | E2 | Agent changes branches other than its session branch | open | 4 |
 | P26 | origin | E2 | Untrusted text the agent reads | reasoning | 6 |
-| P27 | origin | E2 | Poisoned instructions in the repo | reasoning | 6 |
+| P27 | origin | E2 | Poisoned instructions in the repo | accepted | 6 |
 | P28 | origin | E4 | Tool and plugin supply chain | reasoning | 6 |
 | P29 | origin | E4 | Model or provider | reasoning | 6 |
 | P30 | origin | E1 | The human | reasoning | 6 |
@@ -137,7 +137,7 @@ Added 2026-11-16 (#108). Reasoning, not tested. Every path in sections 2–5 sta
 | # | Origin | Example | Today | Gap |
 |---|---|---|---|---|
 | P26 | Untrusted text the agent reads (prompt injection) | issue or MR comment, web page, dependency README or source, log line, MCP tool result | egress allowlist limits what can be fetched (L1); GitLab MCP is limited to the project by the token | content from non-members of the project reaches the agent unmarked (P15) |
-| P27 | Poisoned instructions in the repo | `AGENTS.md`, skills, `.opencode/`, MCP config changed on a branch | MR review before merge (DevOps backbone) | the agent loads these from the working branch, including one it or a stranger just changed |
+| P27 | Poisoned instructions in the repo | `AGENTS.md`, skills, `.opencode/`, MCP config changed on a branch | MR review before merge (DevOps backbone) | accepted (ADR 0041): the agent loads these from the checked-out branch; which branch, and review, are the DevOps process's job. zero's limits (L1–L5, push gate) apply regardless |
 | P28 | Tool and plugin supply chain | MCP server, opencode plugin, skill, npm or Go module | dev image pinned by digest; registries only if allowed in `.zero/policy.yaml` | plugins and MCP servers named in repo config are not checked; modules are not vetted (P17) |
 | P29 | Model or provider | backdoored model, tampered endpoint | model hosts are an explicit allowlist (zen, Copilot) | no approved-model list; model traffic content is not inspected |
 | P30 | The human | careless or malicious prompt | accountability: every token and push carries the developer's identity; policy widening needs approval (#78) | none planned; this is the developer trust model |
@@ -145,12 +145,9 @@ Added 2026-11-16 (#108). Reasoning, not tested. Every path in sections 2–5 sta
 
 ### Candidate layers at the root
 
-Neither is built. Decision 2026-11-16: record them, build later; follow-up issues #109 and #110.
+Not built. Decision 2026-11-16: record it, build later; follow-up issue #110. Trusted instructions (P27, #109) were dropped on 2026-11-18 (ADR 0041).
 
-**Trusted instructions (P27).** Agent configuration (`AGENTS.md`, skills, `.opencode/`, MCP config) is taken from the protected default branch, not from the working branch.
-- Mechanism: at `zero up` zero copies these paths from `origin/<default branch>` of the host checkout into the sandbox and makes them read-only for the agent; changes to them on a session branch take effect only after merge.
-- Unknowns: which paths opencode and VS Code read (global and per project); whether the sandbox filesystem policy can make single paths inside the checkout read-only; how the developer tests a change to these files.
-- Cost: a list of paths per agent tool that must be maintained; friction when working on the instructions themselves.
+**Trusted instructions (P27) — not built, ADR 0041.** Agent configuration (`AGENTS.md`, skills, `.opencode/`, MCP config) would be taken from the protected default branch, not from the working branch. Rejected: which branch the agent runs on, and review of repo instructions, belong to the DevOps process.
 
 **Input provenance (P26).** Forge content written by people who are not project members is not handed to the agent, or is handed over marked as untrusted.
 - Mechanism: a filter between the agent and the forge API/MCP that looks up the author of each issue, comment and MR description and drops or labels content from non-members.
