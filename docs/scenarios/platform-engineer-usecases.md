@@ -118,7 +118,7 @@ Everything else (apply, delete, exec, Secret read, RBAC) stays with the human or
 | G8 | Tools in the image: `kubectl`, `argocd`, `kargo`, `helm`, `kustomize` | image | or MCP servers instead of CLIs; decides where G6 is enforced |
 | G9 | Evidence: which human's session read what in which cluster | L8 | Kubernetes audit shows only the service account unless the token carries the session |
 
-Smallest useful step: `k8s.read` for dev/qa namespaces with a TokenRequest credential (G1 for one system, T7–T9). It was already sketched as UC2 in the identity use cases. Argo CD and Grafana read follow the same pattern; the write capabilities come last.
+Smallest useful step: `k8s.read` for dev/qa namespaces with a TokenRequest credential (G1 for one system, T7–T9). It was already sketched as UC2 in the identity use cases. Argo CD and Grafana read follow the same pattern; the write capabilities come last. How the credential works for every way people log in to clusters: [kubernetes-access.md](kubernetes-access.md).
 
 ## 6. Questions for review
 
