@@ -154,7 +154,7 @@ Neither is built. Decision 2026-11-16: record them, build later; follow-up issue
 
 **Input provenance (P26).** Forge content written by people who are not project members is not handed to the agent, or is handed over marked as untrusted.
 - Mechanism: a filter between the agent and the forge API/MCP that looks up the author of each issue, comment and MR description and drops or labels content from non-members.
-- Unknowns: where the filter runs (OpenShell rules cannot rewrite response bodies; it would be a proxy in `zero serve` or an MCP wrapper); whether labelling changes model behaviour at all; cost of the membership lookups. OpenAPPA covers part of this inside the sandbox (see `../ai-docs/tool-eval-paperclip-openappa.md`, not adopted).
+- Unknowns: where the filter runs (OpenShell rules cannot rewrite response bodies; it would be a proxy in `zero-cp` or an MCP wrapper); whether labelling changes model behaviour at all; cost of the membership lookups. OpenAPPA covers part of this inside the sandbox (see `../ai-docs/tool-eval-paperclip-openappa.md`, not adopted).
 - Cost: another parser of forge responses on the host; does nothing for web pages, dependencies or logs.
 
 ## 7. P14 in depth: CI is code execution outside the sandbox

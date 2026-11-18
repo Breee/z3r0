@@ -6,22 +6,22 @@ Status: proposed (#94). Builds on §2 invariants, §27 control plane, ADR 0024 (
 
 The agent works in a sandbox, sees no secret, can only reach what the project allows, and can only change the forge through one narrow door: its own session branch. Everything after that (review, CI, merge, deploy) is the existing DevOps/GitOps process.
 
-## 28.2 Components (three binaries, one dependency)
+## 28.2 Components (two binaries, one dependency)
 
 | Component | Runs | Job |
 |---|---|---|
 | `zero` CLI | laptop | `zero up/web/code/status/rm/doctor/install`; reads `.zero/policy.yaml` from the host checkout |
-| `zero serve` | laptop (user unit) or cluster | the broker: mints/renews/revokes credentials, push gate, decision log. Same binary in both places; laptop instance = "zero-cp of one" |
+| `zero-cp` | laptop (user unit `zero-cp.service`) or cluster | the service (control plane): mints/renews/revokes credentials, push gate, decision log. Not a command: `zero up` starts it. Same binary in both places; the laptop instance serves one user |
 | OpenShell (dependency) | laptop / cluster | gateway + supervisor: sandbox, egress policy, placeholder substitution |
 | optional: OpenBao, SPIRE | cluster | credential storage off the laptop, workload identity |
 
-Built (#97, ADR 0031): `zero serve` hosts the push gate and the token upkeep loop (renew before expiry, revoke orphans); `zero up` starts it, `zero install` makes it a user unit. Creating and removing a sandbox still mint and revoke in the CLI. Not yet in it: the token endpoint for supervisor identities (PoC 09) and a central deployment.
+Built (#97, ADR 0031; own binary since #119, ADR 0040): `zero-cp` hosts the push gate and the token upkeep loop (renew before expiry, revoke orphans); `zero up` starts it, `zero install` makes it a user unit. Creating and removing a sandbox still mint and revoke in the CLI. Not yet in it: the token endpoint for supervisor identities (PoC 09) and a central deployment.
 
 ```mermaid
 flowchart LR
   dev[developer] --> cli[zero CLI]
   cli --> gw[OpenShell gateway]
-  cli --> srv[zero serve]
+  cli --> srv[zero-cp]
   gw --> sup[supervisor]
   sup --> agent[agent in sandbox]
   sup -- fetch, API, model --> ext[gitlab.com / model API]
@@ -53,7 +53,7 @@ Known holes no layer closes today (L0 also assumes the host follows `docs/host-r
 ## 28.4 Use (what a developer types)
 
 ```
-sudo zero install          # once: OpenShell + zero serve, one sudo
+sudo zero install          # once: OpenShell + zero-cp, one sudo
 zero up                    # in any repo: sandbox, token, policy, push gate
 zero web | zero code       # work with the agent
 zero rm                    # revoke + delete
@@ -65,17 +65,17 @@ Project owners add `.zero/policy.yaml` (hosts, capabilities). Widening asks the 
 
 | | Laptop | Team |
 |---|---|---|
-| zero serve | user unit on laptop | in cluster behind HTTPS |
+| zero-cp | user unit on laptop | in cluster behind HTTPS |
 | credential source | developer's glab/OAuth login | GitLab OAuth app, refresh token in OpenBao |
 | identity | local session | SPIFFE per sandbox (L7) |
 | revocation | `zero rm` / orphan sweep | central, without laptop |
 
-The CLI, policy file and layers are identical; only where `zero serve` runs changes.
+The CLI, policy file and layers are identical; only where `zero-cp` runs changes.
 
 ## 28.6 Next steps (issues)
 
 1. ~~Move push gate into zero (L4 default)~~ — done (#95).
 2. ~~OpenShell deny rules for destructive GitLab REST (L5)~~ — done (#96): no extra rules needed, `create_branch` removed from the token.
-3. ~~`zero serve` as the single broker process (laptop)~~ — done (#97).
+3. ~~`zero-cp` as the single service process (laptop)~~ — done (#97, #119).
 5. Open: systems beyond the forge. Basic platform engineer tasks with GitLab, Kubernetes, Argo CD, Kargo and Grafana, the capabilities they need and the gaps G1–G9: `docs/scenarios/platform-engineer-usecases.md`. Only the GitLab tasks work today.
 4. Done: widening prompt (#78). Login decided: glab, any GitLab host glab knows (#98, ADR 0038); OpenBao stays an opt-in store (ADR 0032). Open: #91/#92 identity decisions (open questions in `docs/scenarios/identity-broker-usecases.md`).

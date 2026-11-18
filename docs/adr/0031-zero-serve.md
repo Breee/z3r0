@@ -6,6 +6,8 @@ requirements: [Z-INV-4, Z-INV-6]
 ---
 # 0031 — zero serve: one host process for push gate and token upkeep
 
+Naming superseded by [ADR 0040](0040-zero-cp-service-binary.md): the process is the binary `zero-cp` with unit `zero-cp.service`, log `journalctl --user -u zero-cp`. The rest stands.
+
 ## Context
 The push gate (ADR 0030) ran as its own detached process, and forge tokens were renewed and orphans revoked only when someone ran `zero up`. A sandbox left running over night kept an expiring token; a crashed sandbox kept a live one.
 

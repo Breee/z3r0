@@ -75,7 +75,7 @@ NAME        STATUS   FOLDERS  TOKEN      POLICY
 orphans: token 29481100 zero-old@io (no sandbox)
 ```
 
-Built in #79. STATUS is `running`, `stopped` (paused), `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is the commit of the first repo folder's policy file, `dirty` if any folder had uncommitted policy changes. One `orphans:` line per leftover: a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy without a workspace. `zero ls` only lists; `zero serve` revokes tokens without a sandbox.
+Built in #79. STATUS is `running`, `stopped` (paused), `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is the commit of the first repo folder's policy file, `dirty` if any folder had uncommitted policy changes. One `orphans:` line per leftover: a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy without a workspace. `zero ls` only lists; `zero-cp` revokes tokens without a sandbox.
 
 ## 5. Examples
 
