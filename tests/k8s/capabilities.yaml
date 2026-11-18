@@ -1,0 +1,67 @@
+# One Role per zero capability. Apply per namespace: kubectl -n <ns> apply -f capabilities.yaml
+# Not shipped on purpose: secrets, pods/exec, pods/attach, pods/portforward, */proxy, RBAC, create/delete of workloads.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-k8s-read, labels: {zero.dev/capability: k8s.read}}
+rules:
+  - apiGroups: [""]
+    resources: [pods, events, services, endpoints, persistentvolumeclaims, resourcequotas, limitranges]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-k8s-logs, labels: {zero.dev/capability: k8s.logs}}
+rules:
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-k8s-config-read, labels: {zero.dev/capability: k8s.config.read}}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-k8s-scale, labels: {zero.dev/capability: k8s.scale}}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments/scale, statefulsets/scale]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-k8s-restart, labels: {zero.dev/capability: k8s.restart}}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets]
+    verbs: [patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-k8s-pod-delete, labels: {zero.dev/capability: k8s.pod.delete}}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [delete]

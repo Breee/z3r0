@@ -1,0 +1,26 @@
+# What a human needs to start a session. Apply per namespace; bind to the team's group.
+# Deliberately leaves out k8s.restart and k8s.pod.delete: the admin adds a Role name here to offer it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: zero-session}
+rules:
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    verbs: [create, delete, get, list]
+  - apiGroups: [""]
+    resources: [serviceaccounts/token]
+    verbs: [create]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [rolebindings]
+    verbs: [create, delete, get, list]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles]
+    verbs: [bind]
+    resourceNames: [zero-k8s-read, zero-k8s-logs, zero-k8s-config-read, zero-k8s-scale]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: zero-session}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: zero-session}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: zero-users}

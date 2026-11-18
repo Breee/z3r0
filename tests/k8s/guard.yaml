@@ -1,0 +1,55 @@
+# Cluster-wide, once. Closes what RBAC cannot express.
+# 1. members of zero-users may create tokens only for service accounts named zero-*
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: zero-token-names}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - {apiGroups: [""], apiVersions: [v1], operations: [CREATE], resources: [serviceaccounts/token]}
+  matchConditions:
+    - name: zero-user
+      expression: "'zero-users' in request.userInfo.groups"
+  validations:
+    - expression: "request.name.startsWith('zero-')"
+      message: "zero-users may create tokens only for service accounts named zero-*"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: zero-token-names}
+spec: {policyName: zero-token-names, validationActions: [Deny]}
+---
+# 2. a zero-* service account may patch a workload only to restart it
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: zero-restart-only}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - {apiGroups: [apps], apiVersions: [v1], operations: [UPDATE], resources: [deployments, statefulsets, daemonsets]}
+  matchConditions:
+    - name: zero-agent
+      expression: "request.userInfo.username.matches('^system:serviceaccount:[^:]+:zero-')"
+  variables:
+    - name: strip
+      expression: "'kubectl.kubernetes.io/restartedAt'"
+    - name: newAnn
+      expression: "has(object.spec.template.metadata.annotations) ? object.spec.template.metadata.annotations.filter(k, k != variables.strip).map(k, k + '=' + object.spec.template.metadata.annotations[k]) : []"
+    - name: oldAnn
+      expression: "has(oldObject.spec.template.metadata.annotations) ? oldObject.spec.template.metadata.annotations.filter(k, k != variables.strip).map(k, k + '=' + oldObject.spec.template.metadata.annotations[k]) : []"
+  validations:
+    - expression: >-
+        object.spec.template.spec == oldObject.spec.template.spec
+        && object.spec.selector == oldObject.spec.selector
+        && (has(object.spec.replicas) ? object.spec.replicas : 1) == (has(oldObject.spec.replicas) ? oldObject.spec.replicas : 1)
+        && (has(object.spec.template.metadata.labels) ? object.spec.template.metadata.labels : {}) == (has(oldObject.spec.template.metadata.labels) ? oldObject.spec.template.metadata.labels : {})
+        && (has(object.metadata.labels) ? object.metadata.labels : {}) == (has(oldObject.metadata.labels) ? oldObject.metadata.labels : {})
+        && variables.newAnn.all(a, a in variables.oldAnn) && variables.oldAnn.all(a, a in variables.newAnn)
+      message: "zero agents may only set the restartedAt annotation"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: zero-restart-only}
+spec: {policyName: zero-restart-only, validationActions: [Deny]}
