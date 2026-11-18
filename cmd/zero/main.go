@@ -77,6 +77,11 @@ func main() {
 		return
 	}
 
+	if !slices.Contains([]string{"up", "attach", "run", "code", "web", "status", "stop", "logs", "pause", "rm"}, cmd) {
+		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
+		fmt.Fprint(os.Stderr, usageText)
+		os.Exit(2)
+	}
 	create := slices.Contains([]string{"up", "attach", "run", "code", "web"}, cmd)
 	z, err := zero.Open(ctx, create)
 	if err != nil {
@@ -121,10 +126,6 @@ func main() {
 		err = z.Pause(os.Stdout)
 	case "rm":
 		err = z.Rm(os.Stdout, slices.Contains(args, "-y"))
-	default:
-		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
-		fmt.Fprint(os.Stderr, usageText)
-		os.Exit(2)
 	}
 	if err != nil {
 		// Propagate the exit code of interactive children (attach/run/code).
