@@ -87,8 +87,8 @@ Read (enough for T1–T17 except the UI half of T17):
 
 | Capability | Meaning | Scope | Open point |
 |---|---|---|---|
-| `k8s.read` | get/list/watch, logs. Never Secrets, exec, port-forward | cluster + namespaces | T10 needs cluster-wide read; ConfigMaps often hold secrets too |
-| `argocd.read` | applications, sync status, diff, resource tree, events | Argo CD project | the diff and live manifests can show Secret data unless Argo CD masks it; pod logs through Argo CD are a second path to `k8s.read` |
+| `k8s.resource.read` | get/list/watch, logs. Never Secrets, exec, port-forward | cluster + namespaces | T10 needs cluster-wide read; ConfigMaps often hold secrets too |
+| `argocd.read` | applications, sync status, diff, resource tree, events | Argo CD project | the diff and live manifests can show Secret data unless Argo CD masks it; pod logs through Argo CD are a second path to `k8s.resource.read` |
 | `kargo.read` | stages, freight, promotions, verifications | Kargo project | Kargo permissions are Kubernetes RBAC on its own resources; a second API to cover |
 | `grafana.read` | dashboards, alert rules and state, datasource queries | folder + datasources | a query can return anything the datasource holds: logs contain tokens and personal data. Loki/Prometheus tenant limits are the real scope, not Grafana's |
 | `gitlab.mr.comment` | comment on an MR | project | spam only, reversible |
@@ -99,7 +99,7 @@ Write, off by default, each one a decision of its own:
 |---|---|---|
 | `argocd.sync` | sync or refresh one app | auto-sync is off for prod in many setups |
 | `kargo.promote` | promote Freight to a stage, never to prod | promotion is the release decision |
-| `k8s.restart` | rollout restart of one workload | a stuck pod is not a manifest change |
+| `k8s.workload.restart` | rollout restart of one workload | a stuck pod is not a manifest change |
 | `grafana.silence` | silence one alert for a limited time | incident handling |
 
 Everything else (apply, delete, exec, Secret read, RBAC) stays with the human or the pipeline.
@@ -118,7 +118,7 @@ Everything else (apply, delete, exec, Secret read, RBAC) stays with the human or
 | G8 | Tools in the image: `kubectl`, `argocd`, `kargo`, `helm`, `kustomize` | image | or MCP servers instead of CLIs; decides where G6 is enforced |
 | G9 | Evidence: which human's session read what in which cluster | L8 | Kubernetes audit shows only the service account unless the token carries the session |
 
-Smallest useful step: `k8s.read` for dev/qa namespaces with a TokenRequest credential (G1 for one system, T7–T9). It was already sketched as UC2 in the identity use cases. Argo CD and Grafana read follow the same pattern; the write capabilities come last. How the credential works for every way people log in to clusters: [kubernetes-access.md](kubernetes-access.md).
+Smallest useful step: `k8s.resource.read` for dev/qa namespaces with a TokenRequest credential (G1 for one system, T7–T9). It was already sketched as UC2 in the identity use cases. Argo CD and Grafana read follow the same pattern; the write capabilities come last. How the credential works for every way people log in to clusters: [kubernetes-access.md](kubernetes-access.md).
 
 ## 6. Questions for review
 

@@ -21,7 +21,7 @@ Z3R0 capabilities are semantic and opinionated, for example:
 ```text
 git.push
 gitlab.pipeline.read
-k8s.logs.read
+k8s.pod.logs
 container.build
 ```
 

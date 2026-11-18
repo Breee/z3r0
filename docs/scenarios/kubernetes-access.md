@@ -65,13 +65,13 @@ Step 4 is the admin's decision "who may hand read access to an agent" (K4). zero
 
 ```yaml
 # .zero/policy.yaml
-capabilities: [k8s.read]
+capabilities: [k8s.resource.read]
 kubernetes:
   - context: dev          # name in the human's kubeconfig
     namespaces: [team-a, team-a-qa]
 ```
 
-`zero up` shows it in the approval prompt like any capability (`+ capability k8s.read: dev (team-a, team-a-qa)`).
+`zero up` shows it in the approval prompt like any capability (`+ capability k8s.resource.read: dev (team-a, team-a-qa)`).
 
 ### Flow
 
@@ -98,7 +98,7 @@ zero cannot fix M1/M2, but it reads the kubeconfig context and says so:
 
 - warn: context uses a client certificate or a static token (M1, M2);
 - warn: human is cluster-admin there (`kubectl auth can-i '*' '*'`), with the hint that the agent still only gets `zero-read`;
-- error: `k8s.read` asked for a context where `zero-token` is missing, with the manifest command.
+- error: `k8s.resource.read` asked for a context where `zero-token` is missing, with the manifest command.
 
 With M1 `system:masters` option C still works and the agent is still read-only; the weak point stays the human's key file on the laptop, outside the sandbox.
 
@@ -134,13 +134,13 @@ With M1 `system:masters` option C still works and the agent is still read-only; 
 
 ## 9. Policy shape: zero's own capabilities (#123)
 
-Question: one coarse `k8s.read`, or own fine capabilities such as `k8s.logs`? Tested on a kind cluster (section 10).
+Question: one coarse `k8s.resource.read`, or own fine capabilities such as `k8s.pod.logs`? Tested on a kind cluster (section 10).
 
 ### Options
 
 | | Shape | Cluster enforces it? | Verdict |
 |---|---|---|---|
-| P1 | one `k8s.read`, one fixed ServiceAccount `zero-agent` (section 5) | yes | simple, but logs and ConfigMaps (KF4) cannot be left out per project, and every session has the same identity |
+| P1 | one `k8s.resource.read`, one fixed ServiceAccount `zero-agent` (section 5) | yes | simple, but logs and ConfigMaps (KF4) cannot be left out per project, and every session has the same identity |
 | P2 | fine capabilities, **one Role per capability**, a ServiceAccount per session bound to the Roles the policy lists | yes, each capability is exactly one Role | **recommended** |
 | P3 | fine capabilities checked by a zero-cp proxy, one wide ServiceAccount behind it | no, zero is the only check | rejected: a bug in zero is a hole in the cluster |
 | P4 | policy lists raw RBAC rules, zero creates Roles | yes | rejected: the human would need the right to create Roles, which is the right to grant anything they hold; not reviewable |
@@ -151,12 +151,12 @@ A capability is a name for a Role that the cluster admin installed. zero never d
 
 | Capability | Role | RBAC rules | Exact in RBAC? | Default |
 |---|---|---|---|---|
-| `k8s.read` | `zero-k8s-read` | get/list/watch pods, events, services, endpoints, PVCs, quotas, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs, ingresses, networkpolicies, HPAs, endpointslices | yes | offered |
-| `k8s.logs` | `zero-k8s-logs` | get `pods/log` | yes | offered |
+| `k8s.resource.read` | `zero-k8s-resource-read` | get/list/watch pods, events, services, endpoints, PVCs, quotas, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs, ingresses, networkpolicies, HPAs, endpointslices | yes | offered |
+| `k8s.pod.logs` | `zero-k8s-pod-logs` | get `pods/log` | yes | offered |
 | `k8s.config.read` | `zero-k8s-config-read` | get/list/watch configmaps | yes | offered |
-| `k8s.scale` | `zero-k8s-scale` | get/patch/update `deployments/scale`, `statefulsets/scale` | yes | offered |
+| `k8s.workload.scale` | `zero-k8s-workload-scale` | get/patch/update `deployments/scale`, `statefulsets/scale` | yes | offered |
 | `k8s.pod.delete` | `zero-k8s-pod-delete` | delete pods | yes | admin opt-in |
-| `k8s.restart` | `zero-k8s-restart` | patch deployments, statefulsets, daemonsets | **no**: patch allows any change. Needs an admission policy on top, and ours still let two other fields through (section 10) | admin opt-in, not recommended; `k8s.pod.delete` restarts a pod exactly |
+| `k8s.workload.restart` | `zero-k8s-workload-restart` | patch deployments, statefulsets, daemonsets | **no**: patch allows any change. Needs an admission policy on top, and ours still let two other fields through (section 10) | admin opt-in, not recommended; `k8s.pod.delete` restarts a pod exactly |
 | Secrets, exec, attach, port-forward, proxy, RBAC, create/delete of workloads | none | | | never a Role, so no policy can ask for it |
 
 Custom Roles follow the same rule: capability `k8s.<x>.<y>` ↔ Role `zero-k8s-<x>-<y>` (for example CRDs: `k8s.argo.read`).
@@ -167,13 +167,13 @@ capabilities: [git.read, git.commit, git.push, gitlab.mr.create]
 kubernetes:
   - context: dev                 # name in the human's kubeconfig
     namespaces: [team-a, team-a-qa]
-    capabilities: [k8s.read, k8s.logs]
+    capabilities: [k8s.resource.read, k8s.pod.logs]
   - context: prod
     namespaces: [team-a]
-    capabilities: [k8s.read]
+    capabilities: [k8s.resource.read]
 ```
 
-Capabilities sit under the cluster entry, not in the top list: the same project wants more in dev than in prod (G7). The approval prompt of `zero up` prints one line per entry: `+ kubernetes dev (team-a, team-a-qa): k8s.read, k8s.logs`.
+Capabilities sit under the cluster entry, not in the top list: the same project wants more in dev than in prod (G7). The approval prompt of `zero up` prints one line per entry: `+ kubernetes dev (team-a, team-a-qa): k8s.resource.read, k8s.pod.logs`.
 
 Who decides what:
 
@@ -198,8 +198,8 @@ Cluster side, once: `tests/k8s/capabilities.yaml` + `tests/k8s/session.yaml` per
 | # | Flaw | Status |
 |---|---|---|
 | PF1 | **Token for any ServiceAccount.** The session needs `create serviceaccounts/token`. RBAC `resourceNames` has no prefix match, so the rule covers every ServiceAccount of the namespace. Proven: a view-only human minted a token for an admin ServiceAccount and read a Secret. | closed by admission policy `zero-names` (tokens only for `zero-*`), proven. Without the policy P2 must not be installed; `zero doctor` has to check it. Needs Kubernetes ≥ 1.30 |
-| PF2 | **Agent can hold more than the human.** `bind` lets a human hand out a Role they do not hold themselves (tested: view-only human, agent with `k8s.scale`). | by design the admin's decision; conflicts with K4 as written. Decision needed: keep, or zero refuses capabilities the human fails in `kubectl auth can-i` |
-| PF3 | `k8s.restart` is not exact (table above). | do not offer by default |
+| PF2 | **Agent can hold more than the human.** `bind` lets a human hand out a Role they do not hold themselves (tested: view-only human, agent with `k8s.workload.scale`). | by design the admin's decision; conflicts with K4 as written. Decision needed: keep, or zero refuses capabilities the human fails in `kubectl auth can-i` |
+| PF3 | `k8s.workload.restart` is not exact (table above). | do not offer by default |
 | PF4 | A session start that fails half way leaves a ServiceAccount without bindings (seen). | zero deletes it on error; `zero ls` lists `zero-*` ServiceAccounts without session as orphans |
 | PF5 | For a few seconds after stop the token still authenticates (no rights left, the bindings are gone first). | accepted |
 | PF6 | The human can bind the offered Roles to any subject of the namespace, not only to `zero-*`. | low: the Roles are what the admin offers to agents anyway; could be closed by a second admission policy |
@@ -214,19 +214,19 @@ Cluster `zero-k8s` (kind v0.31.0, Kubernetes v1.35.0, audit log on), namespaces 
 
 | Check | Result |
 |---|---|
-| non-admin human starts a session (`k8s.read`, `k8s.logs`) | ✅ identity `system:serviceaccount:team-a:zero-s1`, token lifetime 3600 s |
+| non-admin human starts a session (`k8s.resource.read`, `k8s.pod.logs`) | ✅ identity `system:serviceaccount:team-a:zero-s1`, token lifetime 3600 s |
 | get pods, deployment, events, logs | ✅ allowed |
 | ConfigMap (capability not asked for), Secret, exec, port-forward, pod proxy | ✅ denied by RBAC |
 | delete pod, scale, rollout restart, set image | ✅ denied |
 | create token for `deployer`, create RoleBinding to `admin` | ✅ denied |
 | other namespace, nodes, namespaces | ✅ denied |
-| human binds a Role the admin did not offer (`zero-k8s-restart`), or `admin` | ✅ denied (escalation check of RBAC) |
+| human binds a Role the admin did not offer (`zero-k8s-workload-restart`), or `admin` | ✅ denied (escalation check of RBAC) |
 | human starts a session in `team-b` | ✅ denied |
 | stop: ServiceAccount deleted | ✅ bindings gone at once; token `Unauthorized` within 20 s (PF5) |
 | PF1 without guard: human mints token for `deployer`, reads Secret | ❌ works. With `zero-names`: ✅ denied |
 | PF9 without guard: human deletes ServiceAccount `deployer` and its RoleBinding | ❌ works. With `zero-names`: ✅ denied, session start/stop still work |
-| `k8s.scale` | ✅ scale allowed, nothing else |
-| `k8s.restart` + policy `zero-restart-only` | rollout restart ✅ allowed; set image, serviceAccountName, template annotation ✅ denied; change of `spec.strategy` and of the Deployment's own annotations ❌ allowed (PF3) |
+| `k8s.workload.scale` | ✅ scale allowed, nothing else |
+| `k8s.workload.restart` + policy `zero-restart-only` | rollout restart ✅ allowed; set image, serviceAccountName, template annotation ✅ denied; change of `spec.strategy` and of the Deployment's own annotations ❌ allowed (PF3) |
 | audit chain | ✅ `priya` (certificate hash) creates ServiceAccount, RoleBindings and token (`issued-credential-id`); every agent call carries `system:serviceaccount:team-a:zero-s4` and `JTI=<token id>`; denied calls are logged with 403 |
 
 Not tested here: from inside a sandbox (KF1 token placement, KF3 reachability), long `logs -f` streams (KF2), login methods other than a client certificate (they only change how the human's kubectl logs in), clusters below 1.30.

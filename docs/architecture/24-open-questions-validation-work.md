@@ -5,7 +5,7 @@
 3. **OpenShell Provider ↔ OpenBao** — define the enterprise credential-driver/profile path so real credentials remain behind the supervisor/credential authority.
 4. **Phantom Proxy middleware** — implement structured Kubernetes/log redaction, connection-string parsing, cumulative disclosure tracking and organization-specific detectors as OpenShell supervisor middleware.
 5. **GitLab provider/adapter** — support Git HTTPS/API, `glab`, feature-branch push, pipeline reads, MR creation and protected-branch denial using OpenShell + GitLab-native controls.
-6. **Kubernetes adapter** — map `k8s.logs.read`, resource reads and DEV/QA mutations onto OpenShell network/provider policy + native Kubernetes RBAC/admission.
+6. **Kubernetes adapter** — map `k8s.pod.logs`, resource reads and DEV/QA mutations onto OpenShell network/provider policy + native Kubernetes RBAC/admission.
 7. **Production diagnostic path** — prove one-shot approved PROD logs/spec reads can be fetched remotely and sanitized before data reaches the endpoint sandbox.
 8. **Container workflow** — validate container build/run inside OpenShell without exposing the developer Docker socket, including hostile Dockerfiles, network controls and internal registries.
 9. **MicroVM threshold** — define when Z3R0 automatically selects the OpenShell MicroVM driver instead of rootless Podman.

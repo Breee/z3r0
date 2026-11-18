@@ -166,7 +166,7 @@ sequenceDiagram
 
 | Step | Detail | Status |
 |---|---|---|
-| Capability | `k8s.env.read` = get/list/watch pods, events, deployments, logs in the session's branch/QA namespaces. No Secrets, no exec, no port-forward, no writes | ❌ not built |
+| Capability | `k8s.env.read` (now `k8s.resource.read` + `k8s.pod.logs`, capability model 5.6) = get/list/watch pods, events, deployments, logs in the session's branch/QA namespaces. No Secrets, no exec, no port-forward, no writes | ❌ not built |
 | Namespace ownership | zero-cp must know which namespaces belong to which project/branch: naming convention or labels set by the GitOps templates (F24) | ❌ |
 | Human check | sandbox ≤ human: GitLab project membership is the source of truth, no separate K8s user mapping | ❌ |
 | Mint | Kubernetes TokenRequest, bound ServiceAccount token, minimum 10 min 🟡 | ❌ untested |

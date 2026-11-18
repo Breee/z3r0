@@ -338,7 +338,7 @@ Example:
 
 ```yaml
 request:
-  capability: k8s.logs.read
+  capability: k8s.pod.logs
   resource:
     cluster: prod-eu
     namespace: payments
@@ -359,7 +359,7 @@ Example:
 
 ```yaml
 request:
-  capability: k8s.logs.read
+  capability: k8s.pod.logs
 
   resource:
     cluster: prod-eu
