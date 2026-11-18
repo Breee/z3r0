@@ -50,9 +50,9 @@ func Doctor(out io.Writer) error {
 	check("gateway user", gatewayUser())
 	check("client key", clientKey())
 	if gateUp() {
-		check("zero serve", "")
+		check("zero-cp", "")
 	} else {
-		check("zero serve", "not running: systemctl --user start zero (or zero up)")
+		check("zero-cp", "not running: systemctl --user start zero-cp (or zero up)")
 	}
 
 	if top := gitTop(); top != "" {

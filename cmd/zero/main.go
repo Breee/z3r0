@@ -33,7 +33,6 @@ Usage: zero [-c WORKSPACE] <command>
   ls            all workspaces with status, token, policy; leftovers without a workspace
   ctx           list workspaces (* current, + here); ctx use NAME | new NAME [PATH...] |
                 add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt
-  serve         run the broker in the foreground: push gate, token upkeep (zero up starts it itself)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
 
@@ -58,11 +57,6 @@ func main() {
 		return
 	case "install":
 		if err := zero.Install(); err != nil {
-			fatal(err)
-		}
-		return
-	case "serve":
-		if err := zero.Serve(); err != nil {
 			fatal(err)
 		}
 		return

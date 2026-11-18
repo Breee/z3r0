@@ -436,7 +436,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 		if gateUp() {
 			fmt.Fprintf(out, "push gate: on (%s and below)\n", strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/"))
 		} else {
-			fmt.Fprintln(out, "push gate: off (zero serve not running; pushes fail until the next zero up)")
+			fmt.Fprintln(out, "push gate: off (zero-cp not running; pushes fail until the next zero up)")
 		}
 	}
 	if up {

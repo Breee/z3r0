@@ -12,17 +12,17 @@ import (
 	"time"
 )
 
-// zero serve (#97) is the one long-running host process: it hosts the push
+// zero-cp (#97, #119) is the zero service, the one long-running host process: it hosts the push
 // gate for all sandboxes and keeps forge tokens renewed and orphans revoked,
 // so neither depends on the next `zero up`.
 
 const (
-	serveUnit     = "zero.service"
+	serveUnit     = "zero-cp.service"
 	upkeepEvery   = 10 * time.Minute
-	serveGreeting = "zero serve"
+	serveGreeting = "zero-cp"
 )
 
-// Serve runs the broker in the foreground.
+// Serve runs the service; it is the whole of the zero-cp binary.
 func Serve() error {
 	log.SetFlags(log.LstdFlags | log.LUTC)
 	go func() {
@@ -32,7 +32,7 @@ func Serve() error {
 		}
 	}()
 	addr := fmt.Sprintf("127.0.0.1:%d", gatePort)
-	log.Printf("serve: push gate on %s, upkeep every %s", addr, upkeepEvery)
+	log.Printf("zero-cp: push gate on %s, upkeep every %s", addr, upkeepEvery)
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           http.HandlerFunc(gateHandler),
@@ -106,7 +106,21 @@ func upkeep() {
 	}
 }
 
-// ensureServe starts zero serve if it is not answering: through its systemd
+// cpBinary finds zero-cp: next to this zero binary, else on PATH.
+func cpBinary() (string, error) {
+	if exe, err := os.Executable(); err == nil {
+		if p := filepath.Join(filepath.Dir(exe), "zero-cp"); fileExists(p) {
+			return p, nil
+		}
+	}
+	p, err := exec.LookPath("zero-cp")
+	if err != nil {
+		return "", fmt.Errorf("zero-cp not found next to zero or on PATH: sudo zero install")
+	}
+	return p, nil
+}
+
+// ensureServe starts zero-cp if it is not answering: through its systemd
 // user unit when installed, else detached.
 func ensureServe() error {
 	if gateUp() {
@@ -115,14 +129,14 @@ func ensureServe() error {
 	if err := os.MkdirAll(stateRoot(), 0o700); err != nil {
 		return err
 	}
-	out := filepath.Join(stateRoot(), "serve.out")
+	out := filepath.Join(stateRoot(), "zero-cp.out")
 	if _, err := sh("systemctl", "--user", "cat", serveUnit); err == nil {
 		out = "journalctl --user -u " + serveUnit
 		if _, err := sh("systemctl", "--user", "start", serveUnit); err != nil {
 			return err
 		}
 	} else {
-		exe, err := os.Executable()
+		exe, err := cpBinary()
 		if err != nil {
 			return err
 		}
@@ -131,11 +145,11 @@ func ensureServe() error {
 			return err
 		}
 		defer logf.Close()
-		cmd := exec.Command(exe, "serve")
+		cmd := exec.Command(exe)
 		cmd.Stdout, cmd.Stderr = logf, logf
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("start zero serve: %w", err)
+			return fmt.Errorf("start zero-cp: %w", err)
 		}
 		go cmd.Wait()
 	}
@@ -145,5 +159,5 @@ func ensureServe() error {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Errorf("zero serve not answering on 127.0.0.1:%d (see %s)", gatePort, out)
+	return fmt.Errorf("zero-cp not answering on 127.0.0.1:%d (see %s)", gatePort, out)
 }

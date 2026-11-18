@@ -124,19 +124,24 @@ i=0; until sudo -u "$LU" openshell gateway info >/dev/null 2>&1; do
   i=$((i+1)); [ $i -lt 30 ] || { echo "zero install: gateway not reachable" >&2; exit 1; }; sleep 1
 done
 
-# 6. zero serve (push gate, token upkeep) as a user unit of the login user
-if [ -n "${2:-}" ] && [ "$2" != /usr/local/bin/zero ]; then install -m 755 "$2" /usr/local/bin/zero; fi
+# 6. zero-cp, the zero service (push gate, token upkeep), as a user unit of the login user
+if [ -n "${2:-}" ] && [ "$2" != /usr/local/bin/zero ]; then
+  [ -x "$(dirname "$2")/zero-cp" ] || { echo "zero install: zero-cp not found next to $2" >&2; exit 1; }
+  install -m 755 "$2" /usr/local/bin/zero
+  install -m 755 "$(dirname "$2")/zero-cp" /usr/local/bin/zero-cp
+fi
+[ -x /usr/local/bin/zero-cp ] || { echo "zero install: /usr/local/bin/zero-cp missing" >&2; exit 1; }
 LUID=$(id -u "$LU")
 sudo -u "$LU" mkdir -p "$LH/.config/systemd/user"
-sudo -u "$LU" tee "$LH/.config/systemd/user/zero.service" >/dev/null <<UNIT
+sudo -u "$LU" tee "$LH/.config/systemd/user/zero-cp.service" >/dev/null <<UNIT
 [Unit]
-Description=zero serve (push gate, forge token upkeep)
+Description=zero-cp, the zero service (push gate, forge token upkeep)
 
 [Service]
-ExecStart=/usr/local/bin/zero serve
+ExecStart=/usr/local/bin/zero-cp
 Restart=on-failure
 RestartSec=5s
-# serve parses bytes sent by sandboxes (#100). ProtectKernelModules is not
+# zero-cp parses bytes sent by sandboxes (#100). ProtectKernelModules is not
 # possible in a user unit (it needs to drop capabilities).
 NoNewPrivileges=yes
 PrivateTmp=yes
@@ -157,12 +162,16 @@ WantedBy=default.target
 UNIT
 if [ -S "/run/user/$LUID/bus" ]; then
   lu() { sudo -u "$LU" env XDG_RUNTIME_DIR="/run/user/$LUID" "$@"; }
-  # a detached serve started by an earlier zero up holds the port
+  # before #119 the service was `zero serve` in zero.service
+  lu systemctl --user disable --now zero.service 2>/dev/null || true
+  rm -f "$LH/.config/systemd/user/zero.service"
+  # a detached one started by an earlier zero up holds the port
   pkill -u "$LU" -f '^[^ ]*zero serve$' 2>/dev/null || true
+  pkill -u "$LU" -f '^[^ ]*zero-cp$' 2>/dev/null || true
   lu systemctl --user daemon-reload
-  lu systemctl --user enable zero.service
-  lu systemctl --user restart zero.service
+  lu systemctl --user enable zero-cp.service
+  lu systemctl --user restart zero-cp.service
 else
-  echo "zero install: no user session bus for $LU; zero up will start zero serve"
+  echo "zero install: no user session bus for $LU; zero up will start zero-cp"
 fi
 echo "zero install: done (gateway as $OU, OpenShell $VER). Next: zero doctor"
