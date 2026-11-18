@@ -1,6 +1,6 @@
 # uniget podman: quadlet/rootlessport musl-linked, no systemd units
 
-Target: MR to gitlab.com/uniget-org/tools: https://gitlab.com/uniget-org/tools/-/merge_requests/1 (branch `fix-podman-static-helpers` in BreeGit/tools). GitHub issue: https://github.com/uniget-org/tools/issues/29354. Tracking: #67, #120. Caveats C45, C53.
+Target: PR https://github.com/uniget-org/tools/pull/29701 (fork Breee/uniget-tools, branch `fix-podman-static-helpers`; supersedes gitlab.com/uniget-org/tools!1). GitHub issue: https://github.com/uniget-org/tools/issues/29354. Tracking: #67, #120. Caveats C45, C53.
 
 ## Issue
 
