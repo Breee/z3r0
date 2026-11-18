@@ -197,13 +197,15 @@ Cluster side, once: `tests/k8s/capabilities.yaml` + `tests/k8s/session.yaml` per
 
 | # | Flaw | Status |
 |---|---|---|
-| PF1 | **Token for any ServiceAccount.** The session needs `create serviceaccounts/token`. RBAC `resourceNames` has no prefix match, so the rule covers every ServiceAccount of the namespace. Proven: a view-only human minted a token for an admin ServiceAccount and read a Secret. | closed by admission policy `zero-token-names` (tokens only for `zero-*`), proven. Without the policy P2 must not be installed; `zero doctor` has to check it. Needs Kubernetes ≥ 1.30 |
+| PF1 | **Token for any ServiceAccount.** The session needs `create serviceaccounts/token`. RBAC `resourceNames` has no prefix match, so the rule covers every ServiceAccount of the namespace. Proven: a view-only human minted a token for an admin ServiceAccount and read a Secret. | closed by admission policy `zero-names` (tokens only for `zero-*`), proven. Without the policy P2 must not be installed; `zero doctor` has to check it. Needs Kubernetes ≥ 1.30 |
 | PF2 | **Agent can hold more than the human.** `bind` lets a human hand out a Role they do not hold themselves (tested: view-only human, agent with `k8s.scale`). | by design the admin's decision; conflicts with K4 as written. Decision needed: keep, or zero refuses capabilities the human fails in `kubectl auth can-i` |
 | PF3 | `k8s.restart` is not exact (table above). | do not offer by default |
 | PF4 | A session start that fails half way leaves a ServiceAccount without bindings (seen). | zero deletes it on error; `zero ls` lists `zero-*` ServiceAccounts without session as orphans |
 | PF5 | For a few seconds after stop the token still authenticates (no rights left, the bindings are gone first). | accepted |
 | PF6 | The human can bind the offered Roles to any subject of the namespace, not only to `zero-*`. | low: the Roles are what the admin offers to agents anyway; could be closed by a second admission policy |
 | PF7 | More objects per session than P1 (1 ServiceAccount + n RoleBindings per namespace). | accepted; cleaned up by one delete |
+| PF9 | **Delete of any ServiceAccount or RoleBinding.** Same cause as PF1: the session needs `delete`, RBAC cannot limit it to `zero-*`. Proven: the view-only human deleted the admin ServiceAccount and its binding (found in review). | closed by the same policy `zero-names`, proven |
+| PF10 | `zero-names` applies to everything a member of `zero-users` does, also through their other roles (a team lead who may manage ServiceAccounts loses that for other names). | open: the admin keeps such people out of `zero-users`, or the policy gets an exception group |
 | PF8 | Cluster-scoped reads (nodes, namespaces, CRDs; T10) have no place in a namespaced Role. | open: ClusterRole `zero-k8s-cluster-read` + `bind` in a ClusterRole, admin opt-in |
 
 ## 10. Results on kind (2026-11-18, #123)
@@ -221,7 +223,8 @@ Cluster `zero-k8s` (kind v0.31.0, Kubernetes v1.35.0, audit log on), namespaces 
 | human binds a Role the admin did not offer (`zero-k8s-restart`), or `admin` | ✅ denied (escalation check of RBAC) |
 | human starts a session in `team-b` | ✅ denied |
 | stop: ServiceAccount deleted | ✅ bindings gone at once; token `Unauthorized` within 20 s (PF5) |
-| PF1 without guard: human mints token for `deployer`, reads Secret | ❌ works. With `zero-token-names`: ✅ denied |
+| PF1 without guard: human mints token for `deployer`, reads Secret | ❌ works. With `zero-names`: ✅ denied |
+| PF9 without guard: human deletes ServiceAccount `deployer` and its RoleBinding | ❌ works. With `zero-names`: ✅ denied, session start/stop still work |
 | `k8s.scale` | ✅ scale allowed, nothing else |
 | `k8s.restart` + policy `zero-restart-only` | rollout restart ✅ allowed; set image, serviceAccountName, template annotation ✅ denied; change of `spec.strategy` and of the Deployment's own annotations ❌ allowed (PF3) |
 | audit chain | ✅ `priya` (certificate hash) creates ServiceAccount, RoleBindings and token (`issued-credential-id`); every agent call carries `system:serviceaccount:team-a:zero-s4` and `JTI=<token id>`; denied calls are logged with 403 |
