@@ -147,6 +147,8 @@ Question: one coarse `k8s.resource.read`, or own fine capabilities such as `k8s.
 
 ### P2 in detail
 
+Decision (2026-11-18): git is the authority, an agent changes nothing in the cluster. Only read capabilities remain. `k8s.workload.scale`, `k8s.pod.delete` and `k8s.workload.restart` were tested (section 10) and then removed from `tests/k8s`, together with the policy `zero-restart-only`.
+
 A capability is a name for a Role that the cluster admin installed. zero never defines permissions in the cluster, it only binds what is there.
 
 | Capability | Role | RBAC rules | Exact in RBAC? | Default |
@@ -154,9 +156,6 @@ A capability is a name for a Role that the cluster admin installed. zero never d
 | `k8s.resource.read` | `zero-k8s-resource-read` | get/list/watch pods, events, services, endpoints, PVCs, quotas, deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs, ingresses, networkpolicies, HPAs, endpointslices | yes | offered |
 | `k8s.pod.logs` | `zero-k8s-pod-logs` | get `pods/log` | yes | offered |
 | `k8s.config.read` | `zero-k8s-config-read` | get/list/watch configmaps | yes | offered |
-| `k8s.workload.scale` | `zero-k8s-workload-scale` | get/patch/update `deployments/scale`, `statefulsets/scale` | yes | offered |
-| `k8s.pod.delete` | `zero-k8s-pod-delete` | delete pods | yes | admin opt-in |
-| `k8s.workload.restart` | `zero-k8s-workload-restart` | patch deployments, statefulsets, daemonsets | **no**: patch allows any change. Needs an admission policy on top, and ours still let two other fields through (section 10) | admin opt-in, not recommended; `k8s.pod.delete` restarts a pod exactly |
 | Secrets, exec, attach, port-forward, proxy, RBAC, create/delete of workloads | none | | | never a Role, so no policy can ask for it |
 
 Custom Roles follow the same rule: capability `k8s.<x>.<y>` ↔ Role `zero-k8s-<x>-<y>` (for example CRDs: `k8s.argo.read`).
@@ -199,7 +198,7 @@ Cluster side, once: `tests/k8s/capabilities.yaml` + `tests/k8s/session.yaml` per
 |---|---|---|
 | PF1 | **Token for any ServiceAccount.** The session needs `create serviceaccounts/token`. RBAC `resourceNames` has no prefix match, so the rule covers every ServiceAccount of the namespace. Proven: a view-only human minted a token for an admin ServiceAccount and read a Secret. | closed by admission policy `zero-names` (tokens only for `zero-*`), proven. Without the policy P2 must not be installed; `zero doctor` has to check it. Needs Kubernetes ≥ 1.30 |
 | PF2 | **Agent can hold more than the human.** `bind` lets a human hand out a Role they do not hold themselves (tested: view-only human, agent with `k8s.workload.scale`). | by design the admin's decision; conflicts with K4 as written. Decision needed: keep, or zero refuses capabilities the human fails in `kubectl auth can-i` |
-| PF3 | `k8s.workload.restart` is not exact (table above). | do not offer by default |
+| PF3 | `k8s.workload.restart` was not exact in RBAC. | gone with the decision above |
 | PF4 | A session start that fails half way leaves a ServiceAccount without bindings (seen). | zero deletes it on error; `zero ls` lists `zero-*` ServiceAccounts without session as orphans |
 | PF5 | For a few seconds after stop the token still authenticates (no rights left, the bindings are gone first). | accepted |
 | PF6 | The human can bind the offered Roles to any subject of the namespace, not only to `zero-*`. | low: the Roles are what the admin offers to agents anyway; could be closed by a second admission policy |

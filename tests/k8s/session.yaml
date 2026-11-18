@@ -1,5 +1,5 @@
 # What a human needs to start a session. Apply per namespace; bind to the team's group.
-# Deliberately leaves out k8s.workload.restart and k8s.pod.delete: the admin adds a Role name here to offer it.
+# Read capabilities only: git is the authority, an agent changes nothing in the cluster.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata: {name: zero-session}
@@ -16,7 +16,7 @@ rules:
   - apiGroups: [rbac.authorization.k8s.io]
     resources: [roles]
     verbs: [bind]
-    resourceNames: [zero-k8s-resource-read, zero-k8s-pod-logs, zero-k8s-config-read, zero-k8s-workload-scale]
+    resourceNames: [zero-k8s-resource-read, zero-k8s-pod-logs, zero-k8s-config-read]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -26,7 +26,7 @@ Her zero workspace: `zero ctx new platform ~/src/gitops ~/src/charts ~/docs/runb
 - read: Kubernetes, Argo CD, Kargo, Grafana (not built);
 - no direct write to any of the four runtime systems by default.
 
-The few direct writes that platform work does need (sync, promote, restart, silence) are listed in section 4 as separate capabilities, off by default.
+Decision (2026-11-18): git is the authority, an agent changes nothing in the cluster (no restart, scale or patch). The few direct writes outside the cluster (sync, promote, silence) are listed in section 4 as separate capabilities, off by default.
 
 ## 3. Tasks
 
@@ -99,7 +99,6 @@ Write, off by default, each one a decision of its own:
 |---|---|---|
 | `argocd.sync` | sync or refresh one app | auto-sync is off for prod in many setups |
 | `kargo.promote` | promote Freight to a stage, never to prod | promotion is the release decision |
-| `k8s.workload.restart` | rollout restart of one workload | a stuck pod is not a manifest change |
 | `grafana.silence` | silence one alert for a limited time | incident handling |
 
 Everything else (apply, delete, exec, Secret read, RBAC) stays with the human or the pipeline.
