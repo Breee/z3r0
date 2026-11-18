@@ -43,3 +43,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [39](0039-input-folders-read-only-bind-mount.md) | 2026-11-17 | Input folders are a filtered host copy, bind-mounted read-only | Z-INV-1, Z-INV-4 |
 | [40](0040-zero-cp-service-binary.md) | 2026-11-18 | The service is the binary zero-cp, not the command zero serve | Z-INV-4, Z-INV-6 |
 | [41](0041-repo-instructions-are-the-devops-process.md) | 2026-11-18 | Instructions in the repo are the DevOps process's job, not zero's | Z-INV-1, Z-INV-5 |
+| [42](0042-manual-setuid-for-uniget-uidmap.md) | 2026-11-18 | Set setuid on uniget's newuidmap/newgidmap by hand until uniget is fixed | Z-INV-4 |
