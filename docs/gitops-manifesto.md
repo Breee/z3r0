@@ -60,7 +60,7 @@ Check: **doctor** = `zero doctor` checks it today; **could** = zero could check 
 
 | # | Rule | Without it | Owner | Check |
 |---|---|---|---|---|
-| R14 | One config repo per service. Stages are directories, not branches. | Agent workspace covers more services than the task; branch drift hides differences. | team | no |
+| R14 | The repo layout makes two things clear by path or by repo: which stage a file belongs to, and which files are control files (R4). The layout itself is free: one repo per service or a monorepo, stages as directories or as branches. With stage branches, every stage branch is protected like the default branch (R1). | Code owners, `write` paths, and the reviewer cannot tell a harmless change from one that moves a stage (P37). In a monorepo the agent token covers every service in it (R30). | team | no |
 | R15 | Platform configuration (namespaces, admission policies, storage classes, secret stores, AppProjects of other teams) is in a separate repo that is never an agent workspace. | Agent proposes a change to its own guards. | platform | could |
 | R16 | No secrets in git. Stage manifests hold references (External Secrets), the store holds values. | Every clone, every sandbox, and the model provider hold the secret (P34, P36). | team | no |
 | R17 | Promotion between stages is a commit by the promotion tool (Kargo). Promotion to live is manual. | Agent's merge request to dev reaches live without a second look. | platform | no |
