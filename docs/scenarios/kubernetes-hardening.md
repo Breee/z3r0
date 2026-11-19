@@ -3,7 +3,7 @@
 Status: draft, 2026-11-19, #124. Nothing in this file is tested yet; the proof plan is in section 8.
 Related: [kubernetes-access.md](kubernetes-access.md) (how an agent reads a cluster),
 [platform-engineer-usecases.md](platform-engineer-usecases.md), attack path P37 in
-[../attack-paths.md](../attack-paths.md).
+[../attack-paths.md](../attack-paths.md), all assumed practices in [../gitops-manifesto.md](../gitops-manifesto.md).
 
 ## 1. Purpose
 

@@ -2,7 +2,7 @@
 
 All attack paths found for zero that are not fully blocked. Numbers (P01…) are stable and never reused; a new path gets the next number, a row in the index and a row in its area.
 
-Related: design-level threat model in `architecture/14-threat-model-and-attack-paths.md`, layers in `architecture/28-target-architecture.md`, caveats (C) in `../ai-docs/caveats.md`, catalog (A, X) in F07 `catalog.md`, attack tests in `../tests/attacks/`.
+Related: design-level threat model in `architecture/14-threat-model-and-attack-paths.md`, layers in `architecture/28-target-architecture.md`, caveats (C) in `../ai-docs/caveats.md`, catalog (A, X) in F07 `catalog.md`, practices zero assumes around it in `gitops-manifesto.md`, attack tests in `../tests/attacks/`.
 
 Contents:
 1. [Index](#1-index)

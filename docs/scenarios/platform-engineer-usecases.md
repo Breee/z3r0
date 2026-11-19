@@ -2,7 +2,7 @@
 
 Status: **draft for review** (#94). Input for the target architecture (`docs/architecture/28-target-architecture.md`): the tasks decide which layers and capabilities zero needs. Nothing beyond the GitLab part is built or tested; statements about Argo CD, Kargo and Grafana come from their documentation, not from a test here.
 
-Related: `docs/architecture/12-reference-scenario-a-kubernetes-operator.md` (older, wider scenario), `docs/scenarios/identity-broker-usecases.md` (UC2: read a branch environment).
+Related: `docs/architecture/12-reference-scenario-a-kubernetes-operator.md` (older, wider scenario), `docs/scenarios/identity-broker-usecases.md` (UC2: read a branch environment). Practices these use cases assume: [../gitops-manifesto.md](../gitops-manifesto.md).
 
 ## 1. Setting
 
