@@ -37,43 +37,43 @@ P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci
 
 | # | Severity | Effort | Path | Evidence | Section |
 |---|---|---|---|---|---|
-| P01 | high | E3 | Sandbox-written `.git/config` executes on host after `sandbox download` | proven | 2 |
-| P02 | high | E2 | Foreign API key sent to an allowed endpoint | proven | 3 |
-| P03 | high | E5 | Sandbox breakout to the gateway user | proven (blast radius) | 2 |
-| P04 | high | E2 | Placeholder laundering on a bound endpoint | proven | 3 |
-| P05 | medium | E3 | Absolute symlink survives `sandbox download` | proven | 2 |
-| P06 | medium | E2 | Disk fill, no quota | proven | 2 |
-| P07 | inherent | E2 | Data in query/path/body of an allowed endpoint | proven | 3 |
-| P08 | low | E2 | Memory hog kills the sandbox | proven | 2 |
-| P09 | low | E2 | Info leaks from /proc, /etc/hosts, kernel | proven | 2 |
-| P10 | low | E3 | Non-HTTP / `tls: skip` endpoints uninspected | docs only | 3 |
-| P11 | low | E4 | Unsigned image from an allowed registry | policy review | 2 |
-| P12 | low | E1 | Same-name sandbox recreate right after delete | observed | 2 |
-| P13 | high | E3 | Agent-committed hook/tool configs run on host checkout | reasoning | 4 |
-| P14 | high | E3 | Agent code runs in CI on push | proven (#102) | 4, 7 |
-| P15 | high | E2 | Prompt injection via forge content or dependencies | reasoning | 4 |
-| P16 | medium | E3 | Agent widens `.zero/policy.yaml`, approval fatigue | reasoning | 4 |
-| P17 | medium | E4 | Malicious Go module runs on host or CI | reasoning | 4 |
-| P18 | medium | E3 | Agent content rendered in host browser / VS Code | reasoning | 2 |
-| P19 | medium | E5 | GitLab MCP tool ignores project scope | unverified | 4 |
-| P20 | medium | E5 | Token inherits the developer's role | accepted | 4 |
-| P21 | low | E4 | Token not revoked after crash or host loss | by design | 3 |
-| P22 | low | E4 | Local process connects to the forward port | reasoning | 2 |
-| P23 | low | E2 | Resource abuse (branches, MRs, pipelines, quota) | inherent | 4 |
-| P24 | low | E4 | Supply chain of zero itself | accepted | 2 |
-| P25 | high | E2 | Agent changes branches other than its session branch | open | 4 |
-| P26 | origin | E2 | Untrusted text the agent reads | reasoning | 6 |
-| P27 | origin | E2 | Poisoned instructions in the repo | accepted | 6 |
-| P28 | origin | E4 | Tool and plugin supply chain | reasoning | 6 |
-| P29 | origin | E4 | Model or provider | reasoning | 6 |
-| P30 | origin | E1 | The human | reasoning | 6 |
-| P31 | origin | E1 | Plain model error | reasoning | 6 |
-| P32 | medium | E4 | Gateway client key holder bind-mounts gateway user files | reasoning | 5 |
-| P33 | medium | E4 | Gateway client key holder attaches any podman volume | reasoning | 5 |
-| P34 | low | E1 | Secret in an input folder under an unknown name | by design | 5 |
-| P35 | low | E1 | Input folder content carries instructions | reasoning | 5 |
-| P36 | low | E3 | Repo bundle carries the stash into the sandbox | fixed #116 | 4 |
-| P37 | high | E3 | Merged gitops change points a lower environment at live data | reasoning | 4 |
+| <a id="p01"></a>P01 | high | E3 | Sandbox-written `.git/config` executes on host after `sandbox download` | proven | 2 |
+| <a id="p02"></a>P02 | high | E2 | Foreign API key sent to an allowed endpoint | proven | 3 |
+| <a id="p03"></a>P03 | high | E5 | Sandbox breakout to the gateway user | proven (blast radius) | 2 |
+| <a id="p04"></a>P04 | high | E2 | Placeholder laundering on a bound endpoint | proven | 3 |
+| <a id="p05"></a>P05 | medium | E3 | Absolute symlink survives `sandbox download` | proven | 2 |
+| <a id="p06"></a>P06 | medium | E2 | Disk fill, no quota | proven | 2 |
+| <a id="p07"></a>P07 | inherent | E2 | Data in query/path/body of an allowed endpoint | proven | 3 |
+| <a id="p08"></a>P08 | low | E2 | Memory hog kills the sandbox | proven | 2 |
+| <a id="p09"></a>P09 | low | E2 | Info leaks from /proc, /etc/hosts, kernel | proven | 2 |
+| <a id="p10"></a>P10 | low | E3 | Non-HTTP / `tls: skip` endpoints uninspected | docs only | 3 |
+| <a id="p11"></a>P11 | low | E4 | Unsigned image from an allowed registry | policy review | 2 |
+| <a id="p12"></a>P12 | low | E1 | Same-name sandbox recreate right after delete | observed | 2 |
+| <a id="p13"></a>P13 | high | E3 | Agent-committed hook/tool configs run on host checkout | reasoning | 4 |
+| <a id="p14"></a>P14 | high | E3 | Agent code runs in CI on push | proven (#102) | 4, 7 |
+| <a id="p15"></a>P15 | high | E2 | Prompt injection via forge content or dependencies | reasoning | 4 |
+| <a id="p16"></a>P16 | medium | E3 | Agent widens `.zero/policy.yaml`, approval fatigue | reasoning | 4 |
+| <a id="p17"></a>P17 | medium | E4 | Malicious Go module runs on host or CI | reasoning | 4 |
+| <a id="p18"></a>P18 | medium | E3 | Agent content rendered in host browser / VS Code | reasoning | 2 |
+| <a id="p19"></a>P19 | medium | E5 | GitLab MCP tool ignores project scope | unverified | 4 |
+| <a id="p20"></a>P20 | medium | E5 | Token inherits the developer's role | accepted | 4 |
+| <a id="p21"></a>P21 | low | E4 | Token not revoked after crash or host loss | by design | 3 |
+| <a id="p22"></a>P22 | low | E4 | Local process connects to the forward port | reasoning | 2 |
+| <a id="p23"></a>P23 | low | E2 | Resource abuse (branches, MRs, pipelines, quota) | inherent | 4 |
+| <a id="p24"></a>P24 | low | E4 | Supply chain of zero itself | accepted | 2 |
+| <a id="p25"></a>P25 | high | E2 | Agent changes branches other than its session branch | open | 4 |
+| <a id="p26"></a>P26 | origin | E2 | Untrusted text the agent reads | reasoning | 6 |
+| <a id="p27"></a>P27 | origin | E2 | Poisoned instructions in the repo | accepted | 6 |
+| <a id="p28"></a>P28 | origin | E4 | Tool and plugin supply chain | reasoning | 6 |
+| <a id="p29"></a>P29 | origin | E4 | Model or provider | reasoning | 6 |
+| <a id="p30"></a>P30 | origin | E1 | The human | reasoning | 6 |
+| <a id="p31"></a>P31 | origin | E1 | Plain model error | reasoning | 6 |
+| <a id="p32"></a>P32 | medium | E4 | Gateway client key holder bind-mounts gateway user files | reasoning | 5 |
+| <a id="p33"></a>P33 | medium | E4 | Gateway client key holder attaches any podman volume | reasoning | 5 |
+| <a id="p34"></a>P34 | low | E1 | Secret in an input folder under an unknown name | by design | 5 |
+| <a id="p35"></a>P35 | low | E1 | Input folder content carries instructions | reasoning | 5 |
+| <a id="p36"></a>P36 | low | E3 | Repo bundle carries the stash into the sandbox | fixed #116 | 4 |
+| <a id="p37"></a>P37 | high | E3 | Merged gitops change points a lower environment at live data | reasoning | 4 |
 
 ## 2. Sandbox runtime and host
 
