@@ -31,6 +31,8 @@ Effort: what it takes to exploit the path, from least to most. Classified by jud
 | E5 | an exploit or a bug in a dependency (kernel/container CVE, forge permission bug) | sandbox breakout |
 
 By effort: E1 P12 P30 P31 P34 P35 · E2 P02 P04 P06 P07 P08 P09 P15 P23 P25 P26 P27 · E3 P01 P05 P10 P13 P14 P16 P18 P36 P37 · E4 P11 P17 P21 P22 P24 P28 P29 P32 P33 · E5 P03 P19 P20.
+
+"Practice: R…" in a mitigation cell names the rules in [gitops-manifesto.md](gitops-manifesto.md) that close or narrow the path. They are practices of the team or platform, not controls zero enforces, unless the manifesto says so.
 P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci.run` is approved.
 
 | # | Severity | Effort | Path | Evidence | Section |
@@ -107,17 +109,17 @@ Recorded 2026-11-10 for the zero workflow, not proven unless noted. Recorded, no
 
 | # | Severity | Path | Impact | Proof / status | Mitigation | Ref |
 |---|---|---|---|---|---|---|
-| P13 | high | Agent commits hook/tool configs (`.pre-commit-config.yaml`, `.husky/`, `lefthook.yml`, `.envrc`, `.vscode/tasks.json`, `Makefile`, `go:generate`, tests) → developer checks out the branch on the host and runs tooling | Code exec as login user, full host blast radius | reasoning; `.git/hooks`/`.git/config` do not travel (F12) | — | C42 |
-| P14 | high | Agent pushes to its session branch → pipeline starts automatically and runs agent-written code (`.gitlab-ci.yml`, tests, Makefile, scripts, Dockerfile) on a runner outside the sandbox. Detail: section 7 | Exfil of CI secrets and the repo, abuse of job token / OIDC / runner | tested 2026-11-16 (#102), see section 7 | Push gate adds `ci.skip` unless `ci.run` is approved (ADR 0035); `zero doctor` fails on unprotected project CI variables | ADR 0034, #101 |
-| P15 | high | Prompt injection via GitLab content the agent reads (issues, MR comments, job logs, MCP results) or via dependencies/READMEs | Agent performs attacker's actions within its permissions | inherent, not tested | — | A07, F04, P26 |
-| P16 | medium | Agent widens `.zero/policy.yaml` on a branch → developer checks it out → approves the expansion prompt without reading (approval fatigue) | Broader egress/token scope for next sandbox | design (§7a), not built | — | X06 |
-| P17 | medium | Malicious Go module via allowed `proxy.golang.org` → `go.sum` committed → host or CI build runs it | Code exec in CI / on host (sandbox itself contained) | reasoning | — | P13 |
+| P13 | high | Agent commits hook/tool configs (`.pre-commit-config.yaml`, `.husky/`, `lefthook.yml`, `.envrc`, `.vscode/tasks.json`, `Makefile`, `go:generate`, tests) → developer checks out the branch on the host and runs tooling | Code exec as login user, full host blast radius | reasoning; `.git/hooks`/`.git/config` do not travel (F12) | — Practice: R6, R32. | C42 |
+| P14 | high | Agent pushes to its session branch → pipeline starts automatically and runs agent-written code (`.gitlab-ci.yml`, tests, Makefile, scripts, Dockerfile) on a runner outside the sandbox. Detail: section 7 | Exfil of CI secrets and the repo, abuse of job token / OIDC / runner | tested 2026-11-16 (#102), see section 7 | Push gate adds `ci.skip` unless `ci.run` is approved (ADR 0035); `zero doctor` fails on unprotected project CI variables Practice: R4, R8, R9, R12. | ADR 0034, #101 |
+| P15 | high | Prompt injection via GitLab content the agent reads (issues, MR comments, job logs, MCP results) or via dependencies/READMEs | Agent performs attacker's actions within its permissions | inherent, not tested | — Practice: R7. | A07, F04, P26 |
+| P16 | medium | Agent widens `.zero/policy.yaml` on a branch → developer checks it out → approves the expansion prompt without reading (approval fatigue) | Broader egress/token scope for next sandbox | design (§7a), not built | — Practice: R3, R4, R31. | X06 |
+| P17 | medium | Malicious Go module via allowed `proxy.golang.org` → `go.sum` committed → host or CI build runs it | Code exec in CI / on host (sandbox itself contained) | reasoning | — Practice: R13, R19. | P13 |
 | P19 | medium | GitLab MCP tools run with user-scoped `execute_mcp_tool`; some tool may not check the project scope | Read/act on other projects of the user | unverified | — | ADR 0020 |
 | P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | — | ADR 0020 |
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — | — |
-| P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | open, TODO (C43) | — | C43 |
-| P36 | low | A repo folder is added while the agent runs; the bundle in `/tmp/.zero.bundle` was built with `--all` and carried `refs/stash` (a `git stash -u` holds untracked files such as `.env`); the agent copies the bundle before it is deleted | Stashed secrets readable by the agent | bundle content shown on the host (#116), sandbox side not run | fixed #116: bundle holds branches, tags and HEAD only | #116, spec §6.1 |
-| P37 | high | In a gitops repo the agent changes an allowed file of a lower environment (`qa/<service>/values.yaml`, extra manifests) so that the qa service uses live data: live database host, live secret reference, live bucket. The change looks like a normal config fix; a human merges it. The agent then reads live data through its qa read access (logs, config) | Live data reaches the agent and the model provider without any live access granted | reasoning only (2026-11-19) | open: path rules do not judge content; merge request review is the only control; candidate guards on the platform side: docs/scenarios/kubernetes-hardening.md (untested) | #124 |
+| P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | open, TODO (C43) | — Practice: R1, R5. | C43 |
+| P36 | low | A repo folder is added while the agent runs; the bundle in `/tmp/.zero.bundle` was built with `--all` and carried `refs/stash` (a `git stash -u` holds untracked files such as `.env`); the agent copies the bundle before it is deleted | Stashed secrets readable by the agent | bundle content shown on the host (#116), sandbox side not run | fixed #116: bundle holds branches, tags and HEAD only Practice: R16. | #116, spec §6.1 |
+| P37 | high | In a gitops repo the agent changes an allowed file of a lower environment (`qa/<service>/values.yaml`, extra manifests) so that the qa service uses live data: live database host, live secret reference, live bucket. The change looks like a normal config fix; a human merges it. The agent then reads live data through its qa read access (logs, config) | Live data reaches the agent and the model provider without any live access granted | reasoning only (2026-11-19) | open: path rules do not judge content; merge request review is the only control; candidate guards on the platform side: docs/scenarios/kubernetes-hardening.md (untested) Practice: R4, R11, R17, R20, R22-R25. | #124 |
 
 ## 5. Gateway bind mounts and input folders
 
@@ -127,7 +129,7 @@ Added 2026-11-17 (#77, ADR 0039). Not proven unless noted. The agent itself gain
 |---|---|---|---|---|---|---|
 | P32 | medium | A host process with the user's gateway client key creates a sandbox with a bind mount of any path the gateway user can read (`--driver-config-json`), also read-write | Reads the gateway user's home: gateway TLS keys, stored GitLab and Copilot credentials. Before ADR 0039 the user could not read them | not run; follows from `enable_bind_mounts = true` | Upstream read-only upload (#112), then turn the three settings off again (#111) | C52, ADR 0039, #113 |
 | P33 | medium | Same process attaches any existing podman volume (`resource_admission.enabled = false`) | Reads or changes another sandbox's workspace | not run | as P32 | C52, ADR 0039, #113 |
-| P34 | low | Secret in an input folder under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | `.zeroignore`; summary on `zero up`; list widened and content scan decided against in #72 | #72, spec §6.1 |
+| P34 | low | Secret in an input folder under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | `.zeroignore`; summary on `zero up`; list widened and content scan decided against in #72 Practice: R16, R33. | #72, spec §6.1 |
 | P35 | low | Input content (specs, notes) carries instructions for the agent | Prompt injection, as P26 | not run | none; input folders are chosen by the developer | P26 |
 
 ## 6. Origins of agent corruption
@@ -139,11 +141,11 @@ Added 2026-11-16 (#108). Reasoning, not tested. Every path in sections 2–5 sta
 | # | Origin | Example | Today | Gap |
 |---|---|---|---|---|
 | P26 | Untrusted text the agent reads (prompt injection) | issue or MR comment, web page, dependency README or source, log line, MCP tool result | egress allowlist limits what can be fetched (L1); GitLab MCP is limited to the project by the token | content from non-members of the project reaches the agent unmarked (P15) |
-| P27 | Poisoned instructions in the repo | `AGENTS.md`, skills, `.opencode/`, MCP config changed on a branch | MR review before merge (DevOps backbone) | accepted (ADR 0041): the agent loads these from the checked-out branch; which branch, and review, are the DevOps process's job. zero's limits (L1–L5, push gate) apply regardless |
-| P28 | Tool and plugin supply chain | MCP server, opencode plugin, skill, npm or Go module | dev image pinned by digest; registries only if allowed in `.zero/policy.yaml` | plugins and MCP servers named in repo config are not checked; modules are not vetted (P17) |
-| P29 | Model or provider | backdoored model, tampered endpoint | model hosts are an explicit allowlist (zen, Copilot) | no approved-model list; model traffic content is not inspected |
-| P30 | The human | careless or malicious prompt | accountability: every token and push carries the developer's identity; policy widening needs approval (#78) | none planned; this is the developer trust model |
-| P31 | Plain model error | wrong command, wrong branch, deletes work | blast radius only: sandbox, session branch, no deletes | none possible at the root |
+| P27 | Poisoned instructions in the repo | `AGENTS.md`, skills, `.opencode/`, MCP config changed on a branch | MR review before merge (DevOps backbone) | accepted (ADR 0041): the agent loads these from the checked-out branch; which branch, and review, are the DevOps process's job. zero's limits (L1–L5, push gate) apply regardless Practice: R6. |
+| P28 | Tool and plugin supply chain | MCP server, opencode plugin, skill, npm or Go module | dev image pinned by digest; registries only if allowed in `.zero/policy.yaml` | plugins and MCP servers named in repo config are not checked; modules are not vetted (P17) Practice: R13. |
+| P29 | Model or provider | backdoored model, tampered endpoint | model hosts are an explicit allowlist (zen, Copilot) | no approved-model list; model traffic content is not inspected Practice: R29. |
+| P30 | The human | careless or malicious prompt | accountability: every token and push carries the developer's identity; policy widening needs approval (#78) | none planned; this is the developer trust model Practice: R3. |
+| P31 | Plain model error | wrong command, wrong branch, deletes work | blast radius only: sandbox, session branch, no deletes | none possible at the root Practice: R7. |
 
 ### Candidate layers at the root
 
