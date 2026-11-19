@@ -89,13 +89,15 @@ Two limits to know:
 | # | Rule | How to meet it (GitLab) | Risk without it | Level | Owner | zero |
 |---|---|---|---|---|---|---|
 | C1 | A pipeline on an unprotected branch gets no secrets. | every secret CI/CD variable "Protected", also "Masked and hidden"; better: secrets in a secrets manager, fetched by the job | agent branch prints or sends the secrets ([P14](attack-paths.md#p14)) | base | team | checks |
-| C2 | Every runner is hardened: a job cannot leave its container and finds nothing from other jobs. | not privileged, no host Docker socket, no shell executor on shared hosts, fresh environment per job, runner patched | job code takes over the runner and reads tokens of other jobs and projects ([P14](attack-paths.md#p14), OWASP CICD-SEC-7) | base | platform | - |
-| C2a | Unreviewed code runs on other runners than deploy jobs, and these reach no cluster or cloud account. | deploy runners "Protected"; separate runners for all other branches, no route to clusters, cloud accounts or internal admin networks | agent branch uses the network position and credentials of the deploy runner ([P14](attack-paths.md#p14), OWASP CICD-SEC-4) | base | platform | - |
-| C3 | Pipelines log in to cloud and secret stores with short-lived tokens bound to protected refs. | `id_tokens` with own `aud` per service; the service checks the claim `ref_protected` | stolen long-lived deploy credential; agent branch gets the same login as main | depth | platform | - |
-| C4 | The job token of a project reaches only that project. | job token allowlist holds only what is needed | pipeline code reads or writes other projects | depth | team | could check |
-| C5 | Who starts a pipeline cannot override its variables. | "Minimum role to use pipeline variables" = no one allowed; use `inputs` | caller redirects a job, e.g. the deploy target | depth | team | could check |
-| C6 | Everything the pipeline loads is pinned. | images by digest, `include:` by commit SHA or protected tag, lock files, checksums for downloaded tools | changed dependency runs in the pipeline ([P17](attack-paths.md#p17), [P28](attack-paths.md#p28)) | depth | team | - |
-| C7 | The merge request pipeline renders every stage and runs the cluster's admission policies on the result. | job with `helm template` / `kustomize build` + policy CLI (kubeconform, kyverno, `kubectl --dry-run=server`) | reviewer sees a values change, not what it deploys ([P37](attack-paths.md#p37)) | depth | team | - |
+| C2 | A job cannot leave its container. | runner not privileged, no host Docker socket in the job; image builds with a rootless builder | job code becomes root on the runner host ([P14](attack-paths.md#p14)) | base | platform | - |
+| C3 | A job finds nothing that another job left behind. | fresh container or VM per job; no shell executor on a shared host; caches not shared between protected and unprotected branches | job reads tokens and checkouts of other jobs, or poisons the cache a deploy job uses later ([P14](attack-paths.md#p14)) | base | platform | - |
+| C4 | Unreviewed code and deploy jobs run on different runners. | deploy runners "Protected" (take jobs of protected branches only); other runners for everything else | agent branch runs on the runner that holds the deploy job's position ([P14](attack-paths.md#p14), OWASP CICD-SEC-4) | base | platform | - |
+| C5 | The runners for unreviewed code have no route to clusters, cloud accounts or admin networks. | own network segment; no instance role or node identity with rights | job code uses the runner's network position instead of a secret ([P14](attack-paths.md#p14)) | base | platform | - |
+| C6 | Pipelines log in to cloud and secret stores with short-lived tokens bound to protected refs. | `id_tokens` with own `aud` per service; the service checks the claim `ref_protected` | stolen long-lived deploy credential; agent branch gets the same login as main | depth | platform | - |
+| C7 | The job token of a project reaches only that project. | job token allowlist holds only what is needed | pipeline code reads or writes other projects | depth | team | could check |
+| C8 | Who starts a pipeline cannot override its variables. | "Minimum role to use pipeline variables" = no one allowed; use `inputs` | caller redirects a job, e.g. the deploy target | depth | team | could check |
+| C9 | Everything the pipeline loads is pinned. | images by digest, `include:` by commit SHA or protected tag, lock files, checksums for downloaded tools | changed dependency runs in the pipeline ([P17](attack-paths.md#p17), [P28](attack-paths.md#p28)) | depth | team | - |
+| C10 | The merge request pipeline renders every stage and runs the cluster's admission policies on the result. | job with `helm template` / `kustomize build` + policy CLI (kubeconform, kyverno, `kubectl --dry-run=server`) | reviewer sees a values change, not what it deploys ([P37](attack-paths.md#p37)) | depth | team | - |
 
 ### Gate 3: Repository
 
@@ -175,12 +177,12 @@ What the human at the workstation does:
 | One cluster for all stages (K6) | a second wall behind K3 to K5 | K1 to K5 enforced by admission; own nodes for live |
 | Kubernetes below 1.30 (no ValidatingAdmissionPolicy) | built-in admission policies (K3) | Kyverno or Gatekeeper |
 | No promotion tool (G6) | recorded promotion | merge request per stage with F3 and F4 on the stage paths |
-| Runners shared by all branches (C2a) | isolation of unreviewed code | do not grant `ci.run`; then agent pushes start no pipeline (Z2) |
+| Runners shared by all branches (C4) | isolation of unreviewed code | do not grant `ci.run`; then agent pushes start no pipeline (Z2) |
 
 ## 8. What zero checks
 
 - Today `zero doctor` checks F1, F2 and C1 for the GitLab project around the current directory.
-- Candidates, in this order: F4 (code owners exist and are required), F3 (approval settings), C4, C5, D1, K2, K3 and K4
+- Candidates, in this order: F4 (code owners exist and are required), F3 (approval settings), C7, C8, D1, K2, K3 and K4
   (only in namespaces that a zero policy grants to the agent), K7, G3.
 - zero does not check gates 4 and 5 today. It has no access to the delivery system or the cluster.
 
@@ -191,9 +193,9 @@ Read on 2026-11-19. A rule that names no attack path rests on these.
 | Source | Used for |
 |---|---|
 | [OpenGitOps principles 1.0](https://opengitops.dev/): declarative, versioned and immutable, pulled automatically, continuously reconciled | D2, G5 |
-| [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/): CICD-SEC-1 flow control, CICD-SEC-4 poisoned pipeline execution, CICD-SEC-7 insecure system configuration | F1, F3, F7, C1, C2, C2a |
+| [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/): CICD-SEC-1 flow control, CICD-SEC-4 poisoned pipeline execution | F1, F3, F7, C1, C4 |
 | GitLab: [protected branches](https://docs.gitlab.com/user/project/repository/branches/protected/), [approval settings](https://docs.gitlab.com/user/project/merge_requests/approvals/settings/), [code owners](https://docs.gitlab.com/user/project/codeowners/) | F1, F3, F4 |
-| GitLab: [pipeline security](https://docs.gitlab.com/ci/pipeline_security/), [job token](https://docs.gitlab.com/ci/jobs/ci_job_token/), [ID tokens](https://docs.gitlab.com/ci/secrets/id_token_authentication/) | C1 to C6 |
+| GitLab: [pipeline security](https://docs.gitlab.com/ci/pipeline_security/), [job token](https://docs.gitlab.com/ci/jobs/ci_job_token/), [ID tokens](https://docs.gitlab.com/ci/secrets/id_token_authentication/) | C1 to C3, C6 to C9 |
 | Argo CD: [best practices](https://argo-cd.readthedocs.io/en/stable/user-guide/best_practices/), [security](https://argo-cd.readthedocs.io/en/stable/operator-manual/security/), [projects](https://argo-cd.readthedocs.io/en/stable/user-guide/projects/) | G1, G5, D1 to D4 |
 | Kargo: [secure configuration](https://docs.kargo.io/operator-guide/security/secure-configuration/) | D3, D4 |
 | Kubernetes: [RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/), [good practices for Secrets](https://kubernetes.io/docs/concepts/security/secrets-good-practices/), [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) | K1 to K3, K7 |
@@ -205,4 +207,4 @@ Not read: NSA/CISA Kubernetes Hardening Guide, SLSA source track, Kargo and Argo
 
 - How zero confines the agent: [architecture/28-target-architecture.md](architecture/28-target-architecture.md).
 - Example manifests for gates 4 and 5: [scenarios/kubernetes-hardening.md](scenarios/kubernetes-hardening.md).
-- General cluster hardening that has nothing to do with stages or agents (node hardening, etcd encryption, image scanning).
+- General cluster hardening that has nothing to do with stages or agents (node hardening, etcd encryption, image scanning, patch level of runners and controllers).
