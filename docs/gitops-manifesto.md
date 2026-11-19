@@ -30,6 +30,22 @@ last column of each rule is open.
 
 ## 3. Rules
 
+### 3.0 What is fixed and what depends on the organisation
+
+The principles in section 2 are fixed: without them the claim in section 1 does not hold. How an organisation
+reaches them is its own choice. The rules below state the outcome; where a rule names a tool or a layout, that is an
+example.
+
+| Fixed outcome | Depends on the organisation |
+|---|---|
+| No change reaches a protected branch without a human other than the agent (R1, R3). | Number of approvers, code owners or a second maintainer, who may merge. |
+| The agent cannot change control files unseen (R4). | Where control files live: same repo with code owners, separate repo, or a platform repo (R14, R15). |
+| Stage and control boundaries are clear (R14). | One repo per service or monorepo, directories or branches, naming. |
+| Agent code in a pipeline reaches no secret and no cluster (R8, R9). | Runner setup, protected variables or an external secret store, OIDC or not (R10). |
+| A stage reaches only its own data and credentials (R20 to R25). | One cluster per stage or shared cluster with admission policies, which admission tool, which secret store. |
+| A change to live is a separate human decision (R17). | Promotion tool (Kargo, pipeline, second merge request), sync windows. |
+| Sources of charts and images are limited (R19). | Central catalog, allow list per project, or signature checks. |
+
 Owner: **team** (owns the service repo), **platform** (owns clusters and shared repos), **zero**.
 Check: **doctor** = `zero doctor` checks it today; **could** = zero could check it, not built; **no** = outside zero's view.
 
