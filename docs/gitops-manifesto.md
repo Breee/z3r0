@@ -141,7 +141,7 @@ Control files decide where and with which rights things run. An agent may read t
 | `AGENTS.md`, skills, `.zero/policy.yaml` | instruct the agent and set its capabilities |
 | Argo CD `Application`, `AppProject`, `ApplicationSet` | decide source, target cluster, namespace and allowed kinds |
 | Kargo `Project`, `Warehouse`, `Stage`, promotion tasks, analysis templates | decide what is promoted and what counts as verified |
-| namespace, admission policy, `NetworkPolicy`, `SecretStore` manifests | are the walls of gate 5 (belong in the platform repository, G3) |
+| namespace, admission policy, `NetworkPolicy`, `SecretStore` manifests | are the walls of gate 5; rule G3 puts them in the platform repository |
 
 Not control files: values of a stage, application manifests of a stage. They are what the agent is there to change.
 
@@ -179,8 +179,8 @@ What the human at the workstation does:
 ## 8. What zero checks
 
 - Today `zero doctor` checks F1, F2 and C1 for the GitLab project around the current directory.
-- Candidates, in this order: F4 (code owners exist and are required), F3 (approval settings), C4, C5, D1, K2 to K4
-  for the namespaces a policy grants, K7, G3.
+- Candidates, in this order: F4 (code owners exist and are required), F3 (approval settings), C4, C5, D1, K2, K3 and K4
+  (only in namespaces that a zero policy grants to the agent), K7, G3.
 - zero does not check gates 4 and 5 today. It has no access to the delivery system or the cluster.
 
 ## 9. Sources
