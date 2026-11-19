@@ -89,7 +89,8 @@ Two limits to know:
 | # | Rule | How to meet it (GitLab) | Risk without it | Level | Owner | zero |
 |---|---|---|---|---|---|---|
 | C1 | A pipeline on an unprotected branch gets no secrets. | every secret CI/CD variable "Protected", also "Masked and hidden"; better: secrets in a secrets manager, fetched by the job | agent branch prints or sends the secrets ([P14](attack-paths.md#p14)) | base | team | checks |
-| C2 | Unreviewed code runs on runners that reach nothing else. | deploy runners "Protected"; runners for other branches separate, not privileged, no route to clusters or cloud accounts | pipeline code leaves the job ([P14](attack-paths.md#p14), OWASP CICD-SEC-4) | base | platform | - |
+| C2 | Every runner is hardened: a job cannot leave its container and finds nothing from other jobs. | not privileged, no host Docker socket, no shell executor on shared hosts, fresh environment per job, runner patched | job code takes over the runner and reads tokens of other jobs and projects ([P14](attack-paths.md#p14), OWASP CICD-SEC-7) | base | platform | - |
+| C2a | Unreviewed code runs on other runners than deploy jobs, and these reach no cluster or cloud account. | deploy runners "Protected"; separate runners for all other branches, no route to clusters, cloud accounts or internal admin networks | agent branch uses the network position and credentials of the deploy runner ([P14](attack-paths.md#p14), OWASP CICD-SEC-4) | base | platform | - |
 | C3 | Pipelines log in to cloud and secret stores with short-lived tokens bound to protected refs. | `id_tokens` with own `aud` per service; the service checks the claim `ref_protected` | stolen long-lived deploy credential; agent branch gets the same login as main | depth | platform | - |
 | C4 | The job token of a project reaches only that project. | job token allowlist holds only what is needed | pipeline code reads or writes other projects | depth | team | could check |
 | C5 | Who starts a pipeline cannot override its variables. | "Minimum role to use pipeline variables" = no one allowed; use `inputs` | caller redirects a job, e.g. the deploy target | depth | team | could check |
@@ -174,7 +175,7 @@ What the human at the workstation does:
 | One cluster for all stages (K6) | a second wall behind K3 to K5 | K1 to K5 enforced by admission; own nodes for live |
 | Kubernetes below 1.30 (no ValidatingAdmissionPolicy) | built-in admission policies (K3) | Kyverno or Gatekeeper |
 | No promotion tool (G6) | recorded promotion | merge request per stage with F3 and F4 on the stage paths |
-| Runners shared by all branches (C2) | isolation of unreviewed code | do not grant `ci.run`; then agent pushes start no pipeline (Z2) |
+| Runners shared by all branches (C2a) | isolation of unreviewed code | do not grant `ci.run`; then agent pushes start no pipeline (Z2) |
 
 ## 8. What zero checks
 
@@ -190,7 +191,7 @@ Read on 2026-11-19. A rule that names no attack path rests on these.
 | Source | Used for |
 |---|---|
 | [OpenGitOps principles 1.0](https://opengitops.dev/): declarative, versioned and immutable, pulled automatically, continuously reconciled | D2, G5 |
-| [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/): CICD-SEC-1 flow control, CICD-SEC-4 poisoned pipeline execution | F1, F3, F7, C1, C2 |
+| [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/): CICD-SEC-1 flow control, CICD-SEC-4 poisoned pipeline execution, CICD-SEC-7 insecure system configuration | F1, F3, F7, C1, C2, C2a |
 | GitLab: [protected branches](https://docs.gitlab.com/user/project/repository/branches/protected/), [approval settings](https://docs.gitlab.com/user/project/merge_requests/approvals/settings/), [code owners](https://docs.gitlab.com/user/project/codeowners/) | F1, F3, F4 |
 | GitLab: [pipeline security](https://docs.gitlab.com/ci/pipeline_security/), [job token](https://docs.gitlab.com/ci/jobs/ci_job_token/), [ID tokens](https://docs.gitlab.com/ci/secrets/id_token_authentication/) | C1 to C6 |
 | Argo CD: [best practices](https://argo-cd.readthedocs.io/en/stable/user-guide/best_practices/), [security](https://argo-cd.readthedocs.io/en/stable/operator-manual/security/), [projects](https://argo-cd.readthedocs.io/en/stable/user-guide/projects/) | G1, G5, D1 to D4 |
