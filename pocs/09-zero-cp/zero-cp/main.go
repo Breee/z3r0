@@ -3,12 +3,14 @@
 package main
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -19,6 +21,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -142,6 +145,8 @@ func main() {
 	allow := flag.String("allow", "", "file with allowed SPIFFE IDs, re-read on every request")
 	logPath := flag.String("log", "", "decision log (JSON lines)")
 	svid := flag.Bool("svid", false, "grant the verified JWT-SVID itself as the token (PoC 13)")
+	sessions := flag.String("sessions", "", "directory with one backend credential file per sandbox id (PoC 14)")
+	gatewayKey := flag.String("gateway-key", "", "file with the key the gateway sends to /authz/ (PoC 14)")
 	flag.Parse()
 
 	keys, err := loadKeys(*jwks)
@@ -191,6 +196,32 @@ func main() {
 		decide(id, "allow", "registered sandbox")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"access_token": token, "token_type": "Bearer", "expires_in": 60})
+	})
+	// External authorization for a gateway (PoC 14). The gateway has verified the JWT-SVID (it does
+	// not forward it); it proves itself with the gateway key and names the verified subject.
+	// Answers with the backend credential of that session in a header only the gateway sees.
+	http.HandleFunc("/authz/", func(w http.ResponseWriter, r *http.Request) {
+		key, _ := os.ReadFile(*gatewayKey)
+		got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if len(key) == 0 || subtle.ConstantTimeCompare([]byte(got), bytes.TrimSpace(key)) != 1 {
+			decide("", "deny", "authz: caller is not the gateway")
+			http.Error(w, "not the gateway", http.StatusForbidden)
+			return
+		}
+		id := r.Header.Get("X-Zero-Subject")
+		if !allowed(*allow, id) {
+			decide(id, "deny", "authz: sandbox not registered")
+			http.Error(w, "not registered", http.StatusForbidden)
+			return
+		}
+		cred, err := os.ReadFile(filepath.Join(*sessions, filepath.Base(id)))
+		if err != nil {
+			decide(id, "deny", "authz: no backend credential for this session")
+			http.Error(w, "no session", http.StatusForbidden)
+			return
+		}
+		decide(id, "allow", "authz: backend credential of the session")
+		w.Header().Set("X-Zero-Backend-Token", strings.TrimSpace(string(cred)))
 	})
 	// Test upstream: accepts only a granted token and never echoes it back.
 	http.HandleFunc("GET /protected", func(w http.ResponseWriter, r *http.Request) {

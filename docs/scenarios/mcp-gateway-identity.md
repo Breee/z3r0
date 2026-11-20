@@ -43,12 +43,16 @@ Two walls: the tool rule at the gateway and the narrow credential behind it. The
 
 15/15 checks, see `pocs/13-agentgateway/README.md`: a registered sandbox sees and calls only the tool its rule names; another sandbox with a valid identity gets nothing; no token, a forged token and a removed registration fail closed; the agent never sees the token and cannot replace it; the gateway log names the sandbox for every call.
 
+## 3.1 What PoC 14 proved
+
+25/25 checks, see `pocs/14-k8s-mcp/README.md`: one shared gateway serves two sandboxes and calls the Kubernetes MCP server with each session's own ServiceAccount token, which zero-cp hands out per request. Read works; Secrets, the other namespace, a capability not granted and writes fail; the cluster audit log names the right ServiceAccount; no token in the sandbox; a stopped session ends access at the next call.
+
 ## 4. Open decisions
 
 | # | Question | Options |
 |---|---|---|
-| M1 | Which token does the gateway verify? | a) the SVID itself (PoC 13: no issuer of our own, but no capability claims, rules per sandbox ID) · b) token from an identity provider that accepts SPIFFE client assertions (OpenBao, Keycloak; not tested) with session and capability claims · c) opaque key per session with agentgateway API-key auth |
-| M2 | One gateway for all sessions or one per session? | shared: one port, rules on claims, backend credential per session unsolved · per session: simple credential handling, more processes |
+| M1 | Which token does the gateway verify? | Evidence: a) works in PoC 13 and 14; capabilities need not be claims, zero-cp answers per request. Recommendation: a). · a) the SVID itself (PoC 13: no issuer of our own, but no capability claims, rules per sandbox ID) · b) token from an identity provider that accepts SPIFFE client assertions (OpenBao, Keycloak; not tested) with session and capability claims · c) opaque key per session with agentgateway API-key auth |
+| M2 | One gateway for all sessions or one per session? | Evidence: shared works, backend credential per request from zero-cp (PoC 14). Recommendation: shared. · shared: one port, backend credential per session solved in PoC 14, tool rules per session not tested · per session: simple credential handling, more processes |
 | M3 | Which MCP servers? | upstream Kubernetes and GitLab servers pinned by version (tool descriptions are input the agent reads) · tools written in zero-cp |
 | M4 | Namespace and project limits | by credential only · also by rules on tool arguments (`mcpGuardrails`), one tested rule per tool |
 | M5 | git traffic | not MCP: push gate stays; fetch still uses a token in the sandbox today |
@@ -64,10 +68,15 @@ Two walls: the tool rule at the gateway and the narrow credential behind it. The
 - MG6: Streams (`logs -f`) through MCP: not tested.
 - MG7: The upstream podman SPIFFE demo needs local changes to run on 0.1.8 (C49).
 - MG8: SPIRE key rotation: gateway read the keys once from a file in the PoC.
+- MG9: zero-cp is asked on every tool call (no cache); if it is down, all tools fail closed.
+- MG10: The gateway proves itself to zero-cp with a shared key in a file.
+- MG11: The SPIRE agent of the upstream demo stopped after about 2 hours (join-token attestation, agent SVID not renewed). A real setup needs a node attestation that survives.
+- MG12: kubernetes-mcp-server needs `disable_localhost_protection` behind the gateway and binds all interfaces by default; it must be bound to loopback.
+- MG13: Tool rules were the same for all sessions in PoC 14; rules from each session's capabilities are not tested.
 
 ## 6. Next proof steps
 
-1. Kubernetes MCP server behind the gateway with a session ServiceAccount on the kind cluster: read works, Secrets and writes fail at both walls.
-2. Token with capability claims (M1 b) or per-session gateway (M2).
+1. Done in PoC 14: Kubernetes MCP server behind the gateway with a session ServiceAccount.
+2. Tool rules per session from capabilities (MG13).
 3. opencode in the sandbox as MCP client.
 4. GitLab MCP server with the per-sandbox token from the OpenBao broker.

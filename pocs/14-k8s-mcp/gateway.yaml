@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+# One gateway for all sessions. The cluster credential is chosen per request:
+# zero-cp (extAuthz) answers with the session's ServiceAccount token, the gateway
+# sends it to the Kubernetes MCP server as the bearer token.
+mcp:
+  port: 18091
+  policies:
+    jwtAuth:
+      mode: strict
+      issuer: ISSUER
+      audiences: [zero-mcp]
+      jwks:
+        file: JWKS
+    extAuthz:
+      host: 127.0.0.1:18090
+      policies:
+        backendAuth:
+          key:
+            file: GWKEY
+      protocol:
+        http:
+          path: '"/authz/"'
+          addRequestHeaders:
+            x-zero-subject: jwt.sub
+          metadata:
+            backend_token: 'response.headers["x-zero-backend-token"]'
+    mcpAuthorization:
+      rules:
+      - 'mcp.tool.name in ["pods_list_in_namespace", "pods_get", "pods_log", "events_list", "resources_list", "resources_get"]'
+  targets:
+  - name: k8s
+    mcp:
+      host: http://127.0.0.1:18092/mcp
+    policies:
+      backendAuth:
+        key:
+          expression: extauthz.backend_token

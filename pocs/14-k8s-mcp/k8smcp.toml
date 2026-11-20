@@ -1,0 +1,11 @@
+# kubernetes-mcp-server v0.1.3: no credential of its own, uses the bearer token of each request
+port = "18092"
+kubeconfig = "KUBECONFIG"
+cluster_auth_mode = "passthrough"
+require_oauth = true
+skip_jwt_verification = true
+read_only = true
+toolsets = ["core"]
+# behind agentgateway only: the gateway keeps the sandbox's Host header
+bind_address = "127.0.0.1"
+disable_localhost_protection = true
