@@ -1,0 +1,24 @@
+id: zero-mcp-poc
+display_name: zero MCP gateway PoC
+description: The sandbox's JWT-SVID, granted by zero-cp, injected on calls to agentgateway
+category: other
+credentials:
+  - name: access_token
+    description: JWT-SVID with audience zero-mcp
+    required: true
+    auth_style: bearer
+    header_name: Authorization
+    token_grant:
+      grant_type: client_credentials
+      token_endpoint: http://127.0.0.1:18090/token
+      jwt_svid_audience: zero-mcp
+      client_assertion_type: urn:ietf:params:oauth:client-assertion-type:jwt-spiffe
+      cache_ttl: 0s
+endpoints:
+  - host: host.openshell.internal
+    port: 18091
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries:
+  - /usr/bin/curl

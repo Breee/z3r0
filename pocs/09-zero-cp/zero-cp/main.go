@@ -141,6 +141,7 @@ func main() {
 	audience := flag.String("audience", "", "required JWT-SVID audience")
 	allow := flag.String("allow", "", "file with allowed SPIFFE IDs, re-read on every request")
 	logPath := flag.String("log", "", "decision log (JSON lines)")
+	svid := flag.Bool("svid", false, "grant the verified JWT-SVID itself as the token (PoC 13)")
 	flag.Parse()
 
 	keys, err := loadKeys(*jwks)
@@ -183,11 +184,13 @@ func main() {
 		}
 		raw := make([]byte, 16)
 		rand.Read(raw)
+		token := "zerocp-test-" + hex.EncodeToString(raw)
+		if *svid {
+			token = assertion
+		}
 		decide(id, "allow", "registered sandbox")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"access_token": "zerocp-test-" + hex.EncodeToString(raw), "token_type": "Bearer", "expires_in": 60,
-		})
+		json.NewEncoder(w).Encode(map[string]any{"access_token": token, "token_type": "Bearer", "expires_in": 60})
 	})
 	// Test upstream: accepts only a granted token and never echoes it back.
 	http.HandleFunc("GET /protected", func(w http.ResponseWriter, r *http.Request) {

@@ -20,3 +20,4 @@ Prereqs: host setup from `ai-docs/sprints/01-openshell-eval/F01-openshell-baseli
 | 10-openbao | #88: gateway stores provider credentials in OpenBao (vault driver), not in its database; fails closed for new credentials/sandboxes when OpenBao is down | `BAO=… pocs/10-openbao/run.sh` |
 | 11-push-service | #93: host push proxy forwards only the session branch; direct push to gitlab.com denied by OpenShell | `BIND=127.0.0.1 pocs/11-push-service/run.sh` |
 | 12-openbao-broker | #98: GitLab web login gives an OpenBao identity; refresh token in OpenBao mints and revokes a fine-grained per-sandbox token | `BAO=… pocs/12-openbao-broker/run.sh` (interactive) |
+| 13-agentgateway | #127: agentgateway serves MCP tools only to a registered sandbox SPIFFE ID; tools allowed per sandbox, no token in the sandbox | `OPENSHELL_SRC=… AGENTGATEWAY=… pocs/13-agentgateway/run.sh` (needs PoC 08 environment) |

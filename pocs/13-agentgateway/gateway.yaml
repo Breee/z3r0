@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+mcp:
+  port: 18091
+  policies:
+    jwtAuth:
+      mode: strict
+      issuer: ISSUER
+      audiences: [zero-mcp]
+      jwks:
+        file: JWKS
+    mcpAuthorization:
+      rules:
+      - 'mcp.tool.name == "echo" && jwt.sub == "ALLOWED_ID"'
+  targets:
+  - name: everything
+    stdio:
+      cmd: npx
+      args: ["-y", "@modelcontextprotocol/server-everything@2026.8.31"]
