@@ -2,7 +2,7 @@
 
 Question: can an agent reach tools only through an MCP gateway that knows which sandbox is calling, without a credential in the sandbox?
 
-Result (2026-11-20, OpenShell 0.1.8, SPIRE 1.12.4, agentgateway 1.7.0, podman): **yes**. `run.sh` 13/13 PASS.
+Result (2026-11-20, OpenShell 0.1.8, SPIRE 1.12.4, agentgateway 1.7.0, podman): **yes**. `run.sh` 15/15 PASS.
 
 | Check | Result |
 |---|---|

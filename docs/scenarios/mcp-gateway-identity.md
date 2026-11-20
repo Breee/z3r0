@@ -41,7 +41,7 @@ Two walls: the tool rule at the gateway and the narrow credential behind it. The
 
 ## 3. What PoC 13 proved
 
-13/13 checks, see `pocs/13-agentgateway/README.md`: a registered sandbox sees and calls only the tool its rule names; another sandbox with a valid identity gets nothing; no token, a forged token and a removed registration fail closed; the agent never sees the token and cannot replace it; the gateway log names the sandbox for every call.
+15/15 checks, see `pocs/13-agentgateway/README.md`: a registered sandbox sees and calls only the tool its rule names; another sandbox with a valid identity gets nothing; no token, a forged token and a removed registration fail closed; the agent never sees the token and cannot replace it; the gateway log names the sandbox for every call.
 
 ## 4. Open decisions
 

@@ -77,7 +77,10 @@ hasnot "sandbox a: tool outside the rule is denied" "$CALL" '"text":"The sum'
 has "sandbox a: denial is an error" "$CALL" 'error'
 LISTB=$(mcp mcp-b tools/list '{}')
 hasnot "sandbox b (valid identity, no rule): sees no tool" "$LISTB" '"name":"echo"'
-hasnot "sandbox b: tool call denied" "$(mcp mcp-b tools/call '{"name":"echo","arguments":{"message":"hello-b"}}')" '"text":"Echo'
+has "sandbox b: tools/list answers (session works)" "$LISTB" '"tools":\[\]'
+CALLB=$(mcp mcp-b tools/call '{"name":"echo","arguments":{"message":"hello-b"}}')
+hasnot "sandbox b: tool call denied" "$CALLB" 'hello-b'
+has "sandbox b: denial is an error" "$CALLB" 'error'
 check "no token (host, not through the supervisor): 401" \
     "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' 127.0.0.1:18091/mcp)" 401
 FORGED=$(printf '{"alg":"ES256","kid":"x"}' | basenc --base64url -w0 | tr -d =).$(printf '{"sub":"%s","iss":"http://spire-oidc:8080","aud":["zero-mcp"],"exp":9999999999}' "$ID_a" | basenc --base64url -w0 | tr -d =).AAAA
