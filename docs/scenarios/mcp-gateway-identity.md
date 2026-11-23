@@ -55,12 +55,12 @@ Two walls: the tool rule at the gateway and the narrow credential behind it. The
 
 | # | Question | Options |
 |---|---|---|
-| M1 | Which token does the gateway verify? | Evidence: a) works in PoC 13 and 14; capabilities need not be claims, zero-cp answers per request. Recommendation: a). · a) the SVID itself (PoC 13: no issuer of our own, but no capability claims, rules per sandbox ID) · b) token from an identity provider that accepts SPIFFE client assertions (OpenBao, Keycloak; not tested) with session and capability claims · c) opaque key per session with agentgateway API-key auth |
-| M2 | One gateway for all sessions or one per session? | Evidence: shared works, backend credential per request from zero-cp (PoC 14). Recommendation: shared. · shared: one port, backend credential per session solved in PoC 14, tool rules per session not tested · per session: simple credential handling, more processes |
-| M3 | Which MCP servers? | Decided for GitLab (2026-11-23): GitLab's instance endpoint, host from the workspace's forge (self-hosted too); a default tool list with an override per workspace. Evidence: PoC 15. Kubernetes open. · upstream Kubernetes and GitLab servers pinned by version (tool descriptions are input the agent reads) · tools written in zero-cp |
-| M4 | Namespace and project limits | by credential only · also by rules on tool arguments (`mcpGuardrails`), one tested rule per tool |
-| M5 | git traffic | not MCP: push gate stays; fetch still uses a token in the sandbox today |
-| M6 | Does the GitLab MCP move out of the sandbox too? | Evidence: works in PoC 15, the token stays outside. Recommendation: yes, as an addition that can be switched off; tool list from zero-cp per request (variant B). · today zero configures it inside the sandbox with the token |
+| M1 | Which token does the gateway verify? | Decided (ADR 0043): a). Evidence: a) works in PoC 13 and 14; capabilities need not be claims, zero-cp answers per request. · a) the SVID itself (PoC 13: no issuer of our own, but no capability claims, rules per sandbox ID) · b) token from an identity provider that accepts SPIFFE client assertions (OpenBao, Keycloak; not tested) with session and capability claims · c) opaque key per session with agentgateway API-key auth |
+| M2 | One gateway for all sessions or one per session? | Decided (ADR 0043): shared. Evidence: shared works, backend credential per request from zero-cp (PoC 14). · shared: one port, backend credential per session solved in PoC 14, tool rules per session not tested · per session: simple credential handling, more processes |
+| M3 | Which MCP servers? | Decided for GitLab (ADR 0043): GitLab's instance endpoint, host from the workspace's forge (self-hosted too); a default tool list with an override per workspace. Evidence: PoC 15. Kubernetes open. · upstream Kubernetes and GitLab servers pinned by version (tool descriptions are input the agent reads) · tools written in zero-cp |
+| M4 | Namespace and project limits | Open; by credential only until decided. · by credential only · also by rules on tool arguments (`mcpGuardrails`), one tested rule per tool |
+| M5 | git traffic | Open; unchanged. · not MCP: push gate stays; fetch still uses a token in the sandbox today |
+| M6 | Does the GitLab MCP move out of the sandbox too? | Decided (ADR 0043): yes, as an addition that can be switched off; tool list from zero-cp per request (variant B). Evidence: works in PoC 15, the token stays outside. · today zero configures it inside the sandbox with the token |
 
 ## 5. Flaws and gaps
 
