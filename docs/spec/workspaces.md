@@ -56,6 +56,8 @@ cwd ambiguity (folder in several workspaces): if `current` is one of them use it
 ```
 zero ctx                         list; * = current, + = matches cwd
 zero ctx use NAME                set current
+zero switch [NAME]               = ctx use NAME; without NAME pick from the list (arrows, enter)
+zero completion bash             bash completion, completes workspace names for switch, ctx use, -c
 zero ctx new NAME [PATH...]      create (default PATH = cwd), set current. No sandbox yet.
 zero ctx add [PATH...]           add folders to context (default cwd)
 zero ctx remove [PATH...]        remove folders from context
@@ -255,7 +257,7 @@ Decisions:
 
 ## 9. Out of scope
 
-TUI picker and web UI (later, on the same config); GitHub forge; syncing input folders back; renaming workspaces.
+Web UI (later, on the same config); GitHub forge; syncing input folders back; renaming workspaces.
 
 ## 10. Implementation order (issues)
 

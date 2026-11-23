@@ -2,6 +2,7 @@ package zero
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -595,5 +596,35 @@ func TestGatewayPinned(t *testing.T) {
 	}
 	if !slices.Equal(in, []string{podmanGateway, vmGateway}) || os.Getenv("OPENSHELL_GATEWAY") != "other" {
 		t.Fatalf("withGateway: %v, after %q", in, os.Getenv("OPENSHELL_GATEWAY"))
+	}
+}
+
+func TestSwitchKey(t *testing.T) {
+	for in, want := range map[string]string{
+		"k": "up", "\x1b[A": "up", "j": "down", "\x1b[B": "down", "\r": "use",
+		"q": "quit", "\x03": "quit", "x": "",
+	} {
+		if got := switchKey([]byte(in)); got != want {
+			t.Errorf("switchKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRenderSwitch(t *testing.T) {
+	o := &overview{rows: []wsRow{
+		{Name: "api", Status: "running", Token: "gitlab 20h", Policy: "abc123", Folders: 2, Current: true},
+		{Name: "web", Status: "none", Token: "-", Policy: "-", Folders: 1},
+	}, warn: []string{"gateway not reachable"}}
+	var b bytes.Buffer
+	renderSwitch(&b, o, 1)
+	lines := strings.Split(b.String(), "\n")
+	if !strings.HasPrefix(lines[1], "  * api") || !strings.Contains(lines[1], "running") {
+		t.Errorf("current row: %q", lines[1])
+	}
+	if !strings.HasPrefix(lines[2], ">   web") {
+		t.Errorf("selected row: %q", lines[2])
+	}
+	if !strings.Contains(b.String(), "warning: gateway not reachable") || !strings.Contains(b.String(), switchHelp) {
+		t.Errorf("warning or help missing:\n%s", b.String())
 	}
 }

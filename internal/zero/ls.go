@@ -13,12 +13,28 @@ import (
 	"time"
 )
 
-// Ls prints every workspace with its live state, and what is left over
-// without a workspace: tokens, sandboxes, state dirs and input copies.
-func Ls(out io.Writer) error {
+// wsRow is one workspace with its live state.
+type wsRow struct {
+	Name, Status, Token, Policy string
+	Folders                     int
+	Current                     bool
+}
+
+// overview is the live state behind `zero ls` and `zero pick`.
+type overview struct {
+	c          *Config
+	rows       []wsRow
+	tokens     map[string][]Token
+	liveTokens map[string]bool
+	sandboxes  map[string][]string
+	dirs       []string
+	warn       []string
+}
+
+func loadOverview() (*overview, error) {
 	c, err := loadConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	names := make([]string, 0, len(c.Workspaces))
 	for n := range c.Workspaces {
@@ -69,8 +85,7 @@ func Ls(out io.Writer) error {
 		})
 	}
 
-	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "  NAME\tSTATUS\tFOLDERS\tTOKEN\tPOLICY")
+	var rows []wsRow
 	liveTokens := map[string]bool{}
 	for _, n := range names {
 		sb := "zero-" + n
@@ -108,15 +123,37 @@ func Ls(out io.Writer) error {
 				policy += " dirty"
 			}
 		}
+		rows = append(rows, wsRow{Name: n, Status: status, Token: token, Policy: policy,
+			Folders: len(c.Workspaces[n].Folders), Current: n == c.Current})
+	}
+	return &overview{c, rows, tokens, liveTokens, sandboxes, dirs, warn}, nil
+}
+
+// writeRows prints the workspace table.
+func writeRows(out io.Writer, rows []wsRow) error {
+	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "  NAME\tSTATUS\tFOLDERS\tTOKEN\tPOLICY")
+	for _, r := range rows {
 		mark := " "
-		if n == c.Current {
+		if r.Current {
 			mark = "*"
 		}
-		fmt.Fprintf(tw, "%s %s\t%s\t%d\t%s\t%s\n", mark, n, status, len(c.Workspaces[n].Folders), token, policy)
+		fmt.Fprintf(tw, "%s %s\t%s\t%d\t%s\t%s\n", mark, r.Name, r.Status, r.Folders, r.Token, r.Policy)
 	}
-	if err := tw.Flush(); err != nil {
+	return tw.Flush()
+}
+
+// Ls prints every workspace with its live state, and what is left over
+// without a workspace: tokens, sandboxes, state dirs and input copies.
+func Ls(out io.Writer) error {
+	o, err := loadOverview()
+	if err != nil {
 		return err
 	}
+	if err := writeRows(out, o.rows); err != nil {
+		return err
+	}
+	c, tokens, liveTokens, sandboxes, dirs, warn := o.c, o.tokens, o.liveTokens, o.sandboxes, o.dirs, o.warn
 
 	known := func(sb string) bool {
 		n, ok := strings.CutPrefix(sb, "zero-")

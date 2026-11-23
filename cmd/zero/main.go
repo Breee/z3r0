@@ -31,13 +31,27 @@ Usage: zero [-c WORKSPACE] <command>
   pause         stop the sandbox and revoke its token; files stay, zero up continues
   rm [-y]       stop + delete sandbox; lists work not pushed, asks for the workspace name
   ls            all workspaces with status, token, policy; leftovers without a workspace
+  switch [NAME] make NAME the current workspace; without NAME pick it from the ls list
   ctx           list workspaces (* current, + here); ctx use NAME | new NAME [PATH...] |
                 add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt
+  completion bash  bash completion for commands and workspace names: source <(zero completion bash)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
 
 The workspace is picked by -c, then ZERO_CONTEXT, then the current folder, then
 zero ctx use. zero up in a git repo without a workspace creates one.
+`
+
+const bashCompletion = `_zero() {
+  local cur=${COMP_WORDS[COMP_CWORD]}
+  case ${COMP_WORDS[COMP_CWORD-1]} in
+    switch|use|-c|--context)
+      COMPREPLY=($(compgen -W "$(zero ctx 2>/dev/null | cut -c3- | cut -d' ' -f1)" -- "$cur")) ;;
+    zero)
+      COMPREPLY=($(compgen -W "up attach run code web status stop logs pause rm ls switch ctx install doctor completion" -- "$cur")) ;;
+  esac
+}
+complete -F _zero zero
 `
 
 func main() {
@@ -69,6 +83,17 @@ func main() {
 		if err := zero.Ls(os.Stdout); err != nil {
 			fatal(err)
 		}
+		return
+	case "switch":
+		if err := zero.Switch(os.Stdin, os.Stdout, args); err != nil {
+			fatal(err)
+		}
+		return
+	case "completion":
+		if len(args) != 1 || args[0] != "bash" {
+			fatal(fmt.Errorf("usage: zero completion bash"))
+		}
+		fmt.Print(bashCompletion)
 		return
 	case "ctx":
 		if err := zero.Ctx(os.Stdout, ctx, args); err != nil {
