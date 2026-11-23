@@ -87,3 +87,4 @@ Two walls: the tool rule at the gateway and the narrow credential behind it. The
 2. Done in PoC 15: tool rules per workspace (MG13).
 3. opencode in the sandbox as MCP client.
 4. Done in PoC 15 with a token minted by glab: GitLab MCP endpoint behind the gateway. Open: token from the OpenBao broker, tool -> permission table (MG14), a self-hosted instance.
+5. Warden as one gateway in place of agentgateway + zero-cp for an enterprise setup (#133, first look in `ai-docs/tool-eval-warden.md`).
