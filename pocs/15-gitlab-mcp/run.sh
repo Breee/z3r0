@@ -79,7 +79,7 @@ gateway() { # gateway RULE: start the gateway with one mcpAuthorization rule
 cleanup() {
     podman rm -f poc15-gateway poc15-zero-cp >/dev/null 2>&1
     for id in $(cat "$W/tokids" 2>/dev/null); do glab api -X DELETE "/personal_access_tokens/$id" --hostname "$HOST" >/dev/null 2>&1; done
-    $O sandbox delete gl-a gl-b >/dev/null 2>&1
+    $O sandbox delete gl-a gl-b gl-c >/dev/null 2>&1
     sleep 2; $O provider delete zero-mcp-poc >/dev/null 2>&1
     [ -n "${KEEP:-}" ] && { rm -rf "$W/sessions"; cp -r "$W" "$KEEP"; }
     rm -rf "$W"
@@ -99,6 +99,8 @@ $O provider create --name zero-mcp-poc --type zero-mcp-poc --runtime-credentials
 for n in a b; do
     $O sandbox create --name gl-$n --from "$IMAGE" --provider zero-mcp-poc --detach >/dev/null || exit 1
 done
+# workspace c: addition switched off (no provider, no registration, no session)
+$O sandbox create --name gl-c --from "$IMAGE" --detach >/dev/null || exit 1
 sleep 10
 for n in a b; do
     id=$($O sandbox get gl-$n --output json | jq -r .id)
@@ -154,6 +156,10 @@ denied "a: no tool list: call refused by the gateway" gl-a get_project "$PAJ"
 rm "$W/sessions/$SB_a"
 has "a: session removed in zero-cp: gateway fails closed" "$(mcp gl-a tools/list '{}')" 'no session'
 has "b: still works after a's session ended" "$(call gl-b get_project "$PBJ")" "${PB##*/}"
+OFF=$($O sandbox exec --name gl-c -- sh -c "echo sandbox-runs; curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' $URL" 2>/dev/null)
+has "c (addition off): sandbox runs" "$OFF" sandbox-runs
+hasnot "c (addition off): no answer from the MCP gateway" "$OFF" '200$'
+echo "    c got: $(printf %s "$OFF" | tail -c 3)"
 zerocp
 has "zero-cp sends no tool list at all: b's tools/list is empty" "$(mcp gl-b tools/list '{}')" '"tools":\[\]'
 denied "zero-cp sends no tool list at all: b's call refused by the gateway" gl-b get_project "$PBJ"

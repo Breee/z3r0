@@ -2,7 +2,7 @@
 
 Question: can the shared gateway give each workspace its own tool list and its own GitLab token for GitLab's MCP endpoint, with no GitLab token in the sandbox?
 
-Result (2026-11-23, OpenShell 0.1.8, SPIRE 1.12.4, agentgateway 1.7.0, gitlab.com MCP server 19.7.0-pre, podman): **yes**. `run.sh` 30/30 PASS.
+Result (2026-11-23, OpenShell 0.1.8, SPIRE 1.12.4, agentgateway 1.7.0, gitlab.com MCP server 19.7.0-pre, podman): **yes**. `run.sh` 32/32 PASS.
 
 ## Chain
 
@@ -36,6 +36,7 @@ Workspaces: a = token for project A, tool list overridden to `get_project list_b
 | tool removed from a's list | gone from the list and refused at the next request |
 | workspace without a tool list | empty tool list, call refused by the gateway |
 | zero-cp sends no tool list header at all (started without `-tools`) | empty tool list, call refused by the gateway: the rule fails closed |
+| workspace c without the addition (no provider attached) | sandbox runs; the gateway is not reachable from it |
 | a's session removed in zero-cp | gateway fails closed (`no session`), b still works |
 | variant A: one static rule per workspace in the gateway config | works; a changed rule is picked up without restart |
 
@@ -68,7 +69,7 @@ The first three were seen in manual calls on 2026-11-23 while building the PoC; 
 
 ## Core and addition
 
-The MCP gateway is an addition. Core (sandbox, workspaces, push gate, glab login) was not changed and does not need it. A workspace without a tool list gets no tool (checked). Switching the addition off for a workspace (provider not attached, zero's sandbox-side MCP config as today) was not run as a check.
+The MCP gateway is an addition. Core (sandbox, workspaces, push gate, glab login) was not changed and does not need it. A workspace without a tool list gets no tool. A workspace without the provider runs and cannot reach the gateway at all (both checked).
 
 Seam, three points:
 

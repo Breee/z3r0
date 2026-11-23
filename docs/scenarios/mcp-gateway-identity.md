@@ -49,7 +49,7 @@ Two walls: the tool rule at the gateway and the narrow credential behind it. The
 
 ## 3.2 What PoC 15 proved
 
-30/30 checks, see `pocs/15-gitlab-mcp/README.md`: the shared gateway puts GitLab's own MCP endpoint (`https://<forge host>/api/v4/mcp`) behind it and gives each workspace its own tool list and its own GitLab token, both returned by zero-cp per request. A tool outside the list is hidden and refused; the other workspace's project is refused by GitLab; a removed tool or session ends access at the next request; no GitLab token in the sandbox. GitLab checks a separate token permission per tool.
+32/32 checks, see `pocs/15-gitlab-mcp/README.md`: the shared gateway puts GitLab's own MCP endpoint (`https://<forge host>/api/v4/mcp`) behind it and gives each workspace its own tool list and its own GitLab token, both returned by zero-cp per request. A tool outside the list is hidden and refused; the other workspace's project is refused by GitLab; a removed tool or session ends access at the next request; no GitLab token in the sandbox. GitLab checks a separate token permission per tool.
 
 ## 4. Open decisions
 
