@@ -32,6 +32,53 @@ var gitlabCaps = map[string][]string{
 	"gitlab.pipeline.read": {"read_pipeline", "read_job"},
 }
 
+// gitlabTools maps the tools of GitLab's MCP endpoint that zero offers to
+// the fine-grained token permissions GitLab checks for them (ADR 0043,
+// MG14; checked with pocs/15-gitlab-mcp/tools-check.sh). A tool without
+// an entry cannot be in a workspace's list.
+var gitlabTools = map[string][]string{
+	"get_project":          {"read_project"},
+	"get_repository_file":  {"read_code", "read_repository"},
+	"list_repository_tree": {"read_code", "read_repository"},
+	"list_branches":        {"read_branch"},
+	"list_tags":            {"read_repository_tag"},
+	"list_commits":         {"read_code"},
+	"get_commit":           {"read_code"},
+	"list_merge_requests":  {"read_merge_request"},
+	"get_merge_request":    {"read_merge_request"},
+	"list_pipelines":       {"read_pipeline"},
+	"get_pipeline":         {"read_pipeline"},
+	"get_job":              {"read_job"},
+	"list_work_items":      {"read_work_item", "read_namespace"},
+	"get_work_item":        {"read_work_item"},
+	"search_labels":        {"read_project"},
+}
+
+// gitlabDefaultTools is the tool list of a workspace that sets none.
+var gitlabDefaultTools = []string{
+	"get_project", "get_repository_file", "list_repository_tree", "list_branches",
+	"list_tags", "list_commits", "get_commit", "list_merge_requests",
+	"get_merge_request", "list_pipelines", "get_pipeline", "get_job",
+	"list_work_items", "get_work_item", "search_labels",
+}
+
+// gitlabToolPermissions returns the token permissions the tools need.
+func gitlabToolPermissions(tools []string) ([]string, error) {
+	perms := []string{"read_project"}
+	for _, t := range tools {
+		p, ok := gitlabTools[t]
+		if !ok {
+			return nil, fmt.Errorf("unknown gitlab tool %q", t)
+		}
+		for _, x := range p {
+			if !slices.Contains(perms, x) {
+				perms = append(perms, x)
+			}
+		}
+	}
+	return perms, nil
+}
+
 // remoteRe splits an origin URL into host and project path.
 var remoteRe = regexp.MustCompile(`^(?:git@([^:/]+):|ssh://git@([^:/]+)(?::\d+)?/|https://(?:[^@/]+@)?([^/]+)/)(.+?)(?:\.git)?/?$`)
 

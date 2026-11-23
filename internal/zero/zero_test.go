@@ -679,3 +679,31 @@ func TestSwitchByName(t *testing.T) {
 		t.Errorf("switch without terminal: err %v, current %q", err, current())
 	}
 }
+
+func TestGitlabToolPermissions(t *testing.T) {
+	got, err := gitlabToolPermissions([]string{"get_project", "list_commits", "get_commit", "list_branches"})
+	if err != nil || strings.Join(got, " ") != "read_project read_code read_branch" {
+		t.Fatalf("got %v, %v", got, err)
+	}
+	if got, _ := gitlabToolPermissions(nil); strings.Join(got, " ") != "read_project" {
+		t.Fatalf("no tool: %v", got)
+	}
+	if _, err := gitlabToolPermissions([]string{"get_project", "save_note"}); err == nil {
+		t.Fatal("tool without entry accepted")
+	}
+	// the list pocs/15-gitlab-mcp/tools-check.sh was run with (#131)
+	const all = "read_project read_code read_repository read_branch read_repository_tag read_merge_request read_pipeline read_job read_work_item read_namespace"
+	if got, err := gitlabToolPermissions(gitlabDefaultTools); err != nil || strings.Join(got, " ") != all {
+		t.Fatalf("default list: %v, %v", got, err)
+	}
+	if len(gitlabTools) != len(gitlabDefaultTools) {
+		t.Fatalf("%d tools in the table, %d in the default list", len(gitlabTools), len(gitlabDefaultTools))
+	}
+	b, err := os.ReadFile("../../pocs/15-gitlab-mcp/default-tools.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(strings.Fields(string(b)), gitlabDefaultTools) {
+		t.Fatal("default list differs from pocs/15-gitlab-mcp/default-tools.txt")
+	}
+}

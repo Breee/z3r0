@@ -100,6 +100,8 @@ Exceptions:
 - If the script is killed (`kill -9`), its two tokens stay valid until they expire the next day.
 - Anyone on the host with the gateway key can ask zero-cp for a workspace's token (MG10).
 
+`tools-check.sh PERMISSION...` mints a token with the given permissions and calls every default tool on the endpoint directly (#131, MG14).
+
 ## Run
 
 Needs the PoC 08 environment (SPIRE + gateway `spiffe-poc`) and `glab` logged in to the forge host.
