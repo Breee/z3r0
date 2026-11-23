@@ -187,7 +187,7 @@ What zero does so that the rules above are enough. Details in [architecture/28-t
 | # | zero does | Closes | Status |
 |---|---|---|---|
 | Z1 | The agent pushes only to its session branch `zero/<name>`; no delete, no other ref. | [P25](attack-paths.md#p25) | built (push gate) |
-| Z2 | An agent push starts no pipeline unless the policy grants `ci.run`. | [P14](attack-paths.md#p14) | built for pushes; a merge request opened by the agent still starts one (#134) |
+| Z2 | No agent push and no merge request opened by the agent starts a pipeline unless the policy grants `ci.run`. | [P14](attack-paths.md#p14) | built; the agent cannot open a merge request without `ci.run` (ADR 0044) |
 | Z3 | A policy change that widens rights is shown and needs the human's approval. | [P16](attack-paths.md#p16) | built |
 | Z4 | Input folders are copied without files that look like credentials. | [P34](attack-paths.md#p34) | built |
 | Z5 | The agent's forge token cannot merge, approve or change project settings, and covers only the workspace's projects. | - | built |

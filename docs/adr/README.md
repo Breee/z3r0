@@ -45,3 +45,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [41](0041-repo-instructions-are-the-devops-process.md) | 2026-11-18 | Instructions in the repo are the DevOps process's job, not zero's | Z-INV-1, Z-INV-5 |
 | [42](0042-manual-setuid-for-uniget-uidmap.md) | 2026-11-18 | Set setuid on uniget's newuidmap/newgidmap by hand until uniget is fixed | Z-INV-4 |
 | [43](0043-mcp-through-shared-agentgateway.md) | 2026-11-23 | MCP tools go through one shared agentgateway that verifies the sandbox's SVID; opt-in addition | Z-INV-1..6 |
+| [44](0044-merge-request-creation-needs-ci-run.md) | 2026-11-23 | The agent opens merge requests only where `ci.run` is granted; the push gate refuses push options | Z-INV-1, Z-INV-2 |

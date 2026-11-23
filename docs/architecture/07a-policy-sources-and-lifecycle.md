@@ -20,7 +20,6 @@ capabilities:
   - git.push
   - gitlab.issue.read
   - gitlab.mr.read
-  - gitlab.mr.create
   - gitlab.pipeline.read
 ```
 
@@ -35,9 +34,9 @@ No file → this default (§13.1 without containers). Unknown keys or capabiliti
 | `git.push` | `push_code` |
 | `gitlab.issue.read` | `read_work_item` |
 | `gitlab.mr.read` | `read_merge_request` |
-| `gitlab.mr.create` | `create_merge_request` |
+| `gitlab.mr.create` | `create_merge_request`; push options `merge_request.*` pass the gate. Not in the default set; refused without `ci.run` (ADR 0044) |
 | `gitlab.pipeline.read` | `read_pipeline read_job` |
-| `ci.run` | no token permission; without it the push gate adds `ci.skip` to every push (ADR 0035). Not in the default set |
+| `ci.run` | no token permission; without it the push gate adds `ci.skip` to every push (ADR 0035) and refuses every push option of the agent (ADR 0044). Not in the default set |
 | `container.*` | needs E3 (§6.2), not available yet |
 | `network.allow` host | egress rule host:443 read-only (enforce) |
 

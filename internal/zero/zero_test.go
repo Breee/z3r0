@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -197,6 +198,40 @@ func TestWriteCommands(t *testing.T) {
 	}
 }
 
+func TestPushOptions(t *testing.T) {
+	in := pktLine("merge_request.create\n") + pktLine("merge_request.target=main") + "0000PACK"
+	br := bufio.NewReader(strings.NewReader(in))
+	opts, err := readOptions(br)
+	if err != nil || !slices.Equal(opts, []string{"merge_request.create", "merge_request.target=main"}) {
+		t.Fatalf("%q %v", opts, err)
+	}
+	if rest, _ := io.ReadAll(br); string(rest) != "PACK" {
+		t.Errorf("rest %q", rest)
+	}
+	if got := writeOptions(opts); got != pktLine("merge_request.create\n")+pktLine("merge_request.target=main\n")+"0000" {
+		t.Errorf("written %q", got)
+	}
+	if checkOptions(opts, false) == nil {
+		t.Error("merge_request.create passes without gitlab.mr.create")
+	}
+	if err := checkOptions(opts, true); err != nil {
+		t.Error(err)
+	}
+	for _, o := range []string{"ci.variable=A=b", "ci.skip", "merge_request.title=x\nci.variable=A=b", ""} {
+		if checkOptions([]string{o}, true) == nil {
+			t.Errorf("option %q passes", o)
+		}
+	}
+	if checkOptions(nil, false) != nil {
+		t.Error("no options refused")
+	}
+	for _, bad := range []string{"", "0003", "zzzz", "0009ab"} {
+		if _, err := readOptions(bufio.NewReader(strings.NewReader(bad))); err == nil {
+			t.Errorf("readOptions(%q) passes", bad)
+		}
+	}
+}
+
 // FuzzGateCommands feeds arbitrary bytes to the gate's parser (#100): it must
 // not panic, and whatever it accepts must survive the rewrite unchanged.
 func FuzzGateCommands(f *testing.F) {
@@ -310,6 +345,26 @@ func TestLoadPolicyUnion(t *testing.T) {
 	// a's file plus the default of b, which has no file
 	if want := append([]string{"git.read", "ci.run"}, defaultCaps[1:]...); !slices.Equal(p.Capabilities, want) {
 		t.Errorf("caps = %v, want %v", p.Capabilities, want)
+	}
+}
+
+func TestMRCreateNeedsCIRun(t *testing.T) {
+	if slices.Contains(defaultCaps, capMRCreate) {
+		t.Error("gitlab.mr.create is in the default capabilities")
+	}
+	for caps, ok := range map[string]bool{
+		"[git.read, gitlab.mr.create]":         false,
+		"[git.read, gitlab.mr.create, ci.run]": true,
+		"[git.read]":                           true,
+	} {
+		a := t.TempDir()
+		os.MkdirAll(filepath.Join(a, ".zero"), 0o700)
+		os.MkdirAll(filepath.Join(a, ".git"), 0o700)
+		os.WriteFile(filepath.Join(a, ".zero", "policy.yaml"), []byte("capabilities: "+caps+"\n"), 0o600)
+		_, err := (&Sandbox{Folders: []string{a}}).loadPolicy()
+		if (err == nil) != ok {
+			t.Errorf("%s: err = %v, want ok %v", caps, err, ok)
+		}
 	}
 }
 

@@ -41,6 +41,21 @@ if grep -qw ci.run "$ST/caps"; then echo "SKIP ci.skip check (ci.run approved fo
   S=$(glab api "projects/$ID/pipelines?sha=$SHA" | jq -r '.[0].status // "none"')
   case $S in skipped|none) echo "PASS push starts no pipeline ($S)";; *) echo "FAIL push started a pipeline ($S)"; FAILS=$((FAILS+1));; esac
 fi
+if grep -qw gitlab.mr.create "$ST/caps"; then echo "SKIP merge request checks (gitlab.mr.create approved for this sandbox)"; else
+  # #134: a merge request opened by the agent starts a pipeline that ci.skip on the push does not prevent
+  B=zero/${N#zero-}
+  mrs() { glab api "projects/$ID/merge_requests?state=opened&source_branch=$B" | jq length; }
+  M0=$(mrs)
+  want "REST create merge request" "$(code POST /merge_requests "{\"source_branch\":\"$B\",\"target_branch\":\"main\",\"title\":\"forge.sh attack\"}")" 403
+  for o in merge_request.create ci.variable=A=b; do
+    O=$(sbx "cd /tmp/zero/$REPO && git fetch -q origin $B && git push -o $o origin \$(git commit-tree -p FETCH_HEAD -m 'forge.sh option probe' FETCH_HEAD^{tree}):refs/heads/$B")
+    case $O in *"push denied"*) echo "PASS git push -o $o (gate)";; *) echo "FAIL git push -o $o: $O"; FAILS=$((FAILS+1));; esac
+  done
+  R=$(sbx "curl -s -X POST -H \"Authorization: Bearer \$GITLAB_TOKEN\" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"save_merge_request\",\"arguments\":{\"project_id\":\"$ID\",\"source_branch\":\"$B\",\"target_branch\":\"main\",\"title\":\"forge.sh attack\"}}}' https://gitlab.com/api/v4/mcp")
+  case $R in *insufficient_granular_scope*) echo "PASS MCP save_merge_request (token)";; *) echo "FAIL MCP save_merge_request: $R"; FAILS=$((FAILS+1));; esac
+  sleep 3
+  want "no merge request opened (REST, push option, MCP)" "$(mrs)" "$M0"
+fi
 want "control: read MRs works"     "$(code GET /merge_requests)" 200
 glab api "projects/$ID/repository/branches" | jq -r '.[].name' | grep -q zero-attack && { echo "FAIL branch zero-attack exists on forge"; FAILS=$((FAILS+1)); }
 echo "fails: $FAILS"; [ "$FAILS" = 0 ]

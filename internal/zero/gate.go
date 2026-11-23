@@ -86,13 +86,53 @@ func readCommands(r *bufio.Reader) (ups []refUpdate, caps string, err error) {
 	}
 }
 
+// readOptions reads the push options that follow the commands when the
+// client announced push-options, up to their flush packet.
+func readOptions(r *bufio.Reader) ([]string, error) {
+	var opts []string
+	for {
+		head := make([]byte, 4)
+		if _, err := io.ReadFull(r, head); err != nil {
+			return nil, fmt.Errorf("truncated request")
+		}
+		n, err := strconv.ParseUint(string(head), 16, 16)
+		if err != nil || (n != 0 && n < 4) {
+			return nil, fmt.Errorf("unsupported pkt-line")
+		}
+		if n == 0 {
+			return opts, nil
+		}
+		if n > maxCommandLine || len(opts) == maxRefUpdates {
+			return nil, fmt.Errorf("push options too long or too many")
+		}
+		line := make([]byte, n-4)
+		if _, err := io.ReadFull(r, line); err != nil {
+			return nil, fmt.Errorf("truncated request")
+		}
+		opts = append(opts, strings.TrimSuffix(string(line), "\n"))
+	}
+}
+
+// checkOptions refuses the agent's push options: the forge acts on them with
+// only push permission (merge_request.create opens a merge request, whose
+// pipeline ci.skip does not prevent, #134). merge_request.* passes when
+// gitlab.mr.create is granted.
+func checkOptions(opts []string, mrCreate bool) error {
+	for _, o := range opts {
+		if !mrCreate || !strings.HasPrefix(o, "merge_request.") || strings.ContainsAny(o, "\n\x00") {
+			return fmt.Errorf("push option %q not allowed", o)
+		}
+	}
+	return nil
+}
+
 func pktLine(s string) string { return fmt.Sprintf("%04x%s", len(s)+4, s) }
 
 // writeCommands is the command section of a receive-pack request for ups.
 // With skipCI the push option ci.skip is added (#102): the forge records the
 // pipeline as skipped, so agent-written CI code runs only when a human starts
 // it. The rest of the request must follow: the client's own push options if
-// it sent any, then the pack.
+// it announced push-options (writeOptions), then the pack.
 func writeCommands(ups []refUpdate, caps string, skipCI bool) string {
 	hadOpts := slices.Contains(strings.Fields(caps), "push-options")
 	if skipCI && !hadOpts {
@@ -114,6 +154,15 @@ func writeCommands(ups []refUpdate, caps string, skipCI bool) string {
 		}
 	}
 	return b.String()
+}
+
+// writeOptions is the client's push option section after writeCommands.
+func writeOptions(opts []string) string {
+	var b strings.Builder
+	for _, o := range opts {
+		b.WriteString(pktLine(o + "\n"))
+	}
+	return b.String() + "0000"
 }
 
 // checkRefs allows only updates of branch (refs/heads/zero/<name>) and
@@ -142,6 +191,7 @@ type gateSession struct {
 	name, state, upstream string
 	repos                 []string // /<group/project>.git of every workspace repo
 	ciRun                 bool     // capability ci.run: pipelines start on push
+	mrCreate              bool     // capability gitlab.mr.create: merge_request.* push options pass
 }
 
 // gateLookup finds the sandbox owning key by scanning the state dirs, so a
@@ -169,8 +219,9 @@ func gateLookup(key string) *gateSession {
 		if f == nil || len(repos) == 0 {
 			return nil
 		}
+		caps := strings.Fields(read("caps"))
 		return &gateSession{filepath.Base(dir), dir, "https://" + f.Host(), repos,
-			slices.Contains(strings.Fields(read("caps")), capCIRun)}
+			slices.Contains(caps, capCIRun), slices.Contains(caps, capMRCreate)}
 	}
 	return nil
 }
@@ -240,9 +291,16 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 		br := bufio.NewReader(body)
 		ups, caps, err := readCommands(br)
 		if err == nil {
-			rc.SetReadDeadline(time.Time{})
 			err = checkRefs(ups, sessionBranch(gs.name))
 		}
+		hasOpts := slices.Contains(strings.Fields(caps), "push-options")
+		var opts []string
+		if err == nil && hasOpts {
+			if opts, err = readOptions(br); err == nil {
+				err = checkOptions(opts, gs.mrCreate)
+			}
+		}
+		rc.SetReadDeadline(time.Time{})
 		if err != nil {
 			for _, u := range ups {
 				gateRecord(gs, u, "deny", err.Error())
@@ -258,6 +316,9 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			note = ""
 		}
 		cmds := writeCommands(ups, caps, !gs.ciRun)
+		if hasOpts {
+			cmds += writeOptions(opts)
+		}
 		for _, u := range ups {
 			gateRecord(gs, u, "allow", note)
 		}

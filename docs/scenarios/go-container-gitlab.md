@@ -47,7 +47,7 @@ network:
   allow:
     - proxy.golang.org
     - sum.golang.org
-capabilities: [git.read, git.commit, git.push, gitlab.issue.read, gitlab.mr.read, gitlab.mr.create, gitlab.pipeline.read]
+capabilities: [git.read, git.commit, git.push, gitlab.issue.read, gitlab.mr.read, gitlab.mr.create, gitlab.pipeline.read, ci.run]   # gitlab.mr.create needs ci.run (ADR 0044)
 ```
 
 Status: gap. Today every sandbox gets fixed egress: opencode.ai, models.opencode.ai, gitlab.com. **Consequence: `go mod download` of non-vendored deps fails today.**
@@ -103,7 +103,7 @@ Practical today: build the binary and run tests in E1; build and test the real c
 |---|---|---|---|
 | `git commit` | local | — (host identity copied) | done |
 | `git push origin feat/x` | gitlab.com, placeholder → token substituted by OpenShell | token scope (push_code) | done |
-| `git push -o merge_request.create` / `glab mr create` | GitLab | token scope | done |
+| `git push -o merge_request.create` / `glab mr create` | GitLab | push gate (option) / token scope; only with `gitlab.mr.create` + `ci.run` (ADR 0044) | done |
 | `git push origin HEAD:main` | GitLab | **branch protection** (forge) | done — rejected by GitLab |
 | push to other projects | GitLab | token project scope | by design, not tested |
 | merge MR | GitLab | no merge permission in token + pipeline required | by design, not tested |

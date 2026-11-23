@@ -25,8 +25,13 @@ type Policy struct {
 
 var defaultCaps = []string{
 	"git.read", "git.commit", "git.push",
-	"gitlab.issue.read", "gitlab.mr.read", "gitlab.mr.create", "gitlab.pipeline.read",
+	"gitlab.issue.read", "gitlab.mr.read", "gitlab.pipeline.read",
 }
+
+// capMRCreate is not in the default set: opening a merge request starts a
+// merge request pipeline, which ci.skip on the push does not prevent. It is
+// accepted only together with ci.run (ADR 0044).
+const capMRCreate = "gitlab.mr.create"
 
 // capCIRun lets pipelines start on the agent's pushes. Without it (default)
 // the push gate adds ci.skip and a human starts the pipeline (ADR 0035).
@@ -56,6 +61,9 @@ func (s *Sandbox) loadPolicy() (*Policy, error) {
 				u.Capabilities = append(u.Capabilities, c)
 			}
 		}
+	}
+	if slices.Contains(u.Capabilities, capMRCreate) && !slices.Contains(u.Capabilities, capCIRun) {
+		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline (ADR 0044)", capMRCreate, capCIRun)
 	}
 	return u, nil
 }

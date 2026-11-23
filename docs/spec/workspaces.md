@@ -140,7 +140,7 @@ $ zero up
 ctx: team (current)
 policy widens for zero-team:
   + network registry.terraform.io
-  + capability gitlab.mr.create
+  + capability gitlab.pipeline.read
 approve? [y/N] y
 gitlab token: rotated (api, web, infra)
 ```
