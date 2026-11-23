@@ -16,17 +16,20 @@ Probe: `pocs/16-forge-paths`. Test: `tests/attacks/forge.sh`.
 
 1. The provider profile of the token (`zero-gitlab-token`) has no endpoint. Profile endpoints add to a sandbox's rules and cannot be narrowed per sandbox.
 2. `zero up` writes a rule `forge` into the sandbox's policy, with the token bound to it. Allowed on the forge host, per project of the workspace:
-   - `/api/v4/projects/<id>` and `/api/v4/projects/<encoded path>`: GET; below them GET, HEAD, POST, PUT, PATCH
+   - `/api/v4/projects/<id>` and `/api/v4/projects/<encoded path>`: GET; below them GET, HEAD, POST
    - `/<path>.git/info/refs` (GET) and `/<path>.git/git-upload-pack` (POST)
    - pushes stay refused; they go through the push gate (ADR 0030)
    Everything else on the host is refused by OpenShell: other projects, user, group and search API, snippets, GraphQL, the MCP endpoint, uploads, web pages, raw files.
-3. When the workspace's projects change, `zero up` replaces the rule on the running sandbox, together with the new token.
-4. The GitLab MCP endpoint is no longer registered in the sandbox's opencode config. One URL serves all projects and all tools, so a path rule cannot limit it. MCP comes back through the gateway of ADR 0043.
+3. When the workspace's projects change, `zero up` replaces the rule on the sandbox (also when it resumes a paused one), first the rule, then the token.
+4. `network.allow` in `.zero/policy.yaml` must not name the forge host (or a wildcard that covers it); `zero up` refuses. Such an entry would add up with the rule and open the whole host for reading.
+5. A policy file given with `Z3R0_POLICY` gets the same rule.
+6. The GitLab MCP endpoint is no longer registered in the sandbox's opencode config. One URL serves all projects and all tools, so a path rule cannot limit it. MCP comes back through the gateway of ADR 0043.
 
 ## Consequences
 
 - A sandbox created before this change keeps its old profile and reaches the whole host until `zero rm` + `zero up`; `zero up` says so.
 - `glab` works for the project commands tried (`mr list`, `mr view`, `issue list`, `ci list`); its update check and usage ping are refused, which it reports and ignores. Commands that need the user or group API or GraphQL fail.
 - `tools` in the workspace config still decides the token's permissions, but the sandbox has no MCP endpoint until the gateway is built in.
-- Left open: a foreign token can still be sent to the workspace's own projects (the attacker would need access to them). Git LFS, group-level API and a self-hosted instance are not tested. `DELETE` is refused for the whole host, as before.
+- PUT and PATCH are refused on the forge host: the agent cannot edit an existing merge request, issue or note through the API.
+- Left open: a foreign token can still be sent to the workspace's own projects (the attacker would need access to them). Calls below an own project that act on something else (fork, merge request with another target project, pipeline trigger) are not refused by the rule; they need a token with rights on the workspace's project, which the sandbox's own token does not give (not tested one by one). Git LFS, group-level API and a self-hosted instance are not tested. `DELETE` is refused for the whole host, as before.
 - A project is matched by id and by path. A project that is moved or renamed is unreachable until the next `zero up`.

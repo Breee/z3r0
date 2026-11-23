@@ -66,6 +66,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		rerule := repaths
 		if rt.Stopped(s.Name) {
 			resumes := s.read("forge.id") == ""
 			if err := s.resumeForge(pol.Capabilities); err != nil {
@@ -82,13 +83,14 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			// opencode's credential db is stale.
 			os.Remove(s.path("copilot-auth.done"))
 		}
-		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools); err != nil {
-			return 0, err
-		}
-		if repaths {
+		// Rule before token: a failure in between leaves the narrower side.
+		if rerule {
 			if err := s.syncForgeRule(); err != nil {
 				return 0, err
 			}
+		}
+		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools); err != nil {
+			return 0, err
 		}
 		if repaths || retools {
 			s.forgeSynced()
@@ -181,12 +183,17 @@ func (s *Sandbox) create() error {
 			return err
 		}
 	}
-	policy := os.Getenv("Z3R0_POLICY")
-	if policy == "" {
-		policy = s.path("policy.yaml")
-		if err := os.WriteFile(policy, policyYAML, 0o600); err != nil {
-			return fmt.Errorf("write embedded policy: %w", err)
+	base := policyYAML
+	if custom := os.Getenv("Z3R0_POLICY"); custom != "" {
+		b, err := os.ReadFile(custom)
+		if err != nil {
+			return fmt.Errorf("Z3R0_POLICY: %w", err)
 		}
+		base = b
+	}
+	policy := s.path("policy.yaml")
+	if err := os.WriteFile(policy, base, 0o600); err != nil {
+		return fmt.Errorf("write policy: %w", err)
 	}
 	pol, err := s.loadPolicy()
 	if err != nil {
@@ -210,13 +217,11 @@ func (s *Sandbox) create() error {
 	if prov != "" {
 		creds = append(creds, prov)
 		env = s.forge().Env()
-		if policy == s.path("policy.yaml") {
-			if err := s.forgePolicyFile(policyYAML, prov); err != nil {
-				return err
-			}
-			if err := s.write("forge.rule", "1", 0o600); err != nil {
-				return err
-			}
+		if err := s.forgePolicyFile(base, prov); err != nil {
+			return err
+		}
+		if err := s.write("forge.rule", "1", 0o600); err != nil {
+			return err
 		}
 	}
 	cp, err := s.setupCopilot()

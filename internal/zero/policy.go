@@ -65,7 +65,26 @@ func (s *Sandbox) loadPolicy() (*Policy, error) {
 	if slices.Contains(u.Capabilities, capMRCreate) && !slices.Contains(u.Capabilities, capCIRun) {
 		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline (ADR 0044)", capMRCreate, capCIRun)
 	}
+	if f, _, err := s.folderForge(); err != nil {
+		return nil, err
+	} else if f != nil {
+		if err := checkForgeHost(f.Host(), u.Network.Allow); err != nil {
+			return nil, err
+		}
+	}
 	return u, nil
+}
+
+// checkForgeHost refuses a network.allow entry for the forge host: it would
+// add up with the forge rule and open every project on the host again
+// (ADR 0046).
+func checkForgeHost(host string, allow []string) error {
+	for _, h := range allow {
+		if h == host || strings.HasPrefix(h, "*.") && strings.HasSuffix(host, h[1:]) {
+			return fmt.Errorf(".zero/policy.yaml: network.allow: %s covers the forge host; zero limits it to the workspace's projects (ADR 0046)", h)
+		}
+	}
+	return nil
 }
 
 func loadFolderPolicy(top string) (*Policy, error) {

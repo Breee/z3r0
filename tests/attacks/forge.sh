@@ -98,6 +98,9 @@ want "MCP endpoint"                        "$(out "-X POST $T $GL/api/v4/mcp")" 
 want "web page of another project"         "$(out "$GL/gitlab-org/gitlab")" 403
 want "raw file of another project"         "$(out "$GL/gitlab-org/gitlab/-/raw/master/README.md")" 403
 want "git fetch of another project"        "$(out "$GL/gitlab-org/cli.git/info/refs?service=git-upload-pack")" 403
+want "PUT on the own project"             "$(out "-X PUT $T $GL/api/v4/projects/$ID")" 403
+want "PATCH below the own project"        "$(out "-X PATCH $T $GL/api/v4/projects/$ID/issues/1")" 403
+want "fork of the own project"            "$(out "-X POST $T $GL/api/v4/projects/$ID/fork")" 403
 want "upload host"                         "$(out "$GL/uploads/x")" 403
 O=$(sbx "cd /tmp/zero/$REPO && git fetch origin main 2>&1; echo rc=\$?")
 case $O in *rc=0*) echo "PASS control: git fetch of the own project works";; *) echo "FAIL control: git fetch: $O"; FAILS=$((FAILS+1));; esac

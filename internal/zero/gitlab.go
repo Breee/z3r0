@@ -114,6 +114,9 @@ func (gitlab) Profile() []byte   { return gitlabProfileYAML }
 // web pages (#52). Pushes go through the push gate only (#95).
 func (g gitlab) Egress(paths []string) (allow, deny []EgressRule, err error) {
 	for _, path := range paths {
+		if strings.ContainsAny(path, "*?[]{}\\") {
+			return nil, nil, fmt.Errorf("project path %q: not usable in an egress rule", path)
+		}
 		id, err := g.projectID(path)
 		if err != nil {
 			return nil, nil, err
@@ -131,7 +134,7 @@ func gitlabProjectRules(path string, id int64) (allow []EgressRule) {
 	for _, p := range []string{fmt.Sprint(id), url.PathEscape(path)} {
 		base := "/api/v4/projects/" + p
 		allow = append(allow, EgressRule{Method: "GET", Path: base})
-		for _, m := range []string{"GET", "HEAD", "POST", "PUT", "PATCH"} {
+		for _, m := range []string{"GET", "HEAD", "POST"} {
 			allow = append(allow, EgressRule{Method: m, Path: base + "/**"})
 		}
 	}

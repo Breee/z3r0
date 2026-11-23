@@ -88,10 +88,27 @@ func TestForgeRule(t *testing.T) {
 		got = append(got, r.Method+" "+r.Path)
 	}
 	for _, want := range []string{"GET /api/v4/projects/42", "POST /api/v4/projects/42/**",
-		"GET /api/v4/projects/grp%2Fsub%2Fapp", "PATCH /api/v4/projects/grp%2Fsub%2Fapp/**",
+		"GET /api/v4/projects/grp%2Fsub%2Fapp", "HEAD /api/v4/projects/grp%2Fsub%2Fapp/**",
 		"GET /grp/sub/app.git/info/refs", "POST /grp/sub/app.git/git-upload-pack"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("rule %q missing in %v", want, got)
+		}
+	}
+	for _, r := range got {
+		if m, _, _ := strings.Cut(r, " "); !slices.Contains([]string{"GET", "HEAD", "POST"}, m) {
+			t.Errorf("rule %q: method not needed", r)
+		}
+	}
+	if _, _, err := (gitlab{host: "gitlab.com"}).Egress([]string{"grp/a*"}); err == nil {
+		t.Error("project path with a glob character accepted")
+	}
+	for host, want := range map[string]bool{"gitlab.com": false, "*.example.com": false, "proxy.golang.org": true, "*.gitlab.com": true} {
+		forge := "gitlab.com"
+		if strings.Contains(host, "example") {
+			forge = "git.example.com"
+		}
+		if err := checkForgeHost(forge, []string{host}); (err == nil) != want {
+			t.Errorf("network.allow %s with forge %s: %v", host, forge, err)
 		}
 	}
 	for _, r := range got {
