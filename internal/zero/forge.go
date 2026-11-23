@@ -60,6 +60,10 @@ type Forge interface {
 	MCP() string
 	// Env is extra non-secret sandbox env the forge's tools need.
 	Env() []string
+	// DefinitionChanged names a pipeline definition file that commit sha
+	// changes against the default branch of the project at path, or "".
+	// token is the sandbox's token. An error means: not known.
+	DefinitionChanged(token, path, sha string) (file string, err error)
 	// Guardrails lists missing DevOps protections on the project (ADR 0024):
 	// default branch push-protected, merge only with green pipeline.
 	Guardrails(path string) (missing []string, err error)

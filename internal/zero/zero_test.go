@@ -3,6 +3,7 @@ package zero
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -836,5 +837,92 @@ func TestWorkspaceTools(t *testing.T) {
 	}
 	if c, _ = loadConfig(); len(c.Workspaces["a"].Tools) != 2 {
 		t.Fatal("tools lost on save")
+	}
+}
+
+func TestDefinitionFile(t *testing.T) {
+	for f, want := range map[string]bool{
+		".gitlab-ci.yml": true, "ci/build.yaml": true, "deploy/app.YML": true, ".gitlab/CODEOWNERS": true,
+		"ci/pipeline.conf": true, "main.go": false, "Makefile": false, "docs/yml.md": false,
+	} {
+		if got := gitlabDefinitionFile(f, "ci/pipeline.conf"); got != want {
+			t.Errorf("%s: got %v, want %v", f, got, want)
+		}
+	}
+	if gitlabDefinitionFile("ci/pipeline.conf", "") {
+		t.Error("ci/pipeline.conf is no definition file without ci_config_path")
+	}
+}
+
+func TestDefinitionChanged(t *testing.T) {
+	var compare, config string
+	status := http.StatusOK
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer tok" {
+			t.Errorf("authorization %q", r.Header.Get("Authorization"))
+		}
+		switch r.URL.EscapedPath() {
+		case "/projects/g%2Fp":
+			fmt.Fprintf(w, `{"default_branch":"main","ci_config_path":%q}`, config)
+		case "/projects/g%2Fp/repository/compare":
+			if q := r.URL.Query(); q.Get("from") != "main" || q.Get("to") != "abc" || q.Get("straight") != "false" {
+				t.Errorf("query %s", r.URL.RawQuery)
+			}
+			w.WriteHeader(status)
+			io.WriteString(w, compare)
+		default:
+			t.Errorf("path %s", r.URL.EscapedPath())
+		}
+	}))
+	defer srv.Close()
+	many := `{"diffs":[` + strings.Repeat(`{"old_path":"a","new_path":"a"},`, maxCompareFiles-1) + `{"old_path":"a","new_path":"a"}]}`
+	for _, c := range []struct {
+		name, compare, config string
+		status                int
+		file                  string
+		err                   bool
+	}{
+		{"code only", `{"diffs":[{"old_path":"main.go","new_path":"main.go"}]}`, "", 200, "", false},
+		{"ci file", `{"diffs":[{"old_path":"main.go","new_path":"main.go"},{"old_path":".gitlab-ci.yml","new_path":".gitlab-ci.yml"}]}`, "", 200, ".gitlab-ci.yml", false},
+		{"renamed away", `{"diffs":[{"old_path":"ci.yml","new_path":"ci.txt"}]}`, "", 200, "ci.yml", false},
+		{"config path", `{"diffs":[{"old_path":"build/ci","new_path":"build/ci"}]}`, "build/ci", 200, "build/ci", false},
+		{"timeout", `{"compare_timeout":true,"diffs":[]}`, "", 200, "", true},
+		{"too many", many, "", 200, "", true},
+		{"refused", `{}`, "", 403, "", true},
+		{"no json", `<html>`, "", 200, "", true},
+	} {
+		compare, config, status = c.compare, c.config, c.status
+		file, err := gitlabDefinitionChanged(srv.URL, "tok", "g/p", "abc")
+		if file != c.file || (err != nil) != c.err {
+			t.Errorf("%s: got %q, %v", c.name, file, err)
+		}
+	}
+}
+
+func TestCheckedPushParts(t *testing.T) {
+	if got := hex.EncodeToString(emptyPack()); got != "5041434b0000000200000000029d08823bd8a8eab510ad6ac75c823cfd3ed31e" {
+		t.Errorf("empty pack %s", got)
+	}
+	ref := "refs/heads/zero-check/x"
+	for in, ok := range map[string]bool{
+		pktLine("unpack ok\n") + pktLine("ok "+ref+"\n") + "0000":                  true,
+		pktLine("unpack ok\n") + pktLine("ng "+ref+" pre-receive hook\n") + "0000": false,
+		pktLine("unpack index-pack failed\n") + "0000":                             false,
+		pktLine("unpack ok\n") + pktLine("ok refs/heads/other\n") + "0000":         false,
+		"": false,
+	} {
+		if err := readReport(bufio.NewReader(strings.NewReader(in)), ref); (err == nil) != ok {
+			t.Errorf("%q: %v", in, err)
+		}
+	}
+	resp := &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("0000"))}
+	gateNote("report-status side-band-64k", "hello")(resp)
+	if b, _ := io.ReadAll(resp.Body); string(b) != pktLine("\x02hello\n")+"0000" {
+		t.Errorf("note %q", b)
+	}
+	resp = &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("0000"))}
+	gateNote("report-status", "hello")(resp)
+	if b, _ := io.ReadAll(resp.Body); string(b) != "0000" {
+		t.Errorf("note without side band %q", b)
 	}
 }

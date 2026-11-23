@@ -2,8 +2,11 @@ package zero
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/rand"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -325,23 +328,143 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			gateDeny(w, err.Error())
 			return
 		}
-		note := "ci.skip added"
+		skip, note := !gs.ciRun, "ci.skip added"
+		pack := io.Reader(br)
 		if gs.ciRun {
-			note = ""
+			// ci.run: the pipeline starts unless the branch changes a pipeline
+			// definition file (#126, ADR 0045)
+			tmp, why, err := gs.checkDefinition(r, repo, ups, br)
+			if tmp != "" {
+				defer gs.dropRef(r, repo, ups[0].New, tmp)
+			}
+			if err != nil {
+				gateRecord(gs, ups[0], "deny", err.Error())
+				gateDeny(w, err.Error())
+				return
+			}
+			if tmp != "" {
+				pack = bytes.NewReader(emptyPack())
+			}
+			if skip, note = why != "", ""; skip {
+				note = "ci.skip added: " + why
+				proxy.ModifyResponse = gateNote(caps, "zero: pipeline skipped: "+why)
+			}
 		}
-		cmds := writeCommands(ups, caps, !gs.ciRun)
+		cmds := writeCommands(ups, caps, skip)
 		if hasOpts {
 			cmds += writeOptions(opts)
 		}
 		for _, u := range ups {
 			gateRecord(gs, u, "allow", note)
 		}
-		r.Body = io.NopCloser(io.MultiReader(strings.NewReader(cmds), br))
+		r.Body = io.NopCloser(io.MultiReader(strings.NewReader(cmds), pack))
 		r.ContentLength = -1
 		r.Header.Del("Content-Length")
 		proxy.ServeHTTP(w, r)
 	default:
 		http.Error(w, "zero: the gate only serves pushes to "+strings.Join(gs.repos, ", "), http.StatusForbidden)
+	}
+}
+
+// checkDefinition decides whether a push with ci.run may start its pipeline.
+// The gate cannot see file names in the pack, so it pushes the pack to a
+// temporary branch with ci.skip and asks the forge which files the commit
+// changes against the default branch. why is the reason to skip, "" to run.
+// tmp is the temporary ref if the pack was sent: the caller then updates the
+// session branch with an empty pack and drops tmp. Every failure before the
+// pack is sent skips the pipeline; a pack the forge refuses is an error.
+func (gs *gateSession) checkDefinition(r *http.Request, repo string, ups []refUpdate, pack io.Reader) (tmp, why string, err error) {
+	_, token, ok := r.BasicAuth()
+	u := ups[0]
+	f := forgeOf(gs.state)
+	switch {
+	case len(ups) != 1 || u.Ref != sessionBranch(gs.name):
+		return "", "the check needs a push of " + sessionBranch(gs.name) + " alone", nil
+	case !ok || token == "" || len(u.New) != len(zeroSHA):
+		return "", "the check needs a token and a sha1 repository", nil
+	}
+	b := make([]byte, 6)
+	rand.Read(b)
+	tmp = "refs/heads/zero-check/" + strings.TrimPrefix(gs.name, "zero-") + "-" + hex.EncodeToString(b)
+	cmds := writeCommands([]refUpdate{{zeroSHA, u.New, tmp}}, "report-status", true)
+	if err := gs.push(r, repo, tmp, io.MultiReader(strings.NewReader(cmds), pack)); err != nil {
+		return "", "", err
+	}
+	file, err := f.DefinitionChanged(token, strings.TrimSuffix(repo[1:], ".git"), u.New)
+	if err != nil {
+		return tmp, "changed files unknown (" + err.Error() + ")", nil
+	}
+	if file != "" {
+		return tmp, "the branch changes the pipeline definition (" + file + "); a human starts it", nil
+	}
+	return tmp, "", nil
+}
+
+// push sends a receive-pack request of the gate's own for one ref with the
+// client's credentials and reads the plain report-status answer.
+func (gs *gateSession) push(r *http.Request, repo, ref string, body io.Reader) error {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, gs.upstream+repo+"/git-receive-pack", body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", r.Header.Get("Authorization"))
+	req.Header.Set("Content-Type", "application/x-git-receive-pack-request")
+	req.Header.Set("Accept", "application/x-git-receive-pack-result")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("forge not reached")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("forge answered %d", resp.StatusCode)
+	}
+	return readReport(bufio.NewReader(io.LimitReader(resp.Body, 1<<16)), ref)
+}
+
+// readReport is nil when a report-status answer says the pack was unpacked
+// and ref was updated; otherwise the error carries the forge's line.
+func readReport(r *bufio.Reader, ref string) error {
+	lines, err := readOptions(r)
+	if err != nil {
+		return fmt.Errorf("forge answer not understood")
+	}
+	if len(lines) == 2 && lines[0] == "unpack ok" && lines[1] == "ok "+ref {
+		return nil
+	}
+	return fmt.Errorf("forge refused the push: %s", strings.Join(lines, "; "))
+}
+
+// dropRef deletes the temporary ref; a leftover is logged, not an error.
+func (gs *gateSession) dropRef(r *http.Request, repo, sha, ref string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), commandTimeout)
+	defer cancel()
+	cmds := writeCommands([]refUpdate{{sha, zeroSHA, ref}}, "report-status delete-refs", false)
+	if err := gs.push(r.WithContext(ctx), repo, ref, strings.NewReader(cmds)); err != nil {
+		gateRecord(gs, refUpdate{sha, zeroSHA, ref}, "error", "temporary branch not deleted: "+err.Error())
+	}
+}
+
+// emptyPack is a pack without objects: the objects of a checked push are
+// already on the forge.
+func emptyPack() []byte {
+	p := []byte("PACK\x00\x00\x00\x02\x00\x00\x00\x00")
+	sum := sha1.Sum(p)
+	return append(p, sum[:]...)
+}
+
+// gateNote puts a message line in front of the forge's answer, which git
+// prints as "remote: ..." if the client reads side bands.
+func gateNote(caps, msg string) func(*http.Response) error {
+	return func(resp *http.Response) error {
+		if resp.StatusCode == http.StatusOK && slices.Contains(strings.Fields(caps), "side-band-64k") {
+			resp.Body = struct {
+				io.Reader
+				io.Closer
+			}{io.MultiReader(strings.NewReader(pktLine("\x02"+msg+"\n")), resp.Body), resp.Body}
+			resp.ContentLength = -1
+			resp.Header.Del("Content-Length")
+		}
+		return nil
 	}
 }
 

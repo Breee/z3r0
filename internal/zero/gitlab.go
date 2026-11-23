@@ -1,9 +1,12 @@
 package zero
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -25,7 +28,7 @@ var gitlabCaps = map[string][]string{
 	"git.read":             {"read_project", "read_code", "download_code"},
 	"git.commit":           {},
 	"git.push":             {"push_code"},
-	capCIRun:               {},
+	capCIRun:               {"read_repository"}, // the gate compares the pushed commit with the default branch (#126)
 	"gitlab.issue.read":    {"read_work_item"},
 	"gitlab.mr.read":       {"read_merge_request"},
 	"gitlab.mr.create":     {"create_merge_request"},
@@ -252,6 +255,82 @@ func (g gitlab) Tokens() ([]Token, error) {
 		toks = append(toks, Token{ID: fmt.Sprint(t.ID), Name: t.Name, Expires: exp})
 	}
 	return toks, nil
+}
+
+func (g gitlab) DefinitionChanged(token, path, sha string) (string, error) {
+	return gitlabDefinitionChanged("https://"+g.host+"/api/v4", token, path, sha)
+}
+
+// maxCompareFiles: a comparison with this many files or more may have been
+// cut short by the forge, so its answer counts as not known.
+const maxCompareFiles = 300
+
+// gitlabDefinitionChanged compares sha with the project's default branch from
+// their merge base, so the definition the pipeline starts from was on the
+// default branch once.
+func gitlabDefinitionChanged(api, token, path, sha string) (string, error) {
+	get := func(rest string, v any) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, api+"/projects/"+url.PathEscape(path)+rest, nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("forge not reached")
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("forge answered %d", resp.StatusCode)
+		}
+		return json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(v)
+	}
+	var p struct {
+		DefaultBranch string `json:"default_branch"`
+		CIConfigPath  string `json:"ci_config_path"`
+	}
+	if err := get("", &p); err != nil {
+		return "", err
+	}
+	if p.DefaultBranch == "" {
+		return "", fmt.Errorf("no default branch")
+	}
+	var c struct {
+		Timeout bool `json:"compare_timeout"`
+		Diffs   []struct {
+			Old string `json:"old_path"`
+			New string `json:"new_path"`
+		} `json:"diffs"`
+	}
+	q := url.Values{"from": {p.DefaultBranch}, "to": {sha}, "straight": {"false"}}
+	if err := get("/repository/compare?"+q.Encode(), &c); err != nil {
+		return "", err
+	}
+	if c.Timeout || len(c.Diffs) >= maxCompareFiles {
+		return "", fmt.Errorf("comparison incomplete")
+	}
+	for _, d := range c.Diffs {
+		for _, f := range []string{d.Old, d.New} {
+			if gitlabDefinitionFile(f, p.CIConfigPath) {
+				return f, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+// gitlabDefinitionFile reports whether a change of file can change what a
+// pipeline does before any job runs: the project's CI config file, anything
+// under .gitlab/, and every YAML file (a local include must be one).
+func gitlabDefinitionFile(file, ciConfig string) bool {
+	if ciConfig == "" {
+		ciConfig = ".gitlab-ci.yml"
+	}
+	l := strings.ToLower(file)
+	return file == ciConfig || strings.HasPrefix(file, ".gitlab/") ||
+		strings.HasSuffix(l, ".yml") || strings.HasSuffix(l, ".yaml")
 }
 
 func (g gitlab) Guardrails(path string) ([]string, error) {

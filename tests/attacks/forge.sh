@@ -33,7 +33,25 @@ case $O in *"push denied"*) echo "PASS git push delete session branch (gate)";; 
 O=$(sbx "cd /tmp/zero/$REPO && git push https://gitlab.com/$P.git \$(git commit-tree -p HEAD -m 'forge.sh attack' HEAD^{tree}):refs/heads/zero-attack")
 case $O in *403*) echo "PASS direct git push to forge (policy)";; *) echo "FAIL direct git push: $O"; FAILS=$((FAILS+1));; esac
 want "REST start pipeline"          "$(code POST '/pipeline?ref=main')" 403
-if grep -qw ci.run "$ST/caps"; then echo "SKIP ci.skip check (ci.run approved for this sandbox)"; else
+if grep -qw ci.run "$ST/caps"; then
+  # #126: with ci.run a push starts no pipeline while the branch changes a pipeline definition file
+  B=zero/${N#zero-}
+  # probe ci|code|clean: push a commit on the session branch that adds .gitlab-ci.yml, adds a code file, or removes both
+  probe() { ssh -F "$C" "$H" "cd /tmp/zero/$REPO && git fetch -q origin $B main && export GIT_INDEX_FILE=/tmp/forge-sh-index && git read-tree FETCH_HEAD && case $1 in
+      ci) git update-index --add --cacheinfo 100644,\$(echo 'probe: {script: [echo forge.sh]}' | git hash-object -w --stdin),.gitlab-ci.yml;;
+      code) git update-index --add --cacheinfo 100644,\$(date +%s%N | git hash-object -w --stdin),forge-sh-probe.txt;;
+      clean) git read-tree origin/main;; esac &&
+    C=\$(git commit-tree -p FETCH_HEAD -m 'forge.sh ci.run probe ($1)' \$(git write-tree)) && git push origin \$C:refs/heads/$B 2>&1; echo sha \$C" 2>&1; }
+  status() { sleep 5; glab api "projects/$ID/pipelines?sha=$(printf %s "$1" | sed -n 's/^sha //p')" | jq -r '.[0].status // "none"'; }
+  for step in ci code; do
+    O=$(probe $step); S=$(status "$O")
+    case "$S $O" in "skipped "*"pipeline skipped"*) echo "PASS ci.run: push ($step) while the branch changes .gitlab-ci.yml starts no pipeline ($S)";;
+      *) echo "FAIL ci.run: push ($step) while the branch changes .gitlab-ci.yml: $S $O"; FAILS=$((FAILS+1));; esac
+  done
+  O=$(probe clean)
+  case $O in *"pipeline skipped"*|*denied*|*rejected*|*fatal*) echo "FAIL ci.run: push without a definition change: $O"; FAILS=$((FAILS+1));; *) echo "PASS ci.run: push without a definition change is not skipped by the gate";; esac
+  glab api "projects/$ID/repository/branches?search=zero-check" | jq -r '.[].name' | grep -q . && { echo "FAIL temporary branch left on forge"; FAILS=$((FAILS+1)); }
+else
   B=zero/${N#zero-}
   O=$(sbx "cd /tmp/zero/$REPO && { git fetch -q origin $B 2>/dev/null && T=FETCH_HEAD || T=HEAD; } && C=\$(git commit-tree -p \$T -m 'forge.sh ci probe' \$T^{tree}) && git push -q origin \$C:refs/heads/$B && echo sha \$C")
   SHA=$(printf %s "$O" | sed -n 's/^sha //p'); sleep 5
