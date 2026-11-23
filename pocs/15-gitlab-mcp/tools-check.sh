@@ -2,7 +2,7 @@
 # Mints a token with the given permissions for one project and calls every
 # tool of default-tools.txt on the instance MCP endpoint (no gateway).
 # Prints ok, empty (an empty list: no data, or GitLab hiding it) or refused.
-# usage: tools-check.sh PERMISSION...   env: FORGE_HOST, PROJECT
+# usage: tools-check.sh PERMISSION...   env: FORGE_HOST, PROJECT, TOOLS (default: all of default-tools.txt)
 set -euo pipefail
 HOST=${FORGE_HOST:-gitlab.com}
 PROJECT=${PROJECT:-corewire/technology-and-research/developer}
@@ -21,8 +21,10 @@ FILE=$(api "projects/$PID/repository/tree?per_page=100" | jq -r '[.[] | select(.
 body=$(jq -n --arg n "zero-poc15-check" --arg e "$(date -u -d tomorrow +%F)" --argjson id "$PID" \
     '{name:$n, expires_at:$e, granular_scopes:[{access:"selected_memberships", permissions:$ARGS.positional, project_ids:[$id]}, {access:"user", permissions:["execute_mcp_tool"]}]}' --args "$@")
 out=$(printf %s "$body" | api -X POST /user/personal_access_tokens -H 'Content-Type: application/json' --input -)
-TOK=$(printf %s "$out" | jq -r .token); TID=$(printf %s "$out" | jq -r .id)
-trap 'api -X DELETE "/personal_access_tokens/$TID" >/dev/null 2>&1 || true' EXIT
+TID=$(printf %s "$out" | jq -er .id)
+H=$(mktemp); chmod 600 "$H"
+trap 'rm -f "$H"; api -X DELETE "/personal_access_tokens/$TID" >/dev/null 2>&1 || true' EXIT
+printf %s "$out" | jq -er '"Authorization: Bearer " + .token' > "$H"
 
 args() {
     case $1 in
@@ -41,24 +43,26 @@ args() {
 
 echo "host=$HOST project=$PROJECT permissions: $*"
 echo "data: commit=${SHA:0:8} file=$FILE mr=${MR:-none} pipeline=${PIPE:-none} job=${JOB:-none} work_item=${WI:-none}"
-bad=0
+bad=0; empty=0
 while read -r t; do
     if [ "$t" = get_work_item ] && [ -z "$WI" ]; then
         echo "skipped  $t  project has no work item"; continue
     fi
-    r=$(curl -s --max-time 60 "https://$HOST/api/v4/mcp" -H "Authorization: Bearer $TOK" \
+    r=$(curl -s --max-time 60 "https://$HOST/api/v4/mcp" -H @"$H" \
         -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
         -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$t\",\"arguments\":$(args "$t")}}")
     text=$(printf %s "$r" | jq -r '(.result.content[0].text // .error.message // "no answer")' 2>/dev/null | tr '\n' ' ' | cut -c1-260)
-    if [ "$(printf %s "$r" | jq -r '.result.isError // (.error != null)')" = false ]; then
+    if ! printf %s "$r" | jq -e '.result' >/dev/null 2>&1; then
+        echo "error    $t  $text"; bad=$((bad + 1))
+    elif [ "$(printf %s "$r" | jq -r '.result.isError // false')" = false ]; then
         if printf %s "$r" | jq -e '.result.content[0].text | fromjson | (.nodes // .tags // .work_items // .) == []' >/dev/null 2>&1; then
-            echo "empty    $t  $text"
+            echo "empty    $t  $text"; empty=$((empty + 1))
         else
             echo "ok       $t  $text"
         fi
     else
         echo "refused  $t  $text"; bad=$((bad + 1))
     fi
-done < "$HERE/default-tools.txt"
-echo "refused: $bad"
+done < <(printf '%s\n' ${TOOLS:-$(cat "$HERE/default-tools.txt")})
+echo "refused or error: $bad, empty (not proven): $empty"
 [ "$bad" = 0 ]

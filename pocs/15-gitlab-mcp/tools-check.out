@@ -1,0 +1,81 @@
+# each tool with exactly the permissions of gitlabTools
+$ TOOLS="get_project" ./tools-check.sh read_project
+ok get_project
+refused or error: 0, empty (not proven): 0
+$ TOOLS="get_repository_file" ./tools-check.sh read_project read_code read_repository
+ok get_repository_file
+refused or error: 0, empty (not proven): 0
+$ TOOLS="list_repository_tree" ./tools-check.sh read_project read_code read_repository
+ok list_repository_tree
+refused or error: 0, empty (not proven): 0
+$ TOOLS="list_branches" ./tools-check.sh read_branch
+ok list_branches
+refused or error: 0, empty (not proven): 0
+$ TOOLS="list_tags" ./tools-check.sh read_repository_tag
+empty list_tags
+refused or error: 0, empty (not proven): 1
+$ TOOLS="list_commits" ./tools-check.sh read_project read_code
+ok list_commits
+refused or error: 0, empty (not proven): 0
+$ TOOLS="get_commit" ./tools-check.sh read_project read_code
+ok get_commit
+refused or error: 0, empty (not proven): 0
+$ TOOLS="list_merge_requests" ./tools-check.sh read_project read_merge_request
+ok list_merge_requests
+refused or error: 0, empty (not proven): 0
+$ TOOLS="get_merge_request" ./tools-check.sh read_project read_merge_request
+ok get_merge_request
+refused or error: 0, empty (not proven): 0
+$ TOOLS="list_pipelines" ./tools-check.sh read_pipeline
+ok list_pipelines
+refused or error: 0, empty (not proven): 0
+$ TOOLS="get_pipeline" ./tools-check.sh read_project read_pipeline
+ok get_pipeline
+refused or error: 0, empty (not proven): 0
+$ TOOLS="get_job" ./tools-check.sh read_job
+ok get_job
+refused or error: 0, empty (not proven): 0
+$ TOOLS="list_work_items" ./tools-check.sh read_work_item read_namespace
+empty list_work_items
+refused or error: 0, empty (not proven): 1
+$ TOOLS="search_labels" ./tools-check.sh read_project
+ok search_labels
+refused or error: 0, empty (not proven): 0
+# with one permission missing
+$ TOOLS="get_project get_repository_file list_repository_tree list_branches list_tags list_commits get_commit list_merge_requests get_merge_request list_pipelines get_pipeline list_work_items search_labels" ./tools-check.sh read_job
+refused  get_project  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  get_repository_file  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  list_repository_tree  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  list_branches  insufficient_granular_scope 
+refused  list_tags  Tool execution failed: Access denied: This operation requires a fine-grained personal access token with the following project permissions: [Repository Tag: Read]. 
+refused  list_commits  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  get_commit  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  list_merge_requests  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  get_merge_request  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  list_pipelines  insufficient_granular_scope 
+refused  get_pipeline  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused  list_work_items  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Namespace: Read]. 
+refused  search_labels  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Project: Read]. 
+refused or error: 13, empty (not proven): 0
+$ TOOLS="get_job list_merge_requests get_merge_request get_pipeline list_commits get_commit" ./tools-check.sh read_project
+refused  get_job  Tool execution failed: Access denied: This operation requires a fine-grained personal access token with the following project permissions: [Job: Read]. 
+empty list_merge_requests
+refused  get_merge_request  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Merge Request: Read]. 
+refused  get_pipeline  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Pipeline: Read]. 
+refused  list_commits  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Code: Read]. 
+refused  get_commit  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Code: Read]. 
+refused or error: 5, empty (not proven): 1
+$ TOOLS="get_repository_file list_repository_tree" ./tools-check.sh read_project read_code
+refused  get_repository_file  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Repository: Read]. 
+refused  list_repository_tree  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Repository: Read]. 
+refused or error: 2, empty (not proven): 0
+$ TOOLS="get_repository_file list_repository_tree" ./tools-check.sh read_project read_repository
+refused  get_repository_file  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Code: Read]. 
+refused  list_repository_tree  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Code: Read]. 
+refused or error: 2, empty (not proven): 0
+$ TOOLS="list_work_items" ./tools-check.sh read_work_item
+refused  list_work_items  Access denied: This operation requires a fine-grained personal access token with the following permissions: [Namespace: Read]. 
+refused or error: 1, empty (not proven): 0
+$ TOOLS="list_work_items" ./tools-check.sh read_namespace
+empty list_work_items
+refused or error: 0, empty (not proven): 1

@@ -34,20 +34,19 @@ var gitlabCaps = map[string][]string{
 
 // gitlabTools maps the tools of GitLab's MCP endpoint that zero offers to
 // the fine-grained token permissions GitLab checks for them (ADR 0043,
-// MG14; checked with pocs/15-gitlab-mcp/tools-check.sh). A tool without
-// an entry cannot be in a workspace's list.
+// MG14; checked with pocs/15-gitlab-mcp/tools-check.sh).
 var gitlabTools = map[string][]string{
 	"get_project":          {"read_project"},
-	"get_repository_file":  {"read_code", "read_repository"},
-	"list_repository_tree": {"read_code", "read_repository"},
+	"get_repository_file":  {"read_project", "read_code", "read_repository"},
+	"list_repository_tree": {"read_project", "read_code", "read_repository"},
 	"list_branches":        {"read_branch"},
 	"list_tags":            {"read_repository_tag"},
-	"list_commits":         {"read_code"},
-	"get_commit":           {"read_code"},
-	"list_merge_requests":  {"read_merge_request"},
-	"get_merge_request":    {"read_merge_request"},
+	"list_commits":         {"read_project", "read_code"},
+	"get_commit":           {"read_project", "read_code"},
+	"list_merge_requests":  {"read_project", "read_merge_request"},
+	"get_merge_request":    {"read_project", "read_merge_request"},
 	"list_pipelines":       {"read_pipeline"},
-	"get_pipeline":         {"read_pipeline"},
+	"get_pipeline":         {"read_project", "read_pipeline"},
 	"get_job":              {"read_job"},
 	"list_work_items":      {"read_work_item", "read_namespace"},
 	"get_work_item":        {"read_work_item"},
@@ -64,7 +63,7 @@ var gitlabDefaultTools = []string{
 
 // gitlabToolPermissions returns the token permissions the tools need.
 func gitlabToolPermissions(tools []string) ([]string, error) {
-	perms := []string{"read_project"}
+	var perms []string
 	for _, t := range tools {
 		p, ok := gitlabTools[t]
 		if !ok {

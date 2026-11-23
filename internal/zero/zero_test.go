@@ -685,8 +685,8 @@ func TestGitlabToolPermissions(t *testing.T) {
 	if err != nil || strings.Join(got, " ") != "read_project read_code read_branch" {
 		t.Fatalf("got %v, %v", got, err)
 	}
-	if got, _ := gitlabToolPermissions(nil); strings.Join(got, " ") != "read_project" {
-		t.Fatalf("no tool: %v", got)
+	if got, _ := gitlabToolPermissions([]string{"list_branches"}); strings.Join(got, " ") != "read_branch" {
+		t.Fatalf("one tool: %v", got)
 	}
 	if _, err := gitlabToolPermissions([]string{"get_project", "save_note"}); err == nil {
 		t.Fatal("tool without entry accepted")
