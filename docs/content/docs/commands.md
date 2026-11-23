@@ -17,7 +17,7 @@ The first match wins:
 3. the workspace that contains the current folder
 4. the current workspace, set by `zero switch` or `zero ctx use`
 
-Every command prints the workspace and where it came from as its first line:
+Every command that acts on a workspace prints the workspace and where it came from as its first line:
 
 ```
 ctx: developer (cwd)
@@ -35,7 +35,7 @@ ctx: developer (cwd)
 | `zero up --vm` | new sandbox as a MicroVM instead of a container |
 | `zero status` | state of the sandbox, token, push gate |
 | `zero stop` | ends the port forward; the sandbox keeps running |
-| `zero pause` | stops the sandbox and revokes its token; files stay |
+| `zero pause` | stops the sandbox and revokes its token; files stay. Not available for `--vm` sandboxes |
 | `zero rm [-y]` | deletes the sandbox; lists work that is not pushed and asks for the workspace name |
 | `zero logs [-f]` | log of opencode inside the sandbox |
 
@@ -78,6 +78,7 @@ zero run "add a test for the parser and push"
 | `zero ctx add [PATH...]` | adds folders to the workspace |
 | `zero ctx remove [PATH...]` | removes folders from the workspace |
 | `zero ctx rm [-y] NAME` | deletes the workspace and its sandbox |
+| `zero ctx --prompt` | prints the name of the workspace a command would act on, for a shell prompt |
 
 ```sh
 zero ls

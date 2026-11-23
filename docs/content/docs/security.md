@@ -10,7 +10,7 @@ zero assumes that the agent can be turned against you: by a prompt hidden in an 
 
 - a copy of the repositories and input folders of its workspace
 - network access to the GitLab host, the model endpoint and the hosts in the [policy](../policy)
-- a GitLab token for exactly the projects of the workspace, with the permissions of the policy, valid for two days and renewed while the sandbox runs
+- a GitLab token for exactly the projects of the workspace, with the permissions of the policy, valid for one to two days (it ends at midnight UTC of the day after tomorrow) and renewed while the sandbox runs
 - one way to hand over work: `git push` to `zero/<workspace>`
 
 ## What it cannot do
@@ -20,7 +20,7 @@ zero assumes that the agent can be turned against you: by a prompt hidden in an 
 | read your home directory, SSH keys or other repositories | it runs in an OpenShell sandbox with its own file system |
 | read its own GitLab token | the sandbox holds a placeholder; the real token is put into the request outside the sandbox |
 | reach a host that is not allowed | all traffic passes the sandbox proxy; other hosts are blocked |
-| push to `main`, another branch or a tag, or delete a branch | the push gate allows `zero/<workspace>` only; a direct push to GitLab is blocked |
+| push to `main`, another branch or a tag, or delete a branch | the push gate allows `zero/<workspace>` and branches below it only; a direct push to GitLab is blocked |
 | start a pipeline with its code | the push gate adds `ci.skip` and refuses push options, unless the policy grants `ci.run` |
 | open a merge request | the token has no permission for it, unless the policy grants `gitlab.mr.create` |
 | widen its own policy | the policy is read from your host checkout and a wider one needs your approval |
@@ -38,7 +38,7 @@ These points are tested against a running sandbox by [`tests/attacks/forge.sh`](
 
 | Open point | Effect | Tracked |
 |---|---|---|
-| Data can leave through an allowed host | the agent can send data to an allowed host under an account of its own; keep `network.allow` short | [#14](https://github.com/Breee/z3r0/issues/14) |
+| Data can leave through an allowed host | the agent can send data to an allowed host under an account of its own; keep `network.allow` short | [#37](https://github.com/Breee/z3r0/issues/37) |
 | Text from outside reaches the agent unmarked | an issue or merge request comment of a stranger can carry instructions for the agent | [#110](https://github.com/Breee/z3r0/issues/110) |
 | The agent can force-push its own branch | history of `zero/<workspace>` can be rewritten; other branches are not affected | [attack paths](https://github.com/Breee/z3r0/blob/main/docs/attack-paths.md) |
 | `ci.run` together with `gitlab.mr.create` | a merge request opened by the agent through the API runs a changed pipeline definition | [ADR 0045](https://github.com/Breee/z3r0/blob/main/docs/adr/0045-ci-run-skips-while-the-branch-changes-the-pipeline-definition.md) |
