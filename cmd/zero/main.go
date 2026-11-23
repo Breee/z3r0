@@ -47,6 +47,8 @@ const bashCompletion = `_zero() {
   case ${COMP_WORDS[COMP_CWORD-1]} in
     switch|use|-c|--context)
       COMPREPLY=($(compgen -W "$(zero ctx 2>/dev/null | cut -c3- | cut -d' ' -f1)" -- "$cur")) ;;
+    ctx)
+      COMPREPLY=($(compgen -W "use new add remove rm" -- "$cur")) ;;
     zero)
       COMPREPLY=($(compgen -W "up attach run code web status stop logs pause rm ls switch ctx install doctor completion" -- "$cur")) ;;
   esac

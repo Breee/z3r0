@@ -628,3 +628,54 @@ func TestRenderSwitch(t *testing.T) {
 		t.Errorf("warning or help missing:\n%s", b.String())
 	}
 }
+
+func TestNextKey(t *testing.T) {
+	var got []string
+	for b := []byte("jj\x1b[A\x1bOBx\r"); len(b) > 0; {
+		a, n := nextKey(b)
+		got, b = append(got, a), b[n:]
+	}
+	if want := "down down up down  use"; strings.Join(got, " ") != want {
+		t.Errorf("keys = %q, want %q", strings.Join(got, " "), want)
+	}
+	if a, _ := nextKey([]byte("\x1b")); a != "quit" {
+		t.Errorf("lone escape = %q, want quit", a)
+	}
+	for in, want := range map[string]bool{"\x1b": true, "j\x1b[": true, "\x1bO": true, "\x1b[A": false, "j": false} {
+		if cutEscape([]byte(in)) != want {
+			t.Errorf("cutEscape(%q) != %v", in, want)
+		}
+	}
+}
+
+func TestSwitchByName(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	c := &Config{Current: "api", Workspaces: map[string]*Workspace{
+		"api": {Folders: []string{dir}}, "web": {Folders: []string{dir}}}}
+	if err := c.save(); err != nil {
+		t.Fatal(err)
+	}
+	current := func() string {
+		c, err := loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c.Current
+	}
+	if err := Switch(nil, nil, []string{"web"}); err != nil || current() != "web" {
+		t.Errorf("switch web: err %v, current %q", err, current())
+	}
+	if err := Switch(nil, nil, []string{"nope"}); err == nil || current() != "web" {
+		t.Errorf("switch nope: err %v, current %q", err, current())
+	}
+	// Without a name and without a terminal: an error, nothing changed.
+	f, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := Switch(f, f, nil); err == nil || !strings.Contains(err.Error(), "terminal") || current() != "web" {
+		t.Errorf("switch without terminal: err %v, current %q", err, current())
+	}
+}

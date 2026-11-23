@@ -1,6 +1,6 @@
 # Spec: workspaces and contexts
 
-Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039); `zero ls`, unpushed check and typed name on `rm` (#79).
+Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039); `zero ls`, unpushed check and typed name on `rm` (#79); `zero switch`, bash completion (#80).
 
 ## 1. Concepts
 
@@ -9,7 +9,7 @@ Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_
 | Workspace | One sandbox. Named. Holds 1..n folders. Like a VS Code multi-root workspace. |
 | Folder | A host directory in a workspace. Kind `repo` (git) or `input` (no git repo). |
 | Context | The workspace a command acts on. kubectl-style. |
-| Current context | Stored fallback, set by `zero ctx use`. |
+| Current context | Stored fallback, set by `zero ctx use` or `zero switch`. |
 
 Rules that do not change: agent never sees real secrets; the only exit for work is `git push` (ADR 0027); policy is read from the host, never from the sandbox.
 
@@ -56,7 +56,7 @@ cwd ambiguity (folder in several workspaces): if `current` is one of them use it
 ```
 zero ctx                         list; * = current, + = matches cwd
 zero ctx use NAME                set current
-zero switch [NAME]               = ctx use NAME; without NAME pick from the list (arrows, enter)
+zero switch [NAME]               = ctx use NAME; without NAME pick from the list (arrows, enter; q exits 0, unchanged)
 zero completion bash             bash completion, completes workspace names for switch, ctx use, -c
 zero ctx new NAME [PATH...]      create (default PATH = cwd), set current. No sandbox yet.
 zero ctx add [PATH...]           add folders to context (default cwd)
@@ -266,4 +266,4 @@ Web UI (later, on the same config); GitHub forge; syncing input folders back; re
 3. input folders (copy, read-only, exclude list)
 4. widening approval prompt
 5. `zero ls` with orphans; unpushed check on `rm`
-6. picker TUI
+6. `zero switch` + completion (instead of a picker TUI)

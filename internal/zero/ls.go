@@ -20,7 +20,7 @@ type wsRow struct {
 	Current                     bool
 }
 
-// overview is the live state behind `zero ls` and `zero pick`.
+// overview is the live state behind `zero ls` and `zero switch`.
 type overview struct {
 	c          *Config
 	rows       []wsRow

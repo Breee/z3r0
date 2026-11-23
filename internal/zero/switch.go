@@ -47,6 +47,25 @@ func renderSwitch(out io.Writer, o *overview, sel int) {
 	io.WriteString(out, b.String())
 }
 
+// nextKey takes the first key press off b: its action and its length. An
+// escape that starts no known sequence counts as the Esc key.
+func nextKey(b []byte) (string, int) {
+	if b[0] != 0x1b {
+		return switchKey(b[:1]), 1
+	}
+	if len(b) >= 3 && (b[1] == '[' || b[1] == 'O') {
+		return switchKey(b[:3]), 3
+	}
+	return "quit", len(b)
+}
+
+// cutEscape reports whether b ends inside an escape sequence, as happens
+// when a terminal delivers an arrow key in two reads.
+func cutEscape(b []byte) bool {
+	n := len(b)
+	return b[n-1] == 0x1b || n >= 2 && b[n-2] == 0x1b && (b[n-1] == '[' || b[n-1] == 'O')
+}
+
 func termios(f *os.File, req uintptr, t *syscall.Termios) error {
 	if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(t))); e != 0 {
 		return e
@@ -56,7 +75,7 @@ func termios(f *os.File, req uintptr, t *syscall.Termios) error {
 
 // Switch makes a workspace the current one, like `zero ctx use`: the one
 // named in args, or without a name the one picked from the list.
-func Switch(in *os.File, out io.Writer, args []string) error {
+func Switch(in, out *os.File, args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("usage: zero switch [NAME]")
 	}
@@ -80,14 +99,14 @@ func Switch(in *os.File, out io.Writer, args []string) error {
 	if err := c.save(); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "ctx: %s\n", name)
+	fmt.Fprintf(os.Stderr, "ctx: %s (switch)\n", name)
 	return nil
 }
 
 // pickWorkspace shows the list and returns the chosen name; "" if the user left.
-func pickWorkspace(in *os.File, out io.Writer) (string, error) {
+func pickWorkspace(in, out *os.File) (string, error) {
 	var cooked syscall.Termios
-	if err := termios(in, syscall.TCGETS, &cooked); err != nil {
+	if err := termios(in, syscall.TCGETS, &cooked); err != nil || !isTerminal(out) {
 		return "", fmt.Errorf("zero switch without a name needs a terminal (zero switch NAME; zero ls lists them)")
 	}
 	o, err := loadOverview()
@@ -106,6 +125,9 @@ func pickWorkspace(in *os.File, out io.Writer) (string, error) {
 	raw := cooked
 	raw.Lflag &^= syscall.ICANON | syscall.ECHO | syscall.ISIG
 	raw.Cc[syscall.VMIN], raw.Cc[syscall.VTIME] = 1, 0
+	// rest waits a tenth of a second for the rest of an escape sequence.
+	rest := raw
+	rest.Cc[syscall.VMIN], rest.Cc[syscall.VTIME] = 0, 1
 	if err := termios(in, syscall.TCSETS, &raw); err != nil {
 		return "", err
 	}
@@ -118,15 +140,27 @@ func pickWorkspace(in *os.File, out io.Writer) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		switch switchKey(buf[:n]) {
-		case "up":
-			sel = max(0, sel-1)
-		case "down":
-			sel = min(sel+1, len(o.rows)-1)
-		case "use":
-			return o.rows[sel].Name, nil
-		case "quit":
-			return "", nil
+		keys := buf[:n]
+		if cutEscape(keys) {
+			more := make([]byte, 8)
+			termios(in, syscall.TCSETS, &rest)
+			m, _ := in.Read(more)
+			termios(in, syscall.TCSETS, &raw)
+			keys = append(keys, more[:m]...)
+		}
+		for len(keys) > 0 {
+			action, k := nextKey(keys)
+			keys = keys[k:]
+			switch action {
+			case "up":
+				sel = max(0, sel-1)
+			case "down":
+				sel = min(sel+1, len(o.rows)-1)
+			case "use":
+				return o.rows[sel].Name, nil
+			case "quit":
+				return "", nil
+			}
 		}
 	}
 }
