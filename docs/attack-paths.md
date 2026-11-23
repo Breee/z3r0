@@ -33,7 +33,7 @@ Effort: what it takes to exploit the path, from least to most. Classified by jud
 By effort: E1 P12 P30 P31 P34 P35 · E2 P02 P04 P06 P07 P08 P09 P15 P23 P25 P26 P27 · E3 P01 P05 P10 P13 P14 P16 P18 P36 P37 · E4 P11 P17 P21 P22 P24 P28 P29 P32 P33 · E5 P03 P19 P20.
 
 "Practice: F1, C1, …" in a mitigation cell names the rules in [gitops-manifesto.md](gitops-manifesto.md) that close or narrow the path. They are practices of the team or platform, not controls zero enforces, unless the manifesto says so.
-P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci.run` is approved.
+P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci.run` is approved, and while #134 is open (a merge request opened by the agent starts a pipeline).
 
 | # | Severity | Effort | Path | Evidence | Section |
 |---|---|---|---|---|---|
@@ -110,7 +110,7 @@ Recorded 2026-11-10 for the zero workflow, not proven unless noted. Recorded, no
 | # | Severity | Path | Impact | Proof / status | Mitigation | Ref |
 |---|---|---|---|---|---|---|
 | P13 | high | Agent commits hook/tool configs (`.pre-commit-config.yaml`, `.husky/`, `lefthook.yml`, `.envrc`, `.vscode/tasks.json`, `Makefile`, `go:generate`, tests) → developer checks out the branch on the host and runs tooling | Code exec as login user, full host blast radius | reasoning; `.git/hooks`/`.git/config` do not travel (F12) | — Practice: F10, H2. | C42 |
-| P14 | high | Agent pushes to its session branch → pipeline starts automatically and runs agent-written code (`.gitlab-ci.yml`, tests, Makefile, scripts, Dockerfile) on a runner outside the sandbox. Detail: section 7 | Exfil of CI secrets and the repo, abuse of job token / OIDC / runner | tested 2026-11-16 (#102), see section 7 | Push gate adds `ci.skip` unless `ci.run` is approved (ADR 0035); `zero doctor` fails on unprotected project CI variables Practice: F9, C1, C3, C4, C5, C6, C7, C8, C9, Z2. | ADR 0034, #101 |
+| P14 | high | Agent pushes to its session branch → pipeline starts automatically and runs agent-written code (`.gitlab-ci.yml`, tests, Makefile, scripts, Dockerfile) on a runner outside the sandbox. Detail: section 7 | Exfil of CI secrets and the repo, abuse of job token / OIDC / runner | tested 2026-11-16 (#102) and 2026-11-23 (#134), see section 7 | Push gate adds `ci.skip` unless `ci.run` is approved (ADR 0035); **open: the agent opens a merge request and the merge request pipeline runs its code (#134)**; `zero doctor` fails on unprotected project CI variables Practice: F9, C1, C3, C4, C5, C6, C7, C8, C9, Z2. | ADR 0034, #101 |
 | P15 | high | Prompt injection via GitLab content the agent reads (issues, MR comments, job logs, MCP results) or via dependencies/READMEs | Agent performs attacker's actions within its permissions | inherent, not tested | — Practice: F11. | A07, F04, P26 |
 | P16 | medium | Agent widens `.zero/policy.yaml` on a branch → developer checks it out → approves the expansion prompt without reading (approval fatigue) | Broader egress/token scope for next sandbox | design (§7a), not built | — Practice: F4, F5, F9, Z3. | X06 |
 | P17 | medium | Malicious Go module via allowed `proxy.golang.org` → `go.sum` committed → host or CI build runs it | Code exec in CI / on host (sandbox itself contained) | reasoning | — Practice: C14, C15, C16, G7, G8. | P13 |
@@ -179,7 +179,9 @@ Added 2026-11-16 (#101). From GitLab documentation and reasoning; the test of 20
 
 Not reachable: protected variables, protected environments, merge.
 
-**Tested 2026-11-16 (#102, gitlab.com, self-hosted group runner):** a push without `ci.skip` ran the agent's job automatically; it read an unprotected CI variable, not a protected one, had `CI_JOB_TOKEN` and open internet. With `ci.skip` the pipeline is recorded as `skipped`; the agent token cannot start one (REST create/retry/trigger/schedule/MR pipeline, GraphQL: all refused). Built: push gate adds `ci.skip` unless capability `ci.run` is approved (ADR 0035); `zero doctor` fails on unprotected project CI variables. Not built: check of inherited group variables and runner scope.
+**Tested 2026-11-16 (#102, gitlab.com, self-hosted group runner):** a push without `ci.skip` ran the agent's job automatically; it read an unprotected CI variable, not a protected one, had `CI_JOB_TOKEN` and open internet. With `ci.skip` the pipeline is recorded as `skipped`; the pipeline API calls are refused for the agent token (REST create/retry/trigger/schedule/MR pipeline, GraphQL). Built: push gate adds `ci.skip` unless capability `ci.run` is approved (ADR 0035); `zero doctor` fails on unprotected project CI variables. Not built: check of inherited group variables and runner scope.
+
+**Tested 2026-11-23 (#126, #134, gitlab.com, default capabilities, no `ci.run`):** the gate does not hold against a merge request. The agent pushed a `.gitlab-ci.yml` with a rule for `merge_request_event` (push pipeline `skipped`), then opened a merge request with its own token (`gitlab.mr.create`). GitLab started a pipeline with source `merge_request_event` and the agent's job ran on the runner. A later push with `ci.skip` while the merge request is open skips both pipelines; only the creation of the merge request starts one. Open: #134.
 
 **Candidate layers (status before #102).**
 
