@@ -221,11 +221,14 @@ func main() {
 			http.Error(w, "no session", http.StatusForbidden)
 			return
 		}
-		decide(id, "allow", "authz: backend credential of the session")
+		reason := "authz: backend credential of the session"
 		if *tools != "" {
 			list, _ := os.ReadFile(filepath.Join(*tools, filepath.Base(id)))
-			w.Header().Set("X-Zero-Tools", strings.Join(strings.Fields(string(list)), ","))
+			names := strings.Fields(string(list))
+			w.Header().Set("X-Zero-Tools", strings.Join(names, ","))
+			reason += fmt.Sprintf(", %d tools", len(names))
 		}
+		decide(id, "allow", reason)
 		w.Header().Set("X-Zero-Backend-Token", strings.TrimSpace(string(cred)))
 	})
 	// Test upstream: accepts only a granted token and never echoes it back.

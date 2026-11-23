@@ -37,6 +37,24 @@ curl -s -m 60 -H "$h1" -H "$h2" -H "mcp-session-id: $sid" -d "{\"jsonrpc\":\"2.0
 }
 call() { mcp "$1" tools/call "{\"name\":\"$2\",\"arguments\":$3}"; }
 names() { mcp "$1" tools/list '{}' | grep -o '"name":"[a-z_]*"' | cut -d'"' -f4 | sort | tr '\n' ' ' | sed 's/ $//'; }
+# denied LABEL SANDBOX TOOL ARGS: the call returns an error and the gateway log has one more denial for this tool
+denied() {
+    local before out after
+    before=$(podman logs poc15-gateway 2>&1 | grep -c "authorization denied for tool: $3")
+    out=$(call "$2" "$3" "$4")
+    after=$(podman logs poc15-gateway 2>&1 | grep -c "authorization denied for tool: $3")
+    if printf %s "$out" | grep -q '"error"' && ! printf %s "$out" | grep -q '"result"' && [ "$after" = $((before + 1)) ]; then
+        pass "$1"
+    else
+        fail "$1 (denials in the gateway log $before -> $after, response: $(printf %s "$out" | head -c 300))"
+    fi
+}
+zerocp() { # zerocp [FLAGS]: start zero-cp
+    podman rm -f poc15-zero-cp >/dev/null 2>&1
+    podman run -d --name poc15-zero-cp --network host -v "$W:/w" localhost/poc15-zero-cp -svid -jwks /w/bundle.json -audience zero-mcp \
+        -allow /w/allow.txt -sessions /w/sessions -gateway-key /w/gateway.key -log /w/decisions.jsonl "$@" >/dev/null || exit 1
+    sleep 2
+}
 want() { tr -s ' \n' '\n\n' | sort | tr '\n' ' ' | sed 's/^ //; s/ $//'; }
 
 # what zero does on `zero up`: a token for the workspace's projects with the permissions of git.read, usable for MCP
@@ -74,9 +92,7 @@ podman exec openshell-spiffe-demo-spire-server /opt/spire/bin/spire-server bundl
 jq '{keys: [.keys[] | select(.use == "jwt-svid") | .use = "sig"]}' "$W/bundle.json" > "$W/jwks.json"
 : > "$W/allow.txt"; mkdir "$W/sessions" "$W/tools"
 (umask 077; head -c 32 /dev/urandom | basenc --base64url -w0 > "$W/gateway.key")
-podman rm -f poc15-zero-cp >/dev/null 2>&1
-podman run -d --name poc15-zero-cp --network host -v "$W:/w" localhost/poc15-zero-cp -svid -jwks /w/bundle.json -audience zero-mcp \
-    -allow /w/allow.txt -sessions /w/sessions -tools /w/tools -gateway-key /w/gateway.key -log /w/decisions.jsonl >/dev/null || exit 1
+zerocp -tools /w/tools
 
 $O profile import --file "$ROOT/pocs/13-agentgateway/profile.yaml" >/dev/null 2>&1
 $O provider create --name zero-mcp-poc --type zero-mcp-poc --runtime-credentials >/dev/null || exit 1
@@ -106,13 +122,13 @@ check "b: same gateway, tools/list is exactly the default" "$(names gl-b)" "$(wa
 RA=$(call gl-a get_project "$PAJ")
 has "a: get_project on a's project" "$RA" "${PA##*/}"
 hasnot "a: get_project is no error" "$RA" '"isError":true'
-has "a: tool outside the list refused by the gateway (list_commits)" "$(call gl-a list_commits "{\"id\":\"$PA\"}")" '"error"'
-has "a: write tool refused by the gateway (save_note)" "$(call gl-a save_note "$PAJ")" '"error"'
-has "a: b's project refused by GitLab (a's token)" "$(call gl-a get_project "$PBJ")" 'Access denied\|isError'
+denied "a: tool outside the list refused by the gateway (list_commits)" gl-a list_commits "$PAJ"
+denied "a: write tool refused by the gateway (save_note)" gl-a save_note "$PAJ"
+has "a: b's project refused by GitLab (a's token)" "$(call gl-a get_project "$PBJ")" 'Access denied'
 RB=$(call gl-b get_project "$PBJ")
 has "b: get_project on b's project (b's token)" "$RB" "${PB##*/}"
 hasnot "b: get_project is no error" "$RB" '"isError":true'
-has "b: a's project refused by GitLab (b's token)" "$(call gl-b get_project "$PAJ")" 'Access denied\|isError'
+has "b: a's project refused by GitLab (b's token)" "$(call gl-b get_project "$PAJ")" 'Access denied'
 has "b: default tool works (list_commits)" "$(call gl-b list_commits "$PBJ")" 'gid://gitlab/Commit/'
 has "b: tool in the list but beyond the token's permissions refused by GitLab (list_branches)" \
     "$(call gl-b list_branches "{\"id\":\"$PB\"}")" 'insufficient_granular_scope'
@@ -131,13 +147,17 @@ check "a: GitLab not reachable from the sandbox directly" \
 
 echo get_project > "$W/tools/$SB_a"
 check "a: tool removed from the list: gone at the next request" "$(names gl-a)" get_project
-has "a: removed tool refused by the gateway" "$(call gl-a list_branches "{\"id\":\"$PA\"}")" '"error"'
+denied "a: removed tool refused by the gateway" gl-a list_branches "{\"id\":\"$PA\"}"
 rm "$W/tools/$SB_a"
-check "a: no tool list: no tool" "$(names gl-a)" ""
-has "a: no tool list: call refused" "$(call gl-a get_project "$PAJ")" '"error"'
+has "a: no tool list: tools/list answers with an empty list" "$(mcp gl-a tools/list '{}')" '"tools":\[\]'
+denied "a: no tool list: call refused by the gateway" gl-a get_project "$PAJ"
 rm "$W/sessions/$SB_a"
 has "a: session removed in zero-cp: gateway fails closed" "$(mcp gl-a tools/list '{}')" 'no session'
 has "b: still works after a's session ended" "$(call gl-b get_project "$PBJ")" "${PB##*/}"
+zerocp
+has "zero-cp sends no tool list at all: b's tools/list is empty" "$(mcp gl-b tools/list '{}')" '"tools":\[\]'
+denied "zero-cp sends no tool list at all: b's call refused by the gateway" gl-b get_project "$PBJ"
+zerocp -tools /w/tools
 
 echo "--- variant A: zero writes one rule per workspace into the gateway config"
 (umask 077; printf %s "$TOKA" > "$W/sessions/$SB_a")
@@ -151,7 +171,7 @@ check "A: rule changed in the config file: picked up without restart" "$(names g
 echo "--- gateway log (tool calls)"
 podman logs poc15-gateway >> "$W/gateway.log" 2>&1
 grep 'mcp.method.name=tools/call' "$W/gateway.log" | cut -f3- | cut -c1-600 | head -n 4
-check "gateway log carries no GitLab token" "$(grep -c 'glpat-' "$W/gateway.log" "$W/decisions.jsonl" | cut -d: -f2 | paste -sd+ | bc)" 0
+check "gateway log carries no GitLab token" "$(cat "$W/gateway.log" "$W/decisions.jsonl" | grep -c 'glpat-')" 0
 echo "--- zero-cp decisions"
 tail -n 4 "$W/decisions.jsonl" | cut -c1-300
 exit $FAILED

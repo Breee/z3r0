@@ -2,7 +2,7 @@
 
 Question: can the shared gateway give each workspace its own tool list and its own GitLab token for GitLab's MCP endpoint, with no GitLab token in the sandbox?
 
-Result (2026-11-23, OpenShell 0.1.8, SPIRE 1.12.4, agentgateway 1.7.0, gitlab.com MCP server 19.7.0-pre, podman): **yes**. `run.sh` 28/28 PASS.
+Result (2026-11-23, OpenShell 0.1.8, SPIRE 1.12.4, agentgateway 1.7.0, gitlab.com MCP server 19.7.0-pre, podman): **yes**. `run.sh` 30/30 PASS.
 
 ## Chain
 
@@ -26,7 +26,7 @@ Workspaces: a = token for project A, tool list overridden to `get_project list_b
 | a lists tools | exactly its override (2 tools) |
 | b lists tools through the same gateway | exactly the default list (15 tools) |
 | a, b call `get_project` on their own project | works |
-| a calls a tool outside its list (`list_commits`), a write tool (`save_note`) | refused by the gateway |
+| a calls a tool outside its list (`list_commits`), a write tool (`save_note`) | refused by the gateway (error response and a denial for that tool in the gateway log) |
 | a reads b's project, b reads a's project | refused by GitLab: the token is the other workspace's |
 | b calls a tool in its list that its token does not cover (`list_branches`) | refused by GitLab (`insufficient_granular_scope`) |
 | call without identity, call with a GitLab token as identity | 401 |
@@ -34,7 +34,8 @@ Workspaces: a = token for project A, tool list overridden to `get_project list_b
 | GitLab token in the sandbox (env, files, responses, tool results), in the gateway log | none |
 | GitLab reached from the sandbox directly | no |
 | tool removed from a's list | gone from the list and refused at the next request |
-| workspace without a tool list | no tool listed, call refused |
+| workspace without a tool list | empty tool list, call refused by the gateway |
+| zero-cp sends no tool list header at all (started without `-tools`) | empty tool list, call refused by the gateway: the rule fails closed |
 | a's session removed in zero-cp | gateway fails closed (`no session`), b still works |
 | variant A: one static rule per workspace in the gateway config | works; a changed rule is picked up without restart |
 
@@ -46,6 +47,8 @@ Workspaces: a = token for project A, tool list overridden to `get_project list_b
 Recommendation: B.
 
 ## Findings
+
+The first three were seen in manual calls on 2026-11-23 while building the PoC; `run.sh` checks only `list_branches` (refused) and `list_commits` (works).
 
 - GitLab checks one fine-grained token permission per tool. With `git.read`: `get_project` and `list_commits` work; `list_branches`, `list_repository_tree` and `list_pipelines` are refused; `list_merge_requests` returns an empty list instead of a refusal. So the tool list and the token's permissions are two separate layers, and a tool in the list is only useful if the token covers it. zero needs a tool -> permission table; not built.
 - GitLab's endpoint keeps no session; the gateway issues the MCP session ID.
@@ -79,7 +82,8 @@ Run as containers: SPIRE, OpenShell gateway, agentgateway (`ghcr.io/agentgateway
 
 Exceptions:
 
-- host binaries `podman`, `openshell`, and `glab` (mints the tokens, as zero does today), `jq`, `curl` in the script;
+- host binaries `podman`, `openshell`, and `glab` (mints the tokens, as zero does today), `jq`, `curl`, `basenc` in the script;
+- SPIRE and the OpenShell gateway are started by the PoC 08 environment, not by `run.sh`; GitLab is the remote instance;
 - the zero-cp image is built locally, so it has no pinned digest (its base has);
 - both containers use the host network;
 - `ghcr.io/agentgateway` had to be added to the podman trust policy (accept without signature).
@@ -91,6 +95,9 @@ Exceptions:
 - agentgateway listens on all interfaces; the gateway key is a shared secret in a file (MG10).
 - zero-cp is the PoC from `pocs/09-zero-cp` with a new `-tools` flag; tool lists are files written by the script, not zero's config.
 - Write tools were only tested as refused, never allowed.
+- The token search in the sandbox covers the environment, `/tmp`, `/sandbox` and the responses, not the whole file system.
+- If the script is killed (`kill -9`), its two tokens stay valid until they expire the next day.
+- Anyone on the host with the gateway key can ask zero-cp for a workspace's token (MG10).
 
 ## Run
 
