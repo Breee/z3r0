@@ -19,6 +19,9 @@ import (
 
 type Workspace struct {
 	Folders []string `yaml:"folders"`
+	// Tools are the forge MCP tools of the workspace: "default" or tool
+	// names. Empty means none (ADR 0043).
+	Tools []string `yaml:"tools,omitempty"`
 }
 
 type Config struct {
@@ -55,6 +58,9 @@ func loadConfig() (*Config, error) {
 	for name, w := range c.Workspaces {
 		if !wsNameRe.MatchString(name) || w == nil || len(w.Folders) == 0 {
 			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one folder", configPath(), name)
+		}
+		if _, err := mcpTools(w.Tools); err != nil {
+			return nil, fmt.Errorf("%s: workspace %q: %w", configPath(), name, err)
 		}
 	}
 	return c, nil
@@ -234,9 +240,11 @@ func (c *Config) sandbox(name string) *Sandbox {
 			break
 		}
 	}
+	tools, _ := mcpTools(c.Workspaces[name].Tools) // checked by loadConfig
 	s := &Sandbox{
 		Name:    "zero-" + name,
 		Folders: c.Workspaces[name].Folders,
+		Tools:   tools,
 		Repo:    repo,
 		Top:     top,
 		Dir:     dir,

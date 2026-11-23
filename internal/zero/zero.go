@@ -30,6 +30,7 @@ const servePort = 4096
 type Sandbox struct {
 	Name    string   // zero-<workspace>
 	Folders []string // host folders of the workspace
+	Tools   []string // forge MCP tools of the workspace, "default" expanded
 	Repo    string   // basename of the first folder
 	Top     string   // first folder on the host
 	Dir     string   // checkout path of the first folder inside the sandbox

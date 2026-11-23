@@ -110,7 +110,7 @@ func TestParsePolicy(t *testing.T) {
 			t.Errorf("accepted %q", bad)
 		}
 	}
-	if _, err := (gitlab{}).Permissions([]string{"container.build"}); err == nil {
+	if _, err := (gitlab{}).Permissions([]string{"container.build"}, nil); err == nil {
 		t.Error("unknown capability accepted")
 	}
 }
@@ -705,5 +705,71 @@ func TestGitlabToolPermissions(t *testing.T) {
 	}
 	if !slices.Equal(strings.Fields(string(b)), gitlabDefaultTools) {
 		t.Fatal("default list differs from pocs/15-gitlab-mcp/default-tools.txt")
+	}
+}
+
+func TestWorkspaceTools(t *testing.T) {
+	got, err := mcpTools([]string{"get_project", "default", "get_project"})
+	if err != nil || len(got) != len(gitlabDefaultTools) || got[0] != "get_project" {
+		t.Fatalf("default with names: %v, %v", got, err)
+	}
+	if got, err := mcpTools(nil); err != nil || got != nil {
+		t.Fatalf("no list: %v, %v", got, err)
+	}
+	if _, err := mcpTools([]string{"default", "save_note"}); err == nil || !strings.Contains(err.Error(), `"save_note"`) {
+		t.Fatalf("tool without entry: %v", err)
+	}
+
+	caps := []string{"git.read", "git.push"}
+	base, err := (gitlab{}).Permissions(caps, nil)
+	if err != nil || strings.Join(base, " ") != "read_project read_code download_code push_code" {
+		t.Fatalf("without tools: %v, %v", base, err)
+	}
+	with, err := (gitlab{}).Permissions(caps, []string{"get_project", "list_branches"})
+	if err != nil || strings.Join(with, " ") != strings.Join(base, " ")+" read_branch" {
+		t.Fatalf("with tools: %v, %v", with, err)
+	}
+	if _, err := (gitlab{}).Permissions(caps, []string{"save_note"}); err == nil {
+		t.Fatal("permissions for a tool without entry")
+	}
+
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
+	write := func(tools string) {
+		os.MkdirAll(filepath.Join(dir, "zero"), 0o700)
+		os.WriteFile(configPath(), []byte("workspaces:\n    a:\n        folders: ["+dir+"]\n"+tools), 0o600)
+	}
+	write("        tools: [default, nope]\n")
+	if _, err := loadConfig(); err == nil || !strings.Contains(err.Error(), `"nope"`) {
+		t.Fatalf("config with unknown tool: %v", err)
+	}
+	write("")
+	c, err := loadConfig()
+	if err != nil || c.sandbox("a").Tools != nil {
+		t.Fatalf("config without tools: %v", err)
+	}
+	write("        tools: [list_branches, get_project]\n")
+	if c, err = loadConfig(); err != nil {
+		t.Fatal(err)
+	}
+	s := c.sandbox("a")
+	s.State = filepath.Join(dir, "state")
+	os.MkdirAll(s.State, 0o700)
+	if ch, err := s.syncTools(); err != nil || !ch || s.read("tools") != "list_branches get_project" {
+		t.Fatalf("first sync: %v, %v, %q", ch, err, s.read("tools"))
+	}
+	if ch, _ := s.syncTools(); ch {
+		t.Fatal("unchanged list reported as changed")
+	}
+	s.Tools = nil
+	if ch, _ := s.syncTools(); !ch || s.read("tools") != "" {
+		t.Fatal("removed list not recorded")
+	}
+	if err := c.save(); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ = loadConfig(); len(c.Workspaces["a"].Tools) != 2 {
+		t.Fatal("tools lost on save")
 	}
 }

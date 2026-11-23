@@ -1,6 +1,6 @@
 # Spec: workspaces and contexts
 
-Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039); `zero ls`, unpushed check and typed name on `rm` (#79); `zero switch`, bash completion (#80).
+Status: draft (#71). Built: config, context resolution, `zero ctx`, `-c`, `ZERO_CONTEXT`, migration (#75); multi-folder sandbox with repo folders, union policy, one token for all projects (#76). input folders (#77, ADR 0039); `zero ls`, unpushed check and typed name on `rm` (#79); `zero switch`, bash completion (#80); `tools` per workspace (#132).
 
 ## 1. Concepts
 
@@ -31,6 +31,19 @@ workspaces:
 ```
 
 Runtime state stays per workspace: `~/.local/state/zero/zero-<name>/` (port, forge token id, policy sha, lock). Sandbox name `zero-<name>`.
+
+`tools` (optional, built in #132, ADR 0043) lists the GitLab MCP tools of a workspace:
+
+```yaml
+  team:
+    folders: [...]
+    tools: [default]                      # the default list (15 read tools)
+  small:
+    folders: [...]
+    tools: [get_project, list_branches]   # own list; names can stand next to default
+```
+
+Without `tools` nothing changes for the workspace. A name without an entry in zero's tool table (`gitlabTools` in `internal/zero/gitlab.go`) fails when the config is read. The token gets the permissions of the policy capabilities plus those of the listed tools; a changed list re-mints the token at the next `zero up`. `zero status` shows the list. The setting is edited in the file, there is no command for it. Limit: until the MCP gateway is built into zero the MCP endpoint is still reached from inside the sandbox, so the list decides the token's permissions only and does not hide other tools.
 
 Names: `[a-z0-9-]{1,40}`, unique. Folder paths stored as resolved absolute paths (symlinks resolved).
 

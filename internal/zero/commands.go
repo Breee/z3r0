@@ -62,6 +62,10 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		retools, err := s.syncTools()
+		if err != nil {
+			return 0, err
+		}
 		if rt.Stopped(s.Name) {
 			resumes := s.read("forge.id") == ""
 			if err := s.resumeForge(pol.Capabilities); err != nil {
@@ -69,7 +73,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			}
 			if resumes {
 				s.forgeSynced() // minted for the new paths
-				repaths = false
+				repaths, retools = false, false
 			}
 			if err := rt.Start(s.Name); err != nil {
 				return 0, fmt.Errorf("start sandbox: %w", err)
@@ -78,7 +82,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			// opencode's credential db is stale.
 			os.Remove(s.path("copilot-auth.done"))
 		}
-		if err := s.renewForge(pol.Capabilities, ch.caps || repaths); err != nil {
+		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools); err != nil {
 			return 0, err
 		}
 		if repaths {
@@ -179,6 +183,9 @@ func (s *Sandbox) create() error {
 	}
 	var creds, env []string
 	if err := s.write("caps", strings.Join(pol.Capabilities, " "), 0o600); err != nil {
+		return err
+	}
+	if _, err := s.syncTools(); err != nil {
 		return err
 	}
 	prov, err := s.setupForge(pol.Capabilities)
@@ -431,6 +438,9 @@ func (s *Sandbox) Status(out io.Writer) error {
 	}
 	if f := s.forge(); f != nil && s.read("forge.id") != "" {
 		fmt.Fprintf(out, "%s token: %s; capabilities: %s\n", f.Name(), strings.Join(s.forgePaths(), ", "), strings.Join(strings.Fields(s.read("caps")), ", "))
+		if t := strings.Fields(s.read("tools")); len(t) > 0 {
+			fmt.Fprintf(out, "%s tools: %s\n", f.Name(), strings.Join(t, ", "))
+		}
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {

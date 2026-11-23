@@ -46,9 +46,9 @@ type Forge interface {
 	TokenEnv() string
 	// GitUser is the https username git sends with the token.
 	GitUser() string
-	// Permissions maps policy capabilities to token permissions; unknown
-	// capabilities are an error.
-	Permissions(caps []string) ([]string, error)
+	// Permissions maps policy capabilities and MCP tools to token
+	// permissions; an unknown capability or tool is an error.
+	Permissions(caps, tools []string) ([]string, error)
 	// Mint creates a short-lived token scoped to paths; id is used to revoke.
 	Mint(label string, paths []string, perms []string) (token, id string, err error)
 	// Revoke revokes a token by id; an expired or revoked token is not an error.
@@ -148,6 +148,37 @@ func (s *Sandbox) syncForgePaths() (bool, error) {
 	return true, s.write("forge.path", strings.Join(paths, "\n"), 0o600)
 }
 
+// mcpTools expands a workspace's tool list: "default" stands for the default
+// list, duplicates are dropped, a tool without an entry in the forge's table
+// is an error. Only GitLab has MCP tools so far.
+func mcpTools(list []string) ([]string, error) {
+	var out []string
+	for _, t := range list {
+		names := []string{t}
+		if t == "default" {
+			names = gitlabDefaultTools
+		} else if gitlabTools[t] == nil {
+			return nil, fmt.Errorf("unknown tool %q (default or one of: %s)", t, strings.Join(gitlabDefaultTools, ", "))
+		}
+		for _, n := range names {
+			if !slices.Contains(out, n) {
+				out = append(out, n)
+			}
+		}
+	}
+	return out, nil
+}
+
+// syncTools records the workspace's tool list for token minting and reports
+// whether it differs from the list the current token was minted for.
+func (s *Sandbox) syncTools() (bool, error) {
+	list := strings.Join(s.Tools, " ")
+	if list == s.read("tools") {
+		return false, nil
+	}
+	return true, s.write("tools", list, 0o600)
+}
+
 // forgeSynced marks the token as minted for the recorded paths.
 func (s *Sandbox) forgeSynced() { os.Remove(s.path("forge.stale")) }
 
@@ -177,7 +208,7 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	if err := revokeOrphans(f); err != nil {
 		return "", err
 	}
-	perms, err := f.Permissions(caps)
+	perms, err := f.Permissions(caps, strings.Fields(s.read("tools")))
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +271,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 	if f == nil || s.read("forge.id") != "" {
 		return nil
 	}
-	perms, err := f.Permissions(caps)
+	perms, err := f.Permissions(caps, strings.Fields(s.read("tools")))
 	if err != nil {
 		return err
 	}
@@ -271,7 +302,7 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 			return nil
 		}
 	}
-	perms, err := f.Permissions(caps)
+	perms, err := f.Permissions(caps, strings.Fields(s.read("tools")))
 	if err != nil {
 		return err
 	}

@@ -149,7 +149,7 @@ func (g gitlab) glab(args ...string) (string, error) {
 	return sh("glab", append(args, "--hostname", g.host)...)
 }
 
-func (gitlab) Permissions(caps []string) ([]string, error) {
+func (gitlab) Permissions(caps, tools []string) ([]string, error) {
 	perms := []string{"read_project"}
 	for _, c := range caps {
 		p, ok := gitlabCaps[c]
@@ -160,6 +160,15 @@ func (gitlab) Permissions(caps []string) ([]string, error) {
 			if !slices.Contains(perms, x) {
 				perms = append(perms, x)
 			}
+		}
+	}
+	tp, err := gitlabToolPermissions(tools)
+	if err != nil {
+		return nil, err
+	}
+	for _, x := range tp {
+		if !slices.Contains(perms, x) {
+			perms = append(perms, x)
 		}
 	}
 	return perms, nil
