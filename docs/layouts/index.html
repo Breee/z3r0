@@ -1,0 +1,14 @@
+{{- $target := (site.GetPage "/docs").RelPermalink -}}
+<!DOCTYPE html>
+<html lang="{{ site.Language.Lang }}">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0; url={{ $target }}">
+    <link rel="canonical" href="{{ $target }}">
+    <meta name="robots" content="noindex">
+    <title>{{ site.Title }}</title>
+  </head>
+  <body>
+    <p>Redirecting to <a href="{{ $target }}">{{ $target }}</a>.</p>
+  </body>
+</html>

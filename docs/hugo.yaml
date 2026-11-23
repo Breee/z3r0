@@ -1,0 +1,61 @@
+baseURL: "https://breee.github.io/z3r0/"
+title: zero
+defaultContentLanguage: en
+enableGitInfo: true
+
+module:
+  imports:
+    - path: github.com/imfing/hextra
+
+outputs:
+  home: [html, llms]
+  page: [html, markdown]
+  section: [html, rss, markdown]
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+
+menu:
+  main:
+    - name: Documentation
+      pageRef: /docs
+      weight: 1
+    - name: Search
+      weight: 3
+      params:
+        type: search
+    - name: GitHub
+      url: https://github.com/Breee/z3r0
+      weight: 4
+      params:
+        icon: github
+
+params:
+  description: Sandboxes for coding agents. The agent works on your repositories and cannot do damage outside its branch.
+  navbar:
+    displayTitle: true
+    displayLogo: false
+  page:
+    width: wide
+    contextMenu:
+      enable: true
+      links:
+        - name: Open in ChatGPT
+          icon: chatgpt
+          url: "https://chatgpt.com/?q=Read+{markdown_url}+and+help+me+with+{title}"
+        - name: Open in Claude
+          icon: claude
+          url: "https://claude.ai/new?q=Read+{markdown_url}+and+help+me+with+{title}"
+  footer:
+    displayCopyright: false
+    displayPoweredBy: false
+  search:
+    enable: true
+    type: flexsearch
+    flexsearch:
+      index: content
+  editURL:
+    enable: true
+    base: https://github.com/Breee/z3r0/edit/main/docs/content
