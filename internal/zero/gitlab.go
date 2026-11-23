@@ -261,8 +261,9 @@ func (g gitlab) DefinitionChanged(token, path, sha string) (string, error) {
 	return gitlabDefinitionChanged("https://"+g.host+"/api/v4", token, path, sha)
 }
 
-// maxCompareFiles: a comparison with this many files or more may have been
-// cut short by the forge, so its answer counts as not known.
+// maxCompareFiles: a comparison with this many files or more counts as not
+// known. gitlab.com listed 633 files in full and cut at 3000 with
+// compare_timeout set (2026-11-23); the margin is for instances set lower.
 const maxCompareFiles = 300
 
 // gitlabDefinitionChanged compares sha with the project's default branch from
@@ -325,7 +326,7 @@ func gitlabDefinitionChanged(api, token, path, sha string) (string, error) {
 // pipeline does before any job runs: the project's CI config file, anything
 // under .gitlab/, and every YAML file (a local include must be one).
 func gitlabDefinitionFile(file, ciConfig string) bool {
-	if ciConfig == "" {
+	if ciConfig = strings.TrimPrefix(ciConfig, "/"); ciConfig == "" {
 		ciConfig = ".gitlab-ci.yml"
 	}
 	l := strings.ToLower(file)

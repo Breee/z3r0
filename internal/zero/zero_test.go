@@ -849,6 +849,9 @@ func TestDefinitionFile(t *testing.T) {
 			t.Errorf("%s: got %v, want %v", f, got, want)
 		}
 	}
+	if !gitlabDefinitionFile("ci/pipeline.conf", "/ci/pipeline.conf") {
+		t.Error("ci_config_path with a leading / not matched")
+	}
 	if gitlabDefinitionFile("ci/pipeline.conf", "") {
 		t.Error("ci/pipeline.conf is no definition file without ci_config_path")
 	}
@@ -905,10 +908,12 @@ func TestCheckedPushParts(t *testing.T) {
 	}
 	ref := "refs/heads/zero-check/x"
 	for in, ok := range map[string]bool{
-		pktLine("unpack ok\n") + pktLine("ok "+ref+"\n") + "0000":                  true,
-		pktLine("unpack ok\n") + pktLine("ng "+ref+" pre-receive hook\n") + "0000": false,
-		pktLine("unpack index-pack failed\n") + "0000":                             false,
-		pktLine("unpack ok\n") + pktLine("ok refs/heads/other\n") + "0000":         false,
+		pktLine("unpack ok\n") + pktLine("ok "+ref+"\n") + "0000":                                    true,
+		pktLine("unpack ok\n") + pktLine("ng "+ref+" pre-receive hook\n") + "0000":                   false,
+		pktLine("unpack index-pack failed\n") + "0000":                                               false,
+		pktLine("unpack ok\n") + pktLine("ok refs/heads/other\n") + "0000":                           false,
+		pktLine("unpack ok\n") + pktLine("ok refs/heads/other\n") + pktLine("ok "+ref+"\n") + "0000": true,
+		pktLine("ok "+ref+"\n") + pktLine("unpack ok\n") + "0000":                                    false,
 		"": false,
 	} {
 		if err := readReport(bufio.NewReader(strings.NewReader(in)), ref); (err == nil) != ok {

@@ -36,7 +36,7 @@ No file → this default (§13.1 without containers). Unknown keys or capabiliti
 | `gitlab.mr.read` | `read_merge_request` |
 | `gitlab.mr.create` | `create_merge_request`; push options `merge_request.*` pass the gate. Not in the default set; refused without `ci.run` (ADR 0044) |
 | `gitlab.pipeline.read` | `read_pipeline read_job` |
-| `ci.run` | `read_repository`; the push gate still skips the pipeline while the session branch changes a pipeline definition file (ADR 0045). Without it the push gate adds `ci.skip` to every push (ADR 0035) and refuses every push option of the agent (ADR 0044). Not in the default set |
+| `ci.run` | `read_repository` (API read of the whole project repository); the push gate still skips the pipeline while the session branch changes a pipeline definition file (ADR 0045). Without it the push gate adds `ci.skip` to every push (ADR 0035) and refuses every push option of the agent (ADR 0044). Not in the default set |
 | `container.*` | needs E3 (§6.2), not available yet |
 | `network.allow` host | egress rule host:443 read-only (enforce) |
 

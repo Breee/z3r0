@@ -42,7 +42,7 @@ if grep -qw ci.run "$ST/caps"; then
       code) git update-index --add --cacheinfo 100644,\$(date +%s%N | git hash-object -w --stdin),forge-sh-probe.txt;;
       clean) git read-tree origin/main;; esac &&
     C=\$(git commit-tree -p FETCH_HEAD -m 'forge.sh ci.run probe ($1)' \$(git write-tree)) && git push origin \$C:refs/heads/$B 2>&1; echo sha \$C" 2>&1; }
-  status() { sleep 5; glab api "projects/$ID/pipelines?sha=$(printf %s "$1" | sed -n 's/^sha //p')" | jq -r '.[0].status // "none"'; }
+  status() { sleep 5; glab api "projects/$ID/pipelines?ref=$B&sha=$(printf %s "$1" | sed -n 's/^sha //p')" | jq -r '.[0].status // "none"'; }
   for step in ci code; do
     O=$(probe $step); S=$(status "$O")
     case "$S $O" in "skipped "*"pipeline skipped"*) echo "PASS ci.run: push ($step) while the branch changes .gitlab-ci.yml starts no pipeline ($S)";;

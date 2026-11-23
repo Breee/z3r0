@@ -345,9 +345,17 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			if tmp != "" {
 				pack = bytes.NewReader(emptyPack())
 			}
-			if skip, note = why != "", ""; skip {
+			if skip, note = why != "", "checked: no pipeline definition change"; skip {
 				note = "ci.skip added: " + why
 				proxy.ModifyResponse = gateNote(caps, "zero: pipeline skipped: "+why)
+			}
+			// a merge request opened by push option would run the changed
+			// definition in its own pipeline (ADR 0044)
+			if skip && len(opts) > 0 {
+				err := fmt.Errorf("push option %q not allowed: %s", opts[0], why)
+				gateRecord(gs, ups[0], "deny", err.Error())
+				gateDeny(w, err.Error())
+				return
 			}
 		}
 		cmds := writeCommands(ups, caps, skip)
@@ -371,8 +379,9 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 // temporary branch with ci.skip and asks the forge which files the commit
 // changes against the default branch. why is the reason to skip, "" to run.
 // tmp is the temporary ref if the pack was sent: the caller then updates the
-// session branch with an empty pack and drops tmp. Every failure before the
-// pack is sent skips the pipeline; a pack the forge refuses is an error.
+// session branch with an empty pack and drops tmp (also on error: the forge
+// may have created it). Every failure before the pack is sent skips the
+// pipeline; a pack the forge refuses is an error.
 func (gs *gateSession) checkDefinition(r *http.Request, repo string, ups []refUpdate, pack io.Reader) (tmp, why string, err error) {
 	_, token, ok := r.BasicAuth()
 	u := ups[0]
@@ -388,7 +397,7 @@ func (gs *gateSession) checkDefinition(r *http.Request, repo string, ups []refUp
 	tmp = "refs/heads/zero-check/" + strings.TrimPrefix(gs.name, "zero-") + "-" + hex.EncodeToString(b)
 	cmds := writeCommands([]refUpdate{{zeroSHA, u.New, tmp}}, "report-status", true)
 	if err := gs.push(r, repo, tmp, io.MultiReader(strings.NewReader(cmds), pack)); err != nil {
-		return "", "", err
+		return tmp, "", err // the branch may exist all the same
 	}
 	file, err := f.DefinitionChanged(token, strings.TrimSuffix(repo[1:], ".git"), u.New)
 	if err != nil {
@@ -428,7 +437,7 @@ func readReport(r *bufio.Reader, ref string) error {
 	if err != nil {
 		return fmt.Errorf("forge answer not understood")
 	}
-	if len(lines) == 2 && lines[0] == "unpack ok" && lines[1] == "ok "+ref {
+	if len(lines) > 0 && lines[0] == "unpack ok" && slices.Contains(lines[1:], "ok "+ref) {
 		return nil
 	}
 	return fmt.Errorf("forge refused the push: %s", strings.Join(lines, "; "))
@@ -440,7 +449,7 @@ func (gs *gateSession) dropRef(r *http.Request, repo, sha, ref string) {
 	defer cancel()
 	cmds := writeCommands([]refUpdate{{sha, zeroSHA, ref}}, "report-status delete-refs", false)
 	if err := gs.push(r.WithContext(ctx), repo, ref, strings.NewReader(cmds)); err != nil {
-		gateRecord(gs, refUpdate{sha, zeroSHA, ref}, "error", "temporary branch not deleted: "+err.Error())
+		gateRecord(gs, refUpdate{sha, zeroSHA, ref}, "error", "temporary branch not deleted (or never created): "+err.Error())
 	}
 }
 
@@ -456,7 +465,8 @@ func emptyPack() []byte {
 // prints as "remote: ..." if the client reads side bands.
 func gateNote(caps, msg string) func(*http.Response) error {
 	return func(resp *http.Response) error {
-		if resp.StatusCode == http.StatusOK && slices.Contains(strings.Fields(caps), "side-band-64k") {
+		c := strings.Fields(caps)
+		if resp.StatusCode == http.StatusOK && (slices.Contains(c, "side-band-64k") || slices.Contains(c, "side-band")) {
 			resp.Body = struct {
 				io.Reader
 				io.Closer

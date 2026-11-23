@@ -42,7 +42,7 @@ Each layer is a feature. L0–L3 are always on; L4+ are switchable per project/o
 | 3 | Scoped credentials: one fine-grained token per sandbox, project-only, 24–48 h (ADR 0036), renewed, revoked on pause/rm/orphan | blast radius beyond the project; leftover tokens | Z2, Z4 | proven (#70); renew window C44 |
 | 4 | Git write gate: push only to session branch, no delete | overwriting/deleting other branches (C43) | Z2, Z3 | built (#95, ADR 0030); force-push on own branch open |
 | 5 | API action gate: OpenShell `read-write` preset has no DELETE; token has no branch/tag/commit create | deleting branches/tags, creating branches past the git gate via REST/GraphQL | Z2 | built (#96), `tests/attacks/forge.sh` 14/14 |
-| 5a | CI gate: push gate adds `ci.skip`; a human starts the pipeline; `ci.run` capability opts out | agent code running in CI on push (P14): CI variables, runner egress | Z1, Z2 | built (#102, ADR 0035) |
+| 5a | CI gate: push gate adds `ci.skip`; a human starts the pipeline; with `ci.run` the pipeline starts unless the session branch changes a pipeline definition file | agent code running in CI on push (P14): CI variables, runner egress | Z1, Z2 | built (#102, ADR 0035; #126, ADR 0045) |
 | 6 | Isolation strength: VM driver per risk (`zero up --vm`) | kernel escape | Z5 | proven (#17); no container build (C48) |
 | 7 | Identity + revocation off the laptop: SPIFFE per sandbox, sessions/epochs, OpenBao storage | stolen laptop, offline revocation | Z3, Z4, Z6 | PoC 08/09/10 |
 | 8 | Evidence: decision log + OCSF per sandbox → sink | silent misuse, no attribution | Z3, Z6 | partial (local logs only) |
@@ -59,7 +59,7 @@ Focus now: the local version (one developer, one host) with its core. Everything
 | Core | L0–L5a, workspaces (`docs/spec/workspaces.md`), `zero-cp` on the laptop (push gate, token upkeep, decision log), GitLab through glab login, install and doctor | built; open items below |
 | Additions | MCP through a gateway (ADR 0043, PoC 13–15), Kubernetes access (#123), OpenBao store (ADR 0032), SPIFFE identity (L7), VM driver (L6), evidence sink (L8), data-flow guardrail (#129), access broker for an enterprise setup (#133), team deployment (§28.5) | PoC or planned |
 
-Open in the core: a changed pipeline definition runs with `ci.run` (#126); forge content from non-members reaches the agent unmarked (#110); foreign credentials in requests (C18, #14); force-push on the own session branch (L4); `zero code` not re-tested (C31, #49); token profile wider than the project for git/curl (C35, #52).
+Open in the core: with `ci.run` and `gitlab.mr.create` a merge request opened by API runs a changed pipeline definition (ADR 0045); forge content from non-members reaches the agent unmarked (#110); foreign credentials in requests (C18, #14); force-push on the own session branch (L4); `zero code` not re-tested (C31, #49); token profile wider than the project for git/curl (C35, #52).
 
 An addition names its seam to the core (sandbox identity, workspace config, session start and stop) and keeps Z-INV-1..6; example: `pocs/15-gitlab-mcp/README.md`.
 
