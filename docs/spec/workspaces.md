@@ -43,7 +43,7 @@ Runtime state stays per workspace: `~/.local/state/zero/zero-<name>/` (port, for
     tools: [get_project, list_branches]   # own list; names can stand next to default
 ```
 
-Without `tools` nothing changes for the workspace. A name without an entry in zero's tool table (`gitlabTools` in `internal/zero/gitlab.go`) fails when the config is read. The token gets the permissions of the policy capabilities plus those of the listed tools; a changed list re-mints the token at the next `zero up`. `zero status` shows the list. The setting is edited in the file, there is no command for it. Limit: until the MCP gateway is built into zero the MCP endpoint is still reached from inside the sandbox, so the list decides the token's permissions only and does not hide other tools.
+Without `tools` nothing changes for the workspace. A name without an entry in zero's tool table (`gitlabTools` in `internal/zero/gitlab.go`) fails when the config is read. The token gets the permissions of the policy capabilities plus those of the listed tools; a changed list re-mints the token at the next `zero up`. `zero status` shows the list the token was minted for. A wrong name stops every zero command until the file is fixed, like a wrong workspace name. Changing the order of the list also re-mints. The setting is edited in the file, there is no command for it. Limit: until the MCP gateway is built into zero the MCP endpoint is still reached from inside the sandbox, so the list decides the token's permissions only and does not hide other tools.
 
 Names: `[a-z0-9-]{1,40}`, unique. Folder paths stored as resolved absolute paths (symlinks resolved).
 

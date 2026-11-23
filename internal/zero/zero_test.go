@@ -759,6 +759,10 @@ func TestWorkspaceTools(t *testing.T) {
 	if ch, err := s.syncTools(); err != nil || !ch || s.read("tools") != "list_branches get_project" {
 		t.Fatalf("first sync: %v, %v, %q", ch, err, s.read("tools"))
 	}
+	if ch, _ := s.syncTools(); !ch {
+		t.Fatal("list whose mint did not finish reported as unchanged")
+	}
+	s.forgeSynced()
 	if ch, _ := s.syncTools(); ch {
 		t.Fatal("unchanged list reported as changed")
 	}

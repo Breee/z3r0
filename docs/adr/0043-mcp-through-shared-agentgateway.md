@@ -12,7 +12,7 @@ Today zero registers GitLab's MCP endpoint inside the sandbox together with the 
 ## Decision
 - M1: the gateway verifies the SVID itself. No identity provider of our own, no capability claims in the token; zero-cp answers per request.
 - M2: one shared gateway for all sessions.
-- M3 (GitLab): the MCP server is the instance endpoint `https://<forge host>/api/v4/mcp` of the workspace's forge, self-hosted included. Each workspace gets a default tool list (read tools, written by zero) and can override it in its config. Kubernetes is not decided.
+- M3 (GitLab): the MCP server is the instance endpoint `https://<forge host>/api/v4/mcp` of the workspace's forge, self-hosted included. A workspace gets tools only when `tools` is set in its config: `default` is the default list (read tools, written by zero), tool names override it (#132). Kubernetes is not decided.
 - M6: the GitLab MCP moves out of the sandbox. zero-cp returns the tool list per request (PoC 15 variant B); zero does not rewrite gateway config per workspace.
 - This is an addition, not core: sandbox, workspaces, push gate and glab login work without it, and a workspace without it cannot reach the gateway.
 - The gateway runs as a container from `ghcr.io/agentgateway/agentgateway` pinned by digest. The podman image policy gets an entry for `ghcr.io/agentgateway` on hosts that enable the addition.

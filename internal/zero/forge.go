@@ -170,16 +170,20 @@ func mcpTools(list []string) ([]string, error) {
 }
 
 // syncTools records the workspace's tool list for token minting and reports
-// whether it differs from the list the current token was minted for.
+// whether the token must be minted anew for it. Like syncForgePaths it leaves
+// forge.stale until forgeSynced.
 func (s *Sandbox) syncTools() (bool, error) {
 	list := strings.Join(s.Tools, " ")
 	if list == s.read("tools") {
-		return false, nil
+		return fileExists(s.path("forge.stale")), nil
+	}
+	if err := s.write("forge.stale", "1", 0o600); err != nil {
+		return false, err
 	}
 	return true, s.write("tools", list, 0o600)
 }
 
-// forgeSynced marks the token as minted for the recorded paths.
+// forgeSynced marks the token as minted for the recorded paths and tools.
 func (s *Sandbox) forgeSynced() { os.Remove(s.path("forge.stale")) }
 
 func (s *Sandbox) forgeProvider(f Forge) string { return s.Name + "-" + f.Name() }

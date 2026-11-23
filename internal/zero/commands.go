@@ -85,9 +85,15 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools); err != nil {
 			return 0, err
 		}
-		if repaths {
+		if repaths || retools {
 			s.forgeSynced()
-			fmt.Fprintf(out, "%s token: rotated (%s)\n", s.forge().Name(), strings.Join(s.forgePaths(), ", "))
+			if f := s.forge(); f != nil {
+				tools := ""
+				if len(s.Tools) > 0 {
+					tools = "; tools: " + strings.Join(s.Tools, ", ")
+				}
+				fmt.Fprintf(out, "%s token: rotated (%s%s)\n", f.Name(), strings.Join(s.forgePaths(), ", "), tools)
+			}
 		}
 		if len(ch.newHosts) > 0 {
 			if err := s.applyProjectPolicy(pol); err != nil {
@@ -192,6 +198,7 @@ func (s *Sandbox) create() error {
 	if err != nil {
 		return err
 	}
+	s.forgeSynced()
 	if prov != "" {
 		creds = append(creds, prov)
 		env = s.forge().Env()
