@@ -1,0 +1,48 @@
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /bin
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /etc
+    - /var/log
+  read_write:
+    - /tmp
+    - /dev/null
+    - /dev/pts
+    - /dev/ptmx
+landlock:
+  compatibility: best_effort
+network_policies:
+  forge:
+    name: forge
+    endpoints:
+      - host: gitlab.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        allow_encoded_slash: true
+        credential_binding:
+          provider: probe52-gl
+        rules:
+          - allow: {method: GET, path: /api/v4/projects/88739432}
+          - allow: {method: GET, path: /api/v4/projects/88739432/**}
+          - allow: {method: POST, path: /api/v4/projects/88739432/**}
+          - allow: {method: GET, path: /api/v4/projects/corewire%2Ftechnology-and-research%2Fdeveloper}
+          - allow: {method: GET, path: /api/v4/projects/corewire%2Ftechnology-and-research%2Fdeveloper/**}
+          - allow: {method: GET, path: /corewire/technology-and-research/developer.git/**}
+          - allow: {method: POST, path: /corewire/technology-and-research/developer.git/git-upload-pack}
+        deny_rules:
+          - method: "*"
+            path: /**/git-receive-pack
+          - method: GET
+            path: /**/info/refs
+            query:
+              service: git-receive-pack
+    binaries:
+      - path: /usr/bin/git
+      - path: /usr/lib/git-core/git-remote-https
+      - path: /usr/bin/curl

@@ -1,0 +1,11 @@
+id: zero-gitlab-probe
+display_name: zero GitLab probe
+description: probe for #52, credentials only, no endpoints
+category: source_control
+credentials:
+  - name: token
+    description: probe token
+    env_vars: [GITLAB_TOKEN]
+    required: true
+    auth_style: basic
+    header_name: authorization
