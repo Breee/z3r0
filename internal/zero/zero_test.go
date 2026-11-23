@@ -222,6 +222,11 @@ func TestPushOptions(t *testing.T) {
 			t.Errorf("option %q passes", o)
 		}
 	}
+	for caps, ok := range map[string]bool{"report-status push-options": true, "report-status": true, "push-options=1": false, "a Push-Options": false, "push-options-x": false} {
+		if (checkCaps(caps) == nil) != ok {
+			t.Errorf("checkCaps(%q) ok = %v", caps, !ok)
+		}
+	}
 	if checkOptions(nil, false) != nil {
 		t.Error("no options refused")
 	}

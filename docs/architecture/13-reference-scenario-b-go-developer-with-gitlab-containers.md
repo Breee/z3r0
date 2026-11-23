@@ -38,7 +38,8 @@ capabilities:
 
   - gitlab.issue.read
   - gitlab.mr.read
-  - gitlab.mr.create
+  - gitlab.mr.create   # needs ci.run (ADR 0044)
+  - ci.run
   - gitlab.pipeline.read
 
   - container.image.pull

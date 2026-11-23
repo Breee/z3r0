@@ -58,7 +58,7 @@ Developer (once per laptop): `sudo zero install --org …` → installs binaries
 
 **Actor:** Dana, team Payments. **Goal:** let an agent implement a ticket in `payments/ledger` and open an MR.
 
-**Preconditions:** laptop enrolled; Dana is Developer in `payments/*`; repo has `.zero/policy.yaml` (allow proxy.golang.org; capabilities git.push, gitlab.mr.create, gitlab.pipeline.read).
+**Preconditions:** laptop enrolled; Dana is Developer in `payments/*`; repo has `.zero/policy.yaml` (allow proxy.golang.org; capabilities git.push, gitlab.mr.create with ci.run (ADR 0044), gitlab.pipeline.read).
 
 ### Flow
 

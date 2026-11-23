@@ -56,6 +56,11 @@ if grep -qw gitlab.mr.create "$ST/caps"; then echo "SKIP merge request checks (g
   sleep 3
   want "no merge request opened (REST, push option, MCP)" "$(mrs)" "$M0"
 fi
+B=zero/${N#zero-}
+want "REST commit to session branch"  "$(code POST /repository/commits "{\"branch\":\"$B\",\"commit_message\":\"forge.sh attack\",\"actions\":[{\"action\":\"create\",\"file_path\":\"zero-attack\",\"content\":\"x\"}]}")" 403
+want "REST start pipeline on session branch" "$(code POST "/pipeline?ref=$B")" 403
+G=$(sbx "curl -s -X POST -H \"Authorization: Bearer \$GITLAB_TOKEN\" -H 'Content-Type: application/json' -d '{\"query\":\"mutation{mergeRequestCreate(input:{projectPath:\\\"$P\\\",sourceBranch:\\\"$B\\\",targetBranch:\\\"main\\\",title:\\\"forge.sh attack\\\"}){errors}}\"}' https://gitlab.com/api/graphql")
+case $G in *"Access denied"*|*"doesn't have permission"*|*"does not have permission"*) echo "PASS GraphQL create merge request (token)";; *) echo "FAIL GraphQL create merge request: $G"; FAILS=$((FAILS+1));; esac
 want "control: read MRs works"     "$(code GET /merge_requests)" 200
 glab api "projects/$ID/repository/branches" | jq -r '.[].name' | grep -q zero-attack && { echo "FAIL branch zero-attack exists on forge"; FAILS=$((FAILS+1)); }
 echo "fails: $FAILS"; [ "$FAILS" = 0 ]

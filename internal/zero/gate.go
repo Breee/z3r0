@@ -113,10 +113,21 @@ func readOptions(r *bufio.Reader) ([]string, error) {
 	}
 }
 
+// checkCaps refuses a capability that git reads as push-options but the gate
+// would not ("push-options=x"): its options would reach the forge unchecked.
+func checkCaps(caps string) error {
+	for _, c := range strings.Fields(caps) {
+		if c != "push-options" && strings.HasPrefix(strings.ToLower(c), "push-options") {
+			return fmt.Errorf("capability %q not allowed", c)
+		}
+	}
+	return nil
+}
+
 // checkOptions refuses the agent's push options: the forge acts on them with
 // only push permission (merge_request.create opens a merge request, whose
 // pipeline ci.skip does not prevent, #134). merge_request.* passes when
-// gitlab.mr.create is granted.
+// gitlab.mr.create and ci.run are granted (ADR 0044).
 func checkOptions(opts []string, mrCreate bool) error {
 	for _, o := range opts {
 		if !mrCreate || !strings.HasPrefix(o, "merge_request.") || strings.ContainsAny(o, "\n\x00") {
@@ -295,9 +306,12 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		hasOpts := slices.Contains(strings.Fields(caps), "push-options")
 		var opts []string
+		if err == nil {
+			err = checkCaps(caps)
+		}
 		if err == nil && hasOpts {
 			if opts, err = readOptions(br); err == nil {
-				err = checkOptions(opts, gs.mrCreate)
+				err = checkOptions(opts, gs.mrCreate && gs.ciRun)
 			}
 		}
 		rc.SetReadDeadline(time.Time{})

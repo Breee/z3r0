@@ -36,7 +36,7 @@ Status: ✅ works with zero today · 🟡 git part works, the agent lacks read a
 
 | # | Task | Agent needs | Status |
 |---|---|---|---|
-| T1 | Bump an image tag or chart version in `gitops`, open the MR | `git.push`, `gitlab.mr.create` | ✅ |
+| T1 | Bump an image tag or chart version in `gitops`, open the MR | `git.push`, `gitlab.mr.create` (needs `ci.run`, ADR 0044) | ✅ |
 | T2 | Onboard a team: namespace, quota, network policy, RBAC, Argo CD Application from a template | same; runbook from the input folder | ✅ |
 | T3 | Change in two repos at once: new value in `charts`, use it in `gitops` | multi-folder workspace, one token for both projects | ✅ (#76) |
 | T4 | Pipeline of the MR is red: read the job log, fix, push again | `gitlab.pipeline.read` | ✅ a human starts the pipeline unless `ci.run` is approved (ADR 0035) |

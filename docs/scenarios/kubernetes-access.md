@@ -162,7 +162,7 @@ Custom Roles follow the same rule: capability `k8s.<x>.<y>` ↔ Role `zero-k8s-<
 
 ```yaml
 # .zero/policy.yaml
-capabilities: [git.read, git.commit, git.push, gitlab.mr.create]
+capabilities: [git.read, git.commit, git.push, gitlab.mr.create, ci.run]   # gitlab.mr.create needs ci.run (ADR 0044)
 kubernetes:
   - context: dev                 # name in the human's kubeconfig
     namespaces: [team-a, team-a-qa]
