@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+# One gateway for all workspaces, GitLab's instance MCP endpoint behind it.
+# Per request zero-cp (extAuthz) answers with the workspace's GitLab token and tool list.
+mcp:
+  port: 18091
+  policies:
+    jwtAuth:
+      mode: strict
+      issuer: ISSUER
+      audiences: [zero-mcp]
+      jwks:
+        file: /w/jwks.json
+    extAuthz:
+      host: 127.0.0.1:18090
+      policies:
+        backendAuth:
+          key:
+            file: /w/gateway.key
+      protocol:
+        http:
+          path: '"/authz/"'
+          addRequestHeaders:
+            x-zero-subject: jwt.sub
+          metadata:
+            backend_token: 'response.headers["x-zero-backend-token"]'
+            tools: 'response.headers["x-zero-tools"]'
+    mcpAuthorization:
+      rules:
+      - RULE
+  targets:
+  - name: gitlab
+    mcp:
+      host: MCPURL
+    policies:
+      backendAuth:
+        key:
+          expression: extauthz.backend_token

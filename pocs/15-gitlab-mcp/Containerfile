@@ -1,0 +1,9 @@
+FROM docker.io/library/golang@sha256:f496f8c537ed506626ee1a6913afb32c45068a48697163c088f604cc775a0c38 AS build
+WORKDIR /src
+COPY go.mod ./
+COPY pocs/09-zero-cp/zero-cp ./pocs/09-zero-cp/zero-cp
+RUN CGO_ENABLED=0 go build -o /zero-cp ./pocs/09-zero-cp/zero-cp
+
+FROM scratch
+COPY --from=build /zero-cp /zero-cp
+ENTRYPOINT ["/zero-cp"]

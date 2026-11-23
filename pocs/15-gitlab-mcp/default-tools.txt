@@ -1,0 +1,15 @@
+get_project
+get_repository_file
+list_repository_tree
+list_branches
+list_tags
+list_commits
+get_commit
+list_merge_requests
+get_merge_request
+list_pipelines
+get_pipeline
+get_job
+list_work_items
+get_work_item
+search_labels

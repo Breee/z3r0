@@ -146,6 +146,7 @@ func main() {
 	logPath := flag.String("log", "", "decision log (JSON lines)")
 	svid := flag.Bool("svid", false, "grant the verified JWT-SVID itself as the token (PoC 13)")
 	sessions := flag.String("sessions", "", "directory with one backend credential file per sandbox id (PoC 14)")
+	tools := flag.String("tools", "", "directory with one tool list file per sandbox id; no file means no tool (PoC 15)")
 	gatewayKey := flag.String("gateway-key", "", "file with the key the gateway sends to /authz/ (PoC 14)")
 	flag.Parse()
 
@@ -221,6 +222,10 @@ func main() {
 			return
 		}
 		decide(id, "allow", "authz: backend credential of the session")
+		if *tools != "" {
+			list, _ := os.ReadFile(filepath.Join(*tools, filepath.Base(id)))
+			w.Header().Set("X-Zero-Tools", strings.Join(strings.Fields(string(list)), ","))
+		}
 		w.Header().Set("X-Zero-Backend-Token", strings.TrimSpace(string(cred)))
 	})
 	// Test upstream: accepts only a granted token and never echoes it back.
