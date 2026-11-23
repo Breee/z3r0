@@ -50,6 +50,19 @@ Each layer is a feature. L0–L3 are always on; L4+ are switchable per project/o
 
 Known holes no layer closes today (L0 also assumes the host follows `docs/host-recommendations.md`, e.g. no docker group): foreign credentials in requests (C18, #14), spam MRs (accepted as reversible), agent-committed hooks run on host checkout (C42), CI runs agent code once a human starts the pipeline or `ci.run` is approved (P14, [ADR 0034](../adr/0034-agent-is-untrusted-pusher.md), [ADR 0035](../adr/0035-ci-skip-by-default.md)), model traffic content. Where corruption comes from and the two candidate layers at the root: `docs/attack-paths.md`, "Origins of agent corruption" (#108). What zero trusts and what it mitigates: [ADR 0033](../adr/0033-trust-assumption-and-review.md).
 
+## 28.3a Core and additions (2026-11-23)
+
+Focus now: the local version (one developer, one host) with its core. Everything else is an addition layered on top: switchable, removable, and the core works unchanged without it.
+
+| | Contains | Status |
+|---|---|---|
+| Core | L0–L5a, workspaces (`docs/spec/workspaces.md`), `zero-cp` on the laptop (push gate, token upkeep, decision log), GitLab through glab login, install and doctor | built; open items below |
+| Additions | MCP through a gateway (ADR 0043, PoC 13–15), Kubernetes access (#123), OpenBao store (ADR 0032), SPIFFE identity (L7), VM driver (L6), evidence sink (L8), data-flow guardrail (#129), access broker for an enterprise setup (#133), team deployment (§28.5) | PoC or planned |
+
+Open in the core: a changed pipeline definition runs with `ci.run` (#126); forge content from non-members reaches the agent unmarked (#110); foreign credentials in requests (C18, #14); force-push on the own session branch (L4); `zero code` not re-tested (C31, #49); token profile wider than the project for git/curl (C35, #52).
+
+An addition names its seam to the core (sandbox identity, workspace config, session start and stop) and keeps Z-INV-1..6; example: `pocs/15-gitlab-mcp/README.md`.
+
 ## 28.4 Use (what a developer types)
 
 ```
