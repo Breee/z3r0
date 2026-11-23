@@ -20,4 +20,4 @@ GitHub issues + GitHub Project **zero** (https://github.com/users/Breee/projects
 5. Closing requires **REVIEW**: a subagent reviews the change/result against GOOD/DONE before closing; findings and their resolution go into the closing comment.
 6. Status changes (blocked, postponed, moved, not planned) are reflected immediately: project Status/Phase/Sprint, `status:blocked` label, comment with reason.
 
-More rules: `ai-docs/AGENTS.md`.
+More rules: `ai-docs/AGENTS.md`. User guide (Hugo site): `docs/AGENTS.md`.
