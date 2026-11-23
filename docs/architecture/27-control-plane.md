@@ -113,5 +113,5 @@ flowchart LR
 3. **GitLab token lifetime.** GitLab tokens expire at day granularity → `zero-cp` must revoke them explicitly at epoch end and on startup clean up tokens of dead epochs (P21).
 4. **Basic-mode trust.** A root-level compromise of the laptop compromises the local control plane. This is the documented limit of basic mode, not a bug.
 5. **Human delegation chain.** `token_exchange` (RFC 8693) could carry the human's OIDC token through the gateway into the grant (enterprise). Basic mode uses `client_credentials`. Decide when enterprise mode is built.
-6. **Branch scope** remains a forge limitation (C43); the control plane does not change it.
+6. **Branch scope** is not offered by the forge (C43); the push gate enforces it (ADR 0030).
 7. **Model API keys** (opencode Zen, Copilot) are out of scope here; same pattern applies later.

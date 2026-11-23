@@ -26,7 +26,7 @@ Goal: one Go change goes code → test → build → signed commit → push → 
 |---|---|---|---|
 | Phase 1 loop | manual steps work (`docs/scenarios/go-container-gitlab.md`) | scripted end-to-end check | 06 |
 | 5 OpenBao GitLab creds | zero mints PAT via glab | OpenBao issues/revokes the token, rotation without stale placeholders (C44) | 05 |
-| 6 branch push / protected deny | done (F12, F14); any-branch risk C43 | — (GitLab-owned) | — |
+| 6 branch push / protected deny | done (F12, F14); any-branch risk C43 closed by the push gate (#95) | — (GitLab-owned) | — |
 | 7 glab pipeline | done | part of loop check | 06 |
 | 8 build w/o docker socket | ko image build in sandbox | part of loop check; Dockerfile builds deferred to Phase 4 | 06 |
 | 11 trace | none | per-sandbox audit log from OpenShell events + zero actions | 05 |

@@ -28,6 +28,8 @@ for r in refs/heads/main refs/heads/zero-attack refs/tags/zero-attack; do
   O=$(sbx "cd /tmp/zero/$REPO && git push origin \$(git commit-tree -p HEAD -m 'forge.sh attack' HEAD^{tree}):$r")
   case $O in *"push denied"*) echo "PASS git push $r (gate)";; *) echo "FAIL git push $r: $O"; FAILS=$((FAILS+1));; esac
 done
+O=$(sbx "cd /tmp/zero/$REPO && git push origin :refs/heads/zero/${N#zero-}")
+case $O in *"push denied"*) echo "PASS git push delete session branch (gate)";; *) echo "FAIL git push delete session branch: $O"; FAILS=$((FAILS+1));; esac
 O=$(sbx "cd /tmp/zero/$REPO && git push https://gitlab.com/$P.git \$(git commit-tree -p HEAD -m 'forge.sh attack' HEAD^{tree}):refs/heads/zero-attack")
 case $O in *403*) echo "PASS direct git push to forge (policy)";; *) echo "FAIL direct git push: $O"; FAILS=$((FAILS+1));; esac
 want "REST start pipeline"          "$(code POST '/pipeline?ref=main')" 403

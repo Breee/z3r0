@@ -61,7 +61,7 @@ P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci
 | <a id="p22"></a>P22 | low | E4 | Local process connects to the forward port | reasoning | 2 |
 | <a id="p23"></a>P23 | low | E2 | Resource abuse (branches, MRs, pipelines, quota) | inherent | 4 |
 | <a id="p24"></a>P24 | low | E4 | Supply chain of zero itself | accepted | 2 |
-| <a id="p25"></a>P25 | high | E2 | Agent changes branches other than its session branch | open | 4 |
+| <a id="p25"></a>P25 | high | E2 | Agent changes branches other than its session branch | closed by the push gate | 4 |
 | <a id="p26"></a>P26 | origin | E2 | Untrusted text the agent reads | reasoning | 6 |
 | <a id="p27"></a>P27 | origin | E2 | Poisoned instructions in the repo | accepted | 6 |
 | <a id="p28"></a>P28 | origin | E4 | Tool and plugin supply chain | reasoning | 6 |
@@ -117,7 +117,7 @@ Recorded 2026-11-10 for the zero workflow, not proven unless noted. Recorded, no
 | P19 | medium | GitLab MCP tools run with user-scoped `execute_mcp_tool`; some tool may not check the project scope | Read/act on other projects of the user | unverified | — | ADR 0020 |
 | P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | — | ADR 0020 |
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — | — |
-| P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | open, TODO (C43) | — Practice: F1, F2, Z1. | C43 |
+| P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | tested 2026-11-23 (`tests/attacks/forge.sh`): refused; force-push on the own session branch stays possible | Push gate: only `zero/<name>` and below, no delete (ADR 0030); direct push to the forge blocked by policy. Practice: F1, F2, Z1. | C43, #95 |
 | P36 | low | A repo folder is added while the agent runs; the bundle in `/tmp/.zero.bundle` was built with `--all` and carried `refs/stash` (a `git stash -u` holds untracked files such as `.env`); the agent copies the bundle before it is deleted | Stashed secrets readable by the agent | bundle content shown on the host (#116), sandbox side not run | fixed #116: bundle holds branches, tags and HEAD only Practice: G5, G6. | #116, spec §6.1 |
 | P37 | high | In a gitops repo the agent changes an allowed file of a lower environment (`qa/<service>/values.yaml`, extra manifests) so that the qa service uses live data: live database host, live secret reference, live bucket. The change looks like a normal config fix; a human merges it. The agent then reads live data through its qa read access (logs, config) | Live data reaches the agent and the model provider without any live access granted | reasoning only (2026-11-19) | open: path rules do not judge content; merge request review is the only control; candidate guards on the platform side: docs/scenarios/kubernetes-hardening.md (untested) Practice: F9, C17, C18, G9, G10, D1, D2, D3, K3, K4, K6, K7, K8, K9, K10. | #124 |
 
