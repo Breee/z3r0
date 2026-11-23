@@ -9,7 +9,7 @@ zero assumes that the agent can be turned against you: by a prompt hidden in an 
 ## What the agent has
 
 - a copy of the repositories and input folders of its workspace
-- network access to the GitLab host, the model endpoint and the hosts in the [policy](../policy)
+- network access to the workspace's projects on the GitLab host (API and git fetch, nothing else on that host), the model endpoint and the hosts in the [policy](../policy)
 - a GitLab token for exactly the projects of the workspace, with the permissions of the policy, valid for one to two days (it ends at midnight UTC of the day after tomorrow) and renewed while the sandbox runs
 - one way to hand over work: `git push` to `zero/<workspace>`
 
@@ -42,8 +42,8 @@ These points are tested against a running sandbox by [`tests/attacks/forge.sh`](
 | Text from outside reaches the agent unmarked | an issue or merge request comment of a stranger can carry instructions for the agent | [#110](https://github.com/Breee/z3r0/issues/110) |
 | The agent can force-push its own branch | history of `zero/<workspace>` can be rewritten; other branches are not affected | [attack paths](https://github.com/Breee/z3r0/blob/main/docs/attack-paths.md) |
 | `ci.run` together with `gitlab.mr.create` | a merge request opened by the agent through the API runs a changed pipeline definition | [ADR 0045](https://github.com/Breee/z3r0/blob/main/docs/adr/0045-ci-run-skips-while-the-branch-changes-the-pipeline-definition.md) |
-| The token works for all of the GitLab host from any program in the sandbox | limited by the token's projects and permissions, not by the program that uses it | [#52](https://github.com/Breee/z3r0/issues/52) |
-| MCP tools outside the workspace's list are visible | GitLab refuses them at call time; hiding them needs the MCP gateway, which is not built in yet | [ADR 0043](https://github.com/Breee/z3r0/blob/main/docs/adr/0043-mcp-through-shared-agentgateway.md) |
+| A foreign token can be sent to the workspace's own projects | the GitLab host is reachable for the workspace's projects only, but OpenShell cannot tell whose token a request carries | [ADR 0046](https://github.com/Breee/z3r0/blob/main/docs/adr/0046-forge-egress-limited-to-the-workspaces-projects.md) |
+| No GitLab MCP tools in the sandbox | the MCP endpoint is not reachable from the sandbox; it comes back with the MCP gateway, which is not built in yet | [ADR 0043](https://github.com/Breee/z3r0/blob/main/docs/adr/0043-mcp-through-shared-agentgateway.md) |
 
 ## Background
 

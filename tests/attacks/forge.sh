@@ -23,7 +23,7 @@ want "REST create branch"          "$(code POST '/repository/branches?branch=zer
 want "REST create tag"             "$(code POST '/repository/tags?tag_name=zero-attack&ref=main')" 403
 want "REST commit to branch"       "$(code POST /repository/commits '{"branch":"zero-attack","start_branch":"main","commit_message":"x","actions":[]}')" 403
 G=$(sbx "curl -s -X POST -H \"Authorization: Bearer \$GITLAB_TOKEN\" -H 'Content-Type: application/json' -d '{\"query\":\"mutation{createBranch(input:{projectPath:\\\"$P\\\",name:\\\"zero-attack\\\",ref:\\\"main\\\"}){errors}}\"}' https://gitlab.com/api/graphql")
-case $G in *"Access denied"*) echo "PASS GraphQL create branch (token)";; *) echo "FAIL GraphQL create branch: $G"; FAILS=$((FAILS+1));; esac
+case $G in *"Access denied"*|*policy_denied*) echo "PASS GraphQL create branch";; *) echo "FAIL GraphQL create branch: $G"; FAILS=$((FAILS+1));; esac
 for r in refs/heads/main refs/heads/zero-attack refs/tags/zero-attack; do
   O=$(sbx "cd /tmp/zero/$REPO && git push origin \$(git commit-tree -p HEAD -m 'forge.sh attack' HEAD^{tree}):$r")
   case $O in *"push denied"*) echo "PASS git push $r (gate)";; *) echo "FAIL git push $r: $O"; FAILS=$((FAILS+1));; esac
@@ -70,7 +70,7 @@ if grep -qw gitlab.mr.create "$ST/caps"; then echo "SKIP merge request checks (g
     case $O in *"push denied"*) echo "PASS git push -o $o (gate)";; *) echo "FAIL git push -o $o: $O"; FAILS=$((FAILS+1));; esac
   done
   R=$(sbx "curl -s -X POST -H \"Authorization: Bearer \$GITLAB_TOKEN\" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"save_merge_request\",\"arguments\":{\"project_id\":\"$ID\",\"source_branch\":\"$B\",\"target_branch\":\"main\",\"title\":\"forge.sh attack\"}}}' https://gitlab.com/api/v4/mcp")
-  case $R in *insufficient_granular_scope*) echo "PASS MCP save_merge_request (token)";; *) echo "FAIL MCP save_merge_request: $R"; FAILS=$((FAILS+1));; esac
+  case $R in *insufficient_granular_scope*|*policy_denied*) echo "PASS MCP save_merge_request";; *) echo "FAIL MCP save_merge_request: $R"; FAILS=$((FAILS+1));; esac
   sleep 3
   want "no merge request opened (REST, push option, MCP)" "$(mrs)" "$M0"
 fi
@@ -78,7 +78,30 @@ B=zero/${N#zero-}
 want "REST commit to session branch"  "$(code POST /repository/commits "{\"branch\":\"$B\",\"commit_message\":\"forge.sh attack\",\"actions\":[{\"action\":\"create\",\"file_path\":\"zero-attack\",\"content\":\"x\"}]}")" 403
 want "REST start pipeline on session branch" "$(code POST "/pipeline?ref=$B")" 403
 G=$(sbx "curl -s -X POST -H \"Authorization: Bearer \$GITLAB_TOKEN\" -H 'Content-Type: application/json' -d '{\"query\":\"mutation{mergeRequestCreate(input:{projectPath:\\\"$P\\\",sourceBranch:\\\"$B\\\",targetBranch:\\\"main\\\",title:\\\"forge.sh attack\\\"}){errors}}\"}' https://gitlab.com/api/graphql")
-case $G in *"Access denied"*|*"doesn't have permission"*|*"does not have permission"*) echo "PASS GraphQL create merge request (token)";; *) echo "FAIL GraphQL create merge request: $G"; FAILS=$((FAILS+1));; esac
+case $G in *"Access denied"*|*"doesn't have permission"*|*"does not have permission"*|*policy_denied*) echo "PASS GraphQL create merge request";; *) echo "FAIL GraphQL create merge request: $G"; FAILS=$((FAILS+1));; esac
+# #52: the forge host is reachable for the workspace's projects only
+out() { sbx "curl -s -o /dev/null -m 20 -w %{http_code} $1"; }
+T='-H "Authorization: Bearer $GITLAB_TOKEN"'
+X='-H "PRIVATE-TOKEN: glpat-foreign"'
+GL=https://gitlab.com
+want "other project, own token"            "$(out "$T $GL/api/v4/projects/278964")" 403
+want "other project, no token"             "$(out "$GL/api/v4/projects/278964")" 403
+want "other project, foreign token"        "$(out "$X $GL/api/v4/projects/278964")" 403
+want "other project by path"               "$(out "$T $GL/api/v4/projects/gitlab-org%2Fgitlab")" 403
+want "other project through dot segments"  "$(out "--path-as-is $T $GL/api/v4/projects/$ID/../278964")" 403
+want "other project through encoded dots"  "$(out "--path-as-is $T $GL/api/v4/projects/$ID/%2e%2e/278964")" 403
+want "snippet with a foreign token"        "$(out "-X POST $X $GL/api/v4/snippets")" 403
+want "user API"                            "$(out "$T $GL/api/v4/user")" 403
+want "project list"                        "$(out "$T $GL/api/v4/projects")" 403
+want "GraphQL"                             "$(out "-X POST $T $GL/api/graphql")" 403
+want "MCP endpoint"                        "$(out "-X POST $T $GL/api/v4/mcp")" 403
+want "web page of another project"         "$(out "$GL/gitlab-org/gitlab")" 403
+want "raw file of another project"         "$(out "$GL/gitlab-org/gitlab/-/raw/master/README.md")" 403
+want "git fetch of another project"        "$(out "$GL/gitlab-org/cli.git/info/refs?service=git-upload-pack")" 403
+want "upload host"                         "$(out "$GL/uploads/x")" 403
+O=$(sbx "cd /tmp/zero/$REPO && git fetch origin main 2>&1; echo rc=\$?")
+case $O in *rc=0*) echo "PASS control: git fetch of the own project works";; *) echo "FAIL control: git fetch: $O"; FAILS=$((FAILS+1));; esac
+want "control: own project by path"        "$(out "$T $GL/api/v4/projects/$(printf %s "$P" | sed 's#/#%2F#g')")" 200
 want "control: read MRs works"     "$(code GET /merge_requests)" 200
 glab api "projects/$ID/repository/branches" | jq -r '.[].name' | grep -q zero-attack && { echo "FAIL branch zero-attack exists on forge"; FAILS=$((FAILS+1)); }
 echo "fails: $FAILS"; [ "$FAILS" = 0 ]

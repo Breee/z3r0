@@ -118,6 +118,32 @@ func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) 
 	return nil
 }
 
+func (openshell) SetRule(name, rule string, spec map[string]any) error {
+	out, err := sh("openshell", "policy", "get", name, "--base")
+	if err != nil {
+		return err
+	}
+	_, base, ok := strings.Cut(out, "\n---\n")
+	if !ok {
+		return fmt.Errorf("policy get %s: no policy in the answer", name)
+	}
+	b, err := policyWith([]byte(base), rule, spec)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp("", name+"-policy-*.yaml")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(b); err != nil {
+		return err
+	}
+	tmp.Close()
+	_, err = sh("openshell", "policy", "set", name, "--policy", tmp.Name(), "--wait")
+	return err
+}
+
 // ImportCredentialType imports a provider profile. `profile update` needs a
 // resource_version, so an existing profile is kept; after editing one run
 // `openshell profile delete <id>` once.

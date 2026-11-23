@@ -140,7 +140,7 @@ Added 2026-11-16 (#108). Reasoning, not tested. Every path in sections 2–5 sta
 
 | # | Origin | Example | Today | Gap |
 |---|---|---|---|---|
-| P26 | Untrusted text the agent reads (prompt injection) | issue or MR comment, web page, dependency README or source, log line, MCP tool result | egress allowlist limits what can be fetched (L1); GitLab MCP is limited to the project by the token | content from non-members of the project reaches the agent unmarked (P15) |
+| P26 | Untrusted text the agent reads (prompt injection) | issue or MR comment, web page, dependency README or source, log line, MCP tool result | egress allowlist limits what can be fetched (L1); the forge host is reachable for the workspace's projects only (ADR 0046): public projects of others cannot be read | content from non-members of the project reaches the agent unmarked (P15) |
 | P27 | Poisoned instructions in the repo | `AGENTS.md`, skills, `.opencode/`, MCP config changed on a branch | MR review before merge (DevOps backbone) | accepted (ADR 0041): the agent loads these from the checked-out branch; which branch, and review, are the DevOps process's job. zero's limits (L1–L5, push gate) apply regardless Practice: F10. |
 | P28 | Tool and plugin supply chain | MCP server, opencode plugin, skill, npm or Go module | dev image pinned by digest; registries only if allowed in `.zero/policy.yaml` | plugins and MCP servers named in repo config are not checked; modules are not vetted (P17) Practice: C14, C15, C16. |
 | P29 | Model or provider | backdoored model, tampered endpoint | model hosts are an explicit allowlist (zen, Copilot) | no approved-model list; model traffic content is not inspected Practice: K14, K15. |
@@ -201,7 +201,7 @@ Covers P01–P12 only. yes = OpenShell policy/config closes it · partial = narr
 | # | OpenShell today | How / why not |
 |---|---|---|
 | P01 | no | `sandbox download` copies `.git` as-is. Workflow fix: push from sandbox, never download repos. |
-| P02 | partial | Query deny rules block `?api_key=`-style keys. No header matchers → foreign Authorization/X-Api-Key pass (upstream request / F10). |
+| P02 | partial | Query deny rules block `?api_key=`-style keys. No header matchers → foreign Authorization/X-Api-Key pass (upstream request / F10). On the forge host a foreign token reaches the workspace's own projects only (ADR 0046, tested 2026-11-23 with `tests/attacks/forge.sh`). |
 | P03 | no | Host fix done: dedicated user `openshell` (F09). Residual: KEK next to db (C13), client key in login user (C26). VM driver unknown (F09 step 4). |
 | P04 | partial | Tight method/path/query rules on bound endpoints shrink it; placeholder still resolved in any header/basic auth, responses not redacted. |
 | P05 | no | Download keeps absolute symlinks. Workflow fix: don't download. |

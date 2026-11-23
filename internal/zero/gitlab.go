@@ -102,19 +102,54 @@ func (gitlab) Name() string     { return "gitlab" }
 func (g gitlab) Host() string   { return g.host }
 func (gitlab) TokenEnv() string { return "GITLAB_TOKEN" }
 func (gitlab) GitUser() string  { return "oauth2" }
-func (g gitlab) MCP() string    { return "https://" + g.host + "/api/v4/mcp" }
 
-// Profiles are per instance: the endpoint host is part of the profile.
-func (g gitlab) ProfileID() string {
-	if g.host == gitlabCom {
-		return "zero-gitlab"
+// The profile holds the credential only; the endpoints are in the sandbox's
+// policy (forgePolicy), so one profile serves every instance.
+func (gitlab) ProfileID() string { return "zero-gitlab-token" }
+func (gitlab) Profile() []byte   { return gitlabProfileYAML }
+
+// Egress limits the forge host to the workspace's projects: the REST API by
+// project id and by encoded path, and git fetch. Everything else on the host
+// is refused: other projects, user and group API, GraphQL, MCP, snippets,
+// web pages (#52). Pushes go through the push gate only (#95).
+func (g gitlab) Egress(paths []string) (allow, deny []EgressRule, err error) {
+	for _, path := range paths {
+		id, err := g.projectID(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		allow = append(allow, gitlabProjectRules(path, id)...)
 	}
-	return "zero-gitlab-" + regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(strings.ToLower(g.host), "-")
+	deny = []EgressRule{
+		{Method: "*", Path: "/**/git-receive-pack"},
+		{Method: "GET", Path: "/**/info/refs", Query: map[string]string{"service": "git-receive-pack"}},
+	}
+	return allow, deny, nil
 }
 
-func (g gitlab) Profile() []byte {
-	y := strings.Replace(string(gitlabProfileYAML), "id: zero-gitlab\n", "id: "+g.ProfileID()+"\n", 1)
-	return []byte(strings.ReplaceAll(y, "host: "+gitlabCom+"\n", "host: "+g.host+"\n"))
+func gitlabProjectRules(path string, id int64) (allow []EgressRule) {
+	for _, p := range []string{fmt.Sprint(id), url.PathEscape(path)} {
+		base := "/api/v4/projects/" + p
+		allow = append(allow, EgressRule{Method: "GET", Path: base})
+		for _, m := range []string{"GET", "HEAD", "POST", "PUT", "PATCH"} {
+			allow = append(allow, EgressRule{Method: m, Path: base + "/**"})
+		}
+	}
+	return append(allow,
+		EgressRule{Method: "GET", Path: "/" + path + ".git/info/refs"},
+		EgressRule{Method: "POST", Path: "/" + path + ".git/git-upload-pack"})
+}
+
+func (g gitlab) projectID(path string) (int64, error) {
+	out, err := g.glab("api", "projects/"+url.PathEscape(path))
+	if err != nil {
+		return 0, fmt.Errorf("project %s: %w", path, err)
+	}
+	var proj struct{ ID int64 }
+	if err := json.Unmarshal([]byte(out), &proj); err != nil || proj.ID == 0 {
+		return 0, fmt.Errorf("project %s: bad response", path)
+	}
+	return proj.ID, nil
 }
 
 // glab sends PATs as PRIVATE-TOKEN, which OpenShell >= 0.1.8 does not
@@ -180,15 +215,11 @@ func (gitlab) Permissions(caps, tools []string) ([]string, error) {
 func (g gitlab) Mint(label string, paths []string, perms []string) (string, string, error) {
 	var ids []int64
 	for _, path := range paths {
-		out, err := g.glab("api", "projects/"+url.PathEscape(path))
+		id, err := g.projectID(path)
 		if err != nil {
-			return "", "", fmt.Errorf("project %s: %w", path, err)
+			return "", "", err
 		}
-		var proj struct{ ID int64 }
-		if err := json.Unmarshal([]byte(out), &proj); err != nil || proj.ID == 0 {
-			return "", "", fmt.Errorf("project %s: bad response", path)
-		}
-		ids = append(ids, proj.ID)
+		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
 		return "", "", fmt.Errorf("mint token: no project")

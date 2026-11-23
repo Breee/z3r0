@@ -1,7 +1,6 @@
 package zero
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,9 +35,12 @@ type Forge interface {
 	Name() string
 	// Host is the https host the token is valid for, e.g. gitlab.com.
 	Host() string
-	// ProfileID and Profile are the OpenShell provider profile for this host.
+	// ProfileID and Profile are the OpenShell provider profile of the token.
 	ProfileID() string
 	Profile() []byte
+	// Egress is what the sandbox may reach on the forge host for the
+	// projects at paths; anything not allowed is refused.
+	Egress(paths []string) (allow, deny []EgressRule, err error)
 	// LoggedIn is nil when the host session can mint tokens; the error says
 	// how to log in.
 	LoggedIn() error
@@ -55,9 +57,6 @@ type Forge interface {
 	Revoke(id string) error
 	// Tokens lists the user's active tokens.
 	Tokens() ([]Token, error)
-	// MCP is the forge's remote MCP endpoint, or "" if it has none. The agent
-	// reaches it with "Authorization: Bearer <token placeholder>".
-	MCP() string
 	// Env is extra non-secret sandbox env the forge's tools need.
 	Env() []string
 	// DefinitionChanged names a pipeline definition file that commit sha
@@ -236,6 +235,36 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	return prov, nil
 }
 
+// forgePolicyFile writes the sandbox policy file with the forge rule.
+func (s *Sandbox) forgePolicyFile(base []byte, prov string) error {
+	rule, err := forgePolicy(s.forge(), prov, s.forgePaths())
+	if err != nil {
+		return err
+	}
+	b, err := policyWith(base, forgeRule, rule)
+	if err != nil {
+		return err
+	}
+	return s.write("policy.yaml", string(b), 0o600)
+}
+
+// syncForgeRule replaces the forge rule of the running sandbox after the
+// workspace's projects changed.
+func (s *Sandbox) syncForgeRule() error {
+	f := s.forge()
+	if f == nil || !fileExists(s.path("forge.rule")) {
+		return nil
+	}
+	rule, err := forgePolicy(f, s.forgeProvider(f), s.forgePaths())
+	if err != nil {
+		return err
+	}
+	if err := rt.SetRule(s.Name, forgeRule, rule); err != nil {
+		return fmt.Errorf("forge rule: %w", err)
+	}
+	return nil
+}
+
 func importProfile(f Forge) error {
 	if err := rt.ImportCredentialType(f.ProfileID(), f.Profile()); err != nil {
 		return fmt.Errorf("import %s profile: %w", f.Name(), err)
@@ -408,26 +437,6 @@ func (s *Sandbox) configureRemote(top, path string) error {
 	}
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("configure %s remote: %w", f.Name(), err)
-	}
-	return s.configureMCP(f)
-}
-
-// configureMCP registers the forge MCP server in the sandbox's global opencode
-// config. The header holds the placeholder; opencode expands {env:...}.
-func (s *Sandbox) configureMCP(f Forge) error {
-	if f.MCP() == "" {
-		return nil
-	}
-	cfg, _ := json.Marshal(map[string]any{
-		"$schema": "https://opencode.ai/config.json",
-		"mcp": map[string]any{f.Name(): map[string]any{
-			"type": "remote", "url": f.MCP(), "enabled": true, "oauth": false,
-			"headers": map[string]string{"Authorization": "Bearer {env:" + f.TokenEnv() + "}"},
-		}},
-	})
-	script := "mkdir -p ~/.config/opencode && printf '%s' " + shellQuote(string(cfg)) + " > ~/.config/opencode/opencode.json"
-	if _, err := s.ssh(script); err != nil {
-		return fmt.Errorf("configure %s mcp: %w", f.Name(), err)
 	}
 	return nil
 }

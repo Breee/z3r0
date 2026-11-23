@@ -85,6 +85,11 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools); err != nil {
 			return 0, err
 		}
+		if repaths {
+			if err := s.syncForgeRule(); err != nil {
+				return 0, err
+			}
+		}
 		if repaths || retools {
 			s.forgeSynced()
 			if f := s.forge(); f != nil {
@@ -94,6 +99,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 				}
 				fmt.Fprintf(out, "%s token: rotated (%s%s)\n", f.Name(), strings.Join(s.forgePaths(), ", "), tools)
 			}
+		}
+		if s.forge() != nil && !fileExists(s.path("forge.rule")) {
+			fmt.Fprintln(out, "forge: this sandbox reaches the whole forge host, not only its projects, until `zero rm` + `zero up`")
 		}
 		if len(ch.newHosts) > 0 {
 			if err := s.applyProjectPolicy(pol); err != nil {
@@ -202,6 +210,14 @@ func (s *Sandbox) create() error {
 	if prov != "" {
 		creds = append(creds, prov)
 		env = s.forge().Env()
+		if policy == s.path("policy.yaml") {
+			if err := s.forgePolicyFile(policyYAML, prov); err != nil {
+				return err
+			}
+			if err := s.write("forge.rule", "1", 0o600); err != nil {
+				return err
+			}
+		}
 	}
 	cp, err := s.setupCopilot()
 	if err != nil {

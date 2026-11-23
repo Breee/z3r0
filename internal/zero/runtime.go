@@ -26,6 +26,9 @@ type Runtime interface {
 	// AllowEgress lets binary reach host:443 (REST, enforced) under rule;
 	// access is read-only or read-write.
 	AllowEgress(name, rule, binary, access string, hosts []string) error
+	// SetRule replaces the network rule named rule of a running sandbox
+	// and keeps the other rules.
+	SetRule(name, rule string, spec map[string]any) error
 	// ImportCredentialType registers how a credential is bound (endpoints,
 	// header, binaries). An existing type is kept.
 	ImportCredentialType(id string, spec []byte) error

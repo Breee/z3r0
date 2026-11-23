@@ -76,14 +76,41 @@ func TestGitlabHost(t *testing.T) {
 	if !ok || h != "git.example.org" || p != "a/b" {
 		t.Fatalf("parseRemote = %q %q %v", h, p, ok)
 	}
-	g := gitlab{"git.example.org"}
-	y := string(g.Profile())
-	if g.ProfileID() != "zero-gitlab-git-example-org" || !strings.Contains(y, "id: zero-gitlab-git-example-org\n") ||
-		!strings.Contains(y, "host: git.example.org\n") || strings.Contains(y, "host: gitlab.com") {
-		t.Errorf("profile for other host wrong:\n%s", y)
+	if strings.Contains(string(gitlab{h}.Profile()), "endpoints") {
+		t.Error("the token profile must not carry an endpoint: profile endpoints add to the sandbox's rules")
 	}
-	if string(gitlab{gitlabCom}.Profile()) != string(gitlabProfileYAML) {
-		t.Error("gitlab.com profile changed")
+}
+
+func TestForgeRule(t *testing.T) {
+	rules := gitlabProjectRules("grp/sub/app", 42)
+	var got []string
+	for _, r := range rules {
+		got = append(got, r.Method+" "+r.Path)
+	}
+	for _, want := range []string{"GET /api/v4/projects/42", "POST /api/v4/projects/42/**",
+		"GET /api/v4/projects/grp%2Fsub%2Fapp", "PATCH /api/v4/projects/grp%2Fsub%2Fapp/**",
+		"GET /grp/sub/app.git/info/refs", "POST /grp/sub/app.git/git-upload-pack"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("rule %q missing in %v", want, got)
+		}
+	}
+	for _, r := range got {
+		if strings.HasPrefix(r, "DELETE") || strings.Contains(r, "receive-pack") ||
+			!(strings.Contains(r, "/42") || strings.Contains(r, "grp%2Fsub%2Fapp") || strings.Contains(r, "/grp/sub/app.git/")) {
+			t.Errorf("rule %q reaches beyond the project", r)
+		}
+	}
+	b, err := policyWith(policyYAML, forgeRule, map[string]any{"name": forgeRule})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = policyWith(b, "zen", map[string]any{"name": "zen"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	y := string(b)
+	if !strings.Contains(y, "forge:") || !strings.Contains(y, "zen:") || !strings.Contains(y, "filesystem_policy:") {
+		t.Errorf("policy lost a part:\n%s", y)
 	}
 }
 

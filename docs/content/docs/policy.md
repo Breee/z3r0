@@ -89,7 +89,7 @@ workspaces:
 `default` stands for 15 read tools (projects, files, branches, tags, commits, merge requests, pipelines, jobs, work items, labels). The token gets the permissions these tools need on top of the capabilities. A changed list takes effect at the next `zero up`. An unknown tool name stops every zero command until it is corrected.
 
 {{< callout type="warning" >}}
-In this version the list decides the token's permissions only. Tools outside the list are still shown to the agent; GitLab refuses them when they are called.
+In this version the list decides the token's permissions only. The sandbox cannot reach GitLab's MCP endpoint, so the agent has no GitLab MCP tools until the MCP gateway is built in.
 {{< /callout >}}
 
 ## Background

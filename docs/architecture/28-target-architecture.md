@@ -59,7 +59,7 @@ Focus now: the local version (one developer, one host) with its core. Everything
 | Core | L0–L5a, workspaces (`docs/spec/workspaces.md`), `zero-cp` on the laptop (push gate, token upkeep, decision log), GitLab through glab login, install and doctor | built; open items below |
 | Additions | MCP through a gateway (ADR 0043, PoC 13–15), Kubernetes access (#123), OpenBao store (ADR 0032), SPIFFE identity (L7), VM driver (L6), evidence sink (L8), data-flow guardrail (#129), access broker for an enterprise setup (#133), team deployment (§28.5) | PoC or planned |
 
-Open in the core: with `ci.run` and `gitlab.mr.create` a merge request opened by API runs a changed pipeline definition (ADR 0045); forge content from non-members reaches the agent unmarked (#110); foreign credentials in requests (C18, #14); token profile wider than the project for git/curl (C35, #52).
+Open in the core: with `ci.run` and `gitlab.mr.create` a merge request opened by API runs a changed pipeline definition (ADR 0045); forge content from non-members reaches the agent unmarked (#110); foreign credentials in requests (C18, #14; on the forge host only towards the workspace's own projects since ADR 0046).
 
 An addition names its seam to the core (sandbox identity, workspace config, session start and stop) and keeps Z-INV-1..6; example: `pocs/15-gitlab-mcp/README.md`.
 
