@@ -123,7 +123,7 @@ func checkRefs(ups []refUpdate, branch string) error {
 		return fmt.Errorf("no ref updates")
 	}
 	for _, u := range ups {
-		if u.Ref != branch && !strings.HasPrefix(u.Ref, branch+"/") {
+		if u.Ref != branch && !strings.HasPrefix(u.Ref, branch+"/") || strings.Contains(u.Ref, "..") {
 			return fmt.Errorf("%s: only %s and %s/* may be pushed", u.Ref, branch, branch)
 		}
 		if u.New == zeroSHA {

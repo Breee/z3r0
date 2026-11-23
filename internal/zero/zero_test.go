@@ -130,6 +130,7 @@ func TestCheckRefs(t *testing.T) {
 		{{a, n, "refs/tags/v1"}},
 		{{a, zeroSHA, "refs/heads/zero/dev"}},
 		{{a, n, "refs/heads/zero/dev"}, {a, n, "refs/heads/main"}},
+		{{a, n, "refs/heads/zero/dev/../../main"}},
 	}
 	for _, u := range ok {
 		if err := checkRefs(u, b); err != nil {
