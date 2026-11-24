@@ -72,6 +72,8 @@ Other lines you can see there:
 | `zero web` | `up`, then the opencode web UI in the browser. Home lists one session of the workspace's first repository under "Recent sessions"; open it to work in that folder. Other repositories: "Add project" with the path `/tmp/zero/<folder>` |
 | `zero vscode` | `up`, then VS Code with Remote-SSH on the sandbox (`zero code` still works) |
 
+zero sets no model. opencode starts with its own default, a free model with a daily limit; when the limit is reached it says so instead of answering. `/models` in the UI lists the models and switches to the one you pick; or set `model` in an `opencode.json` of the repository (this is also what `zero run` uses). The GitHub Copilot models are in the list when the host's opencode had a Copilot login at the time the sandbox was created.
+
 ```sh
 zero run "add a test for the parser and push"
 ```
