@@ -109,6 +109,8 @@ $ zero up --bogus
 zero up: unknown option "--bogus" (options: --approve, --vm, --max-input N)
 ```
 
+A folder whose name starts with `-` is written as `./-name`.
+
 ## Files
 
 | Path | Content |

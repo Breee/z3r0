@@ -31,6 +31,7 @@ var argSpecs = map[string]argSpec{
 	"install":    {},
 	"doctor":     {},
 	"version":    {},
+	"help":       {},
 	"ctx":        {},
 	"ctx list":   {},
 	"ctx use":    {min: 1, max: 1, names: "NAME"},

@@ -12,7 +12,7 @@ func TestCheckArgs(t *testing.T) {
 		{"attach"}, {"code"}, {"web"}, {"status"}, {"stop"}, {"pause"},
 		{"logs"}, {"logs", "-f"}, {"logs", "--follow"},
 		{"rm"}, {"rm", "-y"}, {"ls"}, {"switch"}, {"switch", "api"},
-		{"completion", "bash"}, {"install"}, {"doctor"}, {"version"},
+		{"completion", "bash"}, {"install"}, {"doctor"}, {"version"}, {"help"},
 		{"run", "fix", "--the", "bug"},
 		{"ctx"}, {"ctx", "list"}, {"ctx", "--prompt"}, {"ctx", "use", "api"},
 		{"ctx", "new", "api"}, {"ctx", "new", "api", ".", "../b"},
@@ -52,6 +52,7 @@ func TestCheckArgs(t *testing.T) {
 		{[]string{"install", "-f"}, "unknown option"},
 		{[]string{"doctor", "x"}, "takes no argument"},
 		{[]string{"version", "-v"}, "unknown option"},
+		{[]string{"help", "--bogus"}, "unknown option"},
 		{[]string{"run"}, "needs a prompt"},
 		{[]string{"ctx", "nope"}, `unknown subcommand "nope"`},
 		{[]string{"ctx", "--prompt", "x"}, "takes no argument"},
@@ -83,11 +84,18 @@ func TestCheckArgs(t *testing.T) {
 }
 
 func TestContextFlag(t *testing.T) {
-	ctx, rest := contextFlag([]string{"-c", "api", "run", "-c", "x"})
-	if ctx != "api" || strings.Join(rest, " ") != "run -c x" {
-		t.Errorf("got %q %v", ctx, rest)
+	ctx, rest, err := contextFlag([]string{"-c", "api", "run", "-c", "x"})
+	if err != nil || ctx != "api" || strings.Join(rest, " ") != "run -c x" {
+		t.Errorf("got %q %v %v", ctx, rest, err)
 	}
-	if _, rest := contextFlag([]string{"up", "-c"}); strings.Join(rest, " ") != "up -c" {
-		t.Errorf("-c without a name must stay to be refused: %v", rest)
+	ctx, rest, err = contextFlag([]string{"up", "--context=api", "--vm"})
+	if err != nil || ctx != "api" || strings.Join(rest, " ") != "up --vm" {
+		t.Errorf("got %q %v %v", ctx, rest, err)
+	}
+	for _, in := range [][]string{{"up", "-c"}, {"-c", "--vm", "up"}, {"--context=", "up"}, {"--context", "-y", "rm"}} {
+		var u usageError
+		if _, _, err := contextFlag(in); !errors.As(err, &u) {
+			t.Errorf("%v: got %v, want a usage error", in, err)
+		}
 	}
 }

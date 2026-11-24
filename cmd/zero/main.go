@@ -38,6 +38,7 @@ Usage: zero [-c WORKSPACE] <command>
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
   version       version of this build
+  help          this text
 
 An option or argument a command does not know is refused (exit 2) before anything runs.
 
@@ -64,16 +65,19 @@ func main() {
 		fmt.Fprint(os.Stderr, usageText)
 		os.Exit(2)
 	}
-	ctx, rest := contextFlag(os.Args[1:])
+	ctx, rest, err := contextFlag(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	if len(rest) == 0 {
 		fmt.Fprint(os.Stderr, usageText)
 		os.Exit(2)
 	}
 	cmd, args := rest[0], rest[1:]
 	switch cmd {
-	case "-h", "--help", "help":
-		fmt.Print(usageText)
-		return
+	case "-h", "--help":
+		cmd = "help"
 	case "--version":
 		cmd = "version"
 	}
@@ -87,6 +91,9 @@ func main() {
 		os.Exit(2)
 	}
 	switch cmd {
+	case "help":
+		fmt.Print(usageText)
+		return
 	case "version":
 		fmt.Println("zero", zero.Version())
 		return
@@ -174,22 +181,36 @@ func main() {
 
 // contextFlag takes -c/--context NAME out of the arguments. Arguments after
 // `run` belong to the prompt and stay untouched.
-func contextFlag(in []string) (ctx string, rest []string) {
+func contextFlag(in []string) (ctx string, rest []string, err error) {
+	named := func(v string) error {
+		if v == "" || strings.HasPrefix(v, "-") {
+			return usageError(fmt.Sprintf("zero: -c needs a workspace name, got %q", v))
+		}
+		ctx = v
+		return nil
+	}
 	for i := 0; i < len(in); i++ {
 		a := in[i]
 		switch {
 		case len(rest) > 0 && rest[0] == "run":
 			rest = append(rest, a)
-		case (a == "-c" || a == "--context") && i+1 < len(in):
+		case a == "-c" || a == "--context":
 			i++
-			ctx = in[i]
+			if i == len(in) {
+				return "", nil, usageError("zero: -c needs a workspace name")
+			}
+			if err := named(in[i]); err != nil {
+				return "", nil, err
+			}
 		case strings.HasPrefix(a, "--context="):
-			ctx = strings.TrimPrefix(a, "--context=")
+			if err := named(strings.TrimPrefix(a, "--context=")); err != nil {
+				return "", nil, err
+			}
 		default:
 			rest = append(rest, a)
 		}
 	}
-	return ctx, rest
+	return ctx, rest, nil
 }
 
 func fatal(err error) {
