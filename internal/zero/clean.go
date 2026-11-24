@@ -1,32 +1,39 @@
 package zero
 
-import "io"
+import (
+	"io"
+	"unicode"
+	"unicode/utf8"
+)
 
 // Text that comes out of a sandbox is written by the agent. Before it reaches
 // the host terminal the control characters are taken out (all but newline and
 // tab), so it cannot move the cursor, repaint a question or set the window
 // title (#140).
 
-// cleaner removes control characters from a byte stream: C0 except \n and \t,
-// DEL, and C1 (U+0080..U+009F, in UTF-8 the bytes C2 80..C2 9F).
-type cleaner struct{ c2 bool }
+// cleaner removes from a UTF-8 byte stream: control characters (C0 except \n
+// and \t, DEL, C1), the characters that change the writing direction
+// (U+202A..U+202E, U+2066..U+2069) and bytes that are not UTF-8, which a
+// terminal with an 8-bit character set could read as C1.
+type cleaner struct{ rest []byte } // start of a character cut off by the end of a write
 
 func (c *cleaner) filter(p []byte) []byte {
-	out := make([]byte, 0, len(p)+1)
-	for _, b := range p {
-		if c.c2 {
-			c.c2 = false
-			if b >= 0x80 && b <= 0x9f {
-				continue
-			}
-			out = append(out, 0xc2)
-		}
+	p = append(c.rest, p...)
+	c.rest = nil
+	out := make([]byte, 0, len(p))
+	for len(p) > 0 {
+		r, n := utf8.DecodeRune(p)
 		switch {
-		case b == 0xc2:
-			c.c2 = true
-		case b == '\n' || b == '\t' || b >= 0x20 && b != 0x7f:
-			out = append(out, b)
+		case r == utf8.RuneError && n == 1:
+			if !utf8.FullRune(p) {
+				c.rest = append(c.rest, p...)
+				return out
+			}
+		case unicode.IsControl(r) && r != '\n' && r != '\t', r >= 0x202a && r <= 0x202e, r >= 0x2066 && r <= 0x2069:
+		default:
+			out = append(out, p[:n]...)
 		}
+		p = p[n:]
 	}
 	return out
 }
@@ -34,11 +41,7 @@ func (c *cleaner) filter(p []byte) []byte {
 // clean is the filter for a whole text.
 func clean(s string) string {
 	var c cleaner
-	out := c.filter([]byte(s))
-	if c.c2 {
-		out = append(out, 0xc2)
-	}
-	return string(out)
+	return string(c.filter([]byte(s)))
 }
 
 // cleanWriter filters what is written through it.

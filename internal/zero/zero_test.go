@@ -1156,7 +1156,9 @@ func TestClean(t *testing.T) {
 		"a\u009b2Jb\u009d0;t\u009cc":           "a2Jb0;tc",                   // C1 forms of CSI, OSC, ST
 		"line\rdelete zero-api? [y/N]\x08\x7f": "linedelete zero-api? [y/N]", // carriage return, backspace, DEL
 		"a\x00b":                               "ab",
-		"é\xc2":                                "é\xc2", // cut-off sequence stays as it is
+		"é\xc2":                                "é",                 // cut-off character
+		"a\x9b2J\xffb\xc0\x9bc":                "a2Jbc",             // bytes that are not UTF-8
+		"zero-api\u202eipa-orez\u2066x\u2069":  "zero-apiipa-orezx", // writing direction
 	} {
 		if got := clean(in); got != want {
 			t.Errorf("clean(%q) = %q, want %q", in, got, want)
