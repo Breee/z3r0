@@ -49,13 +49,14 @@ sudo zero doctor   # checks the gateway's credential store only
 ```
 
 ```
-zero 4e756bd3724e 2026-11-24
+zero 0ff5fed54dd0 2026-11-24
 skip  credential store: run `sudo zero doctor`
 ok    openshell gateway
 ok    gateway user
 ok    client key
 ok    zero-cp
 ok    model login
+warn  glab login for gitlab.com is stored in plain text: glab auth login --hostname gitlab.com --use-keyring
 ok    guardrails corewire/technology-and-research/developer
 ```
 
