@@ -7,8 +7,10 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -46,6 +48,68 @@ const (
 	maxCommandLine = 1024
 	commandTimeout = 30 * time.Second
 )
+
+// Limits on one push (#139). One gate serves all sandboxes, so a sandbox must
+// not be able to hold it with endless or stalled requests.
+const (
+	maxPushBytes = 2 << 30          // request body, as sent and unpacked
+	pushIdle     = 2 * time.Minute  // longest pause while the body arrives
+	pushTimeout  = 30 * time.Minute // a whole request
+	maxPushes    = 2                // pushes of one sandbox at a time
+)
+
+var errPushTooLarge = errors.New("push larger than 2 GiB")
+
+// limitReader fails with errPushTooLarge after n bytes; before each read
+// touch (if set) moves the read deadline of the connection.
+type limitReader struct {
+	r     io.Reader
+	n     int64
+	touch func()
+	hit   bool
+}
+
+func (l *limitReader) Read(p []byte) (int, error) {
+	if l.n <= 0 {
+		// the end exactly at the limit is not an error
+		if n, err := l.r.Read(make([]byte, 1)); n == 0 && err != nil {
+			return 0, err
+		}
+		l.hit = true
+		return 0, errPushTooLarge
+	}
+	if l.touch != nil {
+		l.touch()
+	}
+	if int64(len(p)) > l.n {
+		p = p[:l.n]
+	}
+	n, err := l.r.Read(p)
+	l.n -= int64(n)
+	return n, err
+}
+
+var (
+	pushMu  sync.Mutex
+	pushing = map[string]int{}
+)
+
+// pushSlot takes one of the sandbox's push slots; free gives it back.
+func pushSlot(name string) (free func(), ok bool) {
+	pushMu.Lock()
+	defer pushMu.Unlock()
+	if pushing[name] >= maxPushes {
+		return nil, false
+	}
+	pushing[name]++
+	return func() {
+		pushMu.Lock()
+		defer pushMu.Unlock()
+		if pushing[name]--; pushing[name] == 0 {
+			delete(pushing, name)
+		}
+	}, true
+}
 
 type refUpdate struct{ Old, New, Ref string }
 
@@ -217,7 +281,7 @@ func gateLookup(key string) *gateSession {
 	dirs, _ := filepath.Glob(filepath.Join(stateRoot(), "*", "gate.key"))
 	for _, p := range dirs {
 		b, err := os.ReadFile(p)
-		if err != nil || strings.TrimSpace(string(b)) != key {
+		if err != nil || subtle.ConstantTimeCompare(bytes.TrimSpace(b), []byte(key)) != 1 {
 			continue
 		}
 		dir := filepath.Dir(p)
@@ -264,6 +328,35 @@ func gateRecord(gs *gateSession, u refUpdate, decision, reason string) {
 	})
 }
 
+// gateRefuse answers 403 and records the request: in the journal, and in the
+// sandbox's gate.log if the key was valid. The key itself is not logged.
+func gateRefuse(w http.ResponseWriter, r *http.Request, gs *gateSession, key, path, reason string) {
+	who := "unknown key"
+	if len(key) > 4 {
+		who = "key " + key[:4] + "..."
+	}
+	if gs != nil {
+		who = gs.name
+	}
+	path = strings.ToValidUTF8(path, "?")
+	if len(path) > 200 {
+		path = path[:200]
+	}
+	log.Printf("gate: refused %s %q from %s (%s): %s", r.Method, path, r.RemoteAddr, who, reason)
+	if gs != nil {
+		gateLogMu.Lock()
+		if f, err := os.OpenFile(filepath.Join(gs.state, "gate.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+			json.NewEncoder(f).Encode(map[string]string{
+				"time": time.Now().UTC().Format(time.RFC3339), "sandbox": gs.name, "peer": r.RemoteAddr,
+				"method": r.Method, "path": path, "decision": "refused", "reason": reason,
+			})
+			f.Close()
+		}
+		gateLogMu.Unlock()
+	}
+	http.Error(w, "zero: "+reason, http.StatusForbidden)
+}
+
 func gateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/healthz" {
 		fmt.Fprintln(w, serveGreeting)
@@ -273,10 +366,16 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 	key, rest, _ := strings.Cut(rest, "/")
 	gs := gateLookup(key)
 	if !ok || gs == nil {
-		http.Error(w, "zero: unknown sandbox", http.StatusForbidden)
+		if !ok {
+			key, rest = "", r.URL.Path
+		}
+		gateRefuse(w, r, nil, key, rest, "unknown sandbox")
 		return
 	}
 	rest = "/" + rest
+	ctx, cancel := context.WithTimeout(r.Context(), pushTimeout)
+	defer cancel()
+	r = r.WithContext(ctx)
 	target, _ := url.Parse(gs.upstream)
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	r.URL.Path, r.URL.RawPath, r.Host = rest, "", target.Host
@@ -289,9 +388,26 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && op == "info/refs" && r.URL.Query().Get("service") == "git-receive-pack":
 		proxy.ServeHTTP(w, r)
 	case r.Method == http.MethodPost && op == "git-receive-pack":
-		body := io.Reader(r.Body)
+		free, ok := pushSlot(gs.name)
+		if !ok {
+			err := fmt.Errorf("%d pushes of this sandbox are running; try again when one has ended", maxPushes)
+			gateRecord(gs, refUpdate{}, "deny", err.Error())
+			gateDeny(w, err.Error())
+			return
+		}
+		defer free()
+		rc := http.NewResponseController(w)
+		rc.SetWriteDeadline(time.Now().Add(pushTimeout))
+		if r.ContentLength > maxPushBytes {
+			gateRecord(gs, refUpdate{}, "deny", errPushTooLarge.Error())
+			gateDeny(w, errPushTooLarge.Error())
+			return
+		}
+		// the limit counts the bytes as sent and, if compressed, as unpacked
+		sent := &limitReader{r: r.Body, n: maxPushBytes}
+		body := io.Reader(sent)
 		if r.Header.Get("Content-Encoding") == "gzip" {
-			zr, err := gzip.NewReader(r.Body)
+			zr, err := gzip.NewReader(sent)
 			if err != nil {
 				http.Error(w, "bad gzip body", http.StatusBadRequest)
 				return
@@ -299,10 +415,12 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 			body = zr
 			r.Header.Del("Content-Encoding")
 		}
-		// the command list must arrive promptly; the pack may take longer
-		rc := http.NewResponseController(w)
+		lim := &limitReader{r: body, n: maxPushBytes}
+		tooLarge := func() bool { return sent.hit || lim.hit }
+		// the command list must arrive promptly; the pack may take longer,
+		// but not stall
 		rc.SetReadDeadline(time.Now().Add(commandTimeout))
-		br := bufio.NewReader(body)
+		br := bufio.NewReader(lim)
 		ups, caps, err := readCommands(br)
 		if err == nil {
 			err = checkRefs(ups, sessionBranch(gs.name))
@@ -317,7 +435,8 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 				err = checkOptions(opts, gs.mrCreate && gs.ciRun)
 			}
 		}
-		rc.SetReadDeadline(time.Time{})
+		sent.touch = func() { rc.SetReadDeadline(time.Now().Add(pushIdle)) }
+		sent.touch()
 		if err != nil {
 			for _, u := range ups {
 				gateRecord(gs, u, "deny", err.Error())
@@ -338,6 +457,9 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 				defer gs.dropRef(r, repo, ups[0].New, tmp)
 			}
 			if err != nil {
+				if tooLarge() {
+					err = errPushTooLarge
+				}
 				gateRecord(gs, ups[0], "deny", err.Error())
 				gateDeny(w, err.Error())
 				return
@@ -368,9 +490,18 @@ func gateHandler(w http.ResponseWriter, r *http.Request) {
 		r.Body = io.NopCloser(io.MultiReader(strings.NewReader(cmds), pack))
 		r.ContentLength = -1
 		r.Header.Del("Content-Length")
+		proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
+			if tooLarge() {
+				gateRecord(gs, refUpdate{}, "deny", errPushTooLarge.Error())
+				gateDeny(w, errPushTooLarge.Error())
+				return
+			}
+			gateRecord(gs, refUpdate{}, "error", "push not forwarded: "+err.Error())
+			w.WriteHeader(http.StatusBadGateway)
+		}
 		proxy.ServeHTTP(w, r)
 	default:
-		http.Error(w, "zero: the gate only serves pushes to "+strings.Join(gs.repos, ", "), http.StatusForbidden)
+		gateRefuse(w, r, gs, key, rest, "the gate only serves pushes to "+strings.Join(gs.repos, ", "))
 	}
 }
 

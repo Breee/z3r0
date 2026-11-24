@@ -37,6 +37,8 @@ func Serve() error {
 		Addr:              addr,
 		Handler:           http.HandlerFunc(gateHandler),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       pushTimeout,
+		WriteTimeout:      pushTimeout,
 		IdleTimeout:       time.Minute,
 		MaxHeaderBytes:    64 << 10,
 	}

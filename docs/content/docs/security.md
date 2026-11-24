@@ -26,7 +26,7 @@ zero assumes that the agent can be turned against you: by a prompt hidden in an 
 | widen its own policy | the policy is read from your host checkout and a wider one needs your approval |
 | keep access after you stop | `zero pause` and `zero rm` revoke the token |
 
-These points are tested against a running sandbox by [`tests/attacks/forge.sh`](https://github.com/Breee/z3r0/blob/main/tests/attacks/forge.sh). Every decision of the push gate is written to `~/.local/state/zero/zero-<name>/gate.log`.
+These points are tested against a running sandbox by [`tests/attacks/forge.sh`](https://github.com/Breee/z3r0/blob/main/tests/attacks/forge.sh). Every decision of the push gate is written to `~/.local/state/zero/zero-<name>/gate.log`. Requests the gate refuses are written there too, and to the journal of `zero-cp` (`journalctl --user -u zero-cp`). One push may be 2 GiB at most, may pause for two minutes at most and takes 30 minutes at most; a sandbox has two pushes at a time.
 
 ## What you have to do
 

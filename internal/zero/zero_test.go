@@ -440,6 +440,83 @@ func TestGateSeveralRepos(t *testing.T) {
 	}
 }
 
+func TestGateLimits(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dir := filepath.Join(stateRoot(), "zero-team")
+	os.MkdirAll(dir, 0o700)
+	key := strings.Repeat("ab", 16)
+	for k, v := range map[string]string{"gate.key": key, "forge": "gitlab", "forge.path": "g/api\n"} {
+		os.WriteFile(filepath.Join(dir, k), []byte(v), 0o600)
+	}
+	gateLog := func() string {
+		b, _ := os.ReadFile(filepath.Join(dir, "gate.log"))
+		return string(b)
+	}
+
+	// refused requests are recorded, the key is not
+	w := httptest.NewRecorder()
+	gateHandler(w, httptest.NewRequest("GET", "/s/"+key+"/g/other.git/info/refs?service=git-receive-pack", nil))
+	if l := gateLog(); w.Code != http.StatusForbidden || !strings.Contains(l, `"decision":"refused"`) ||
+		!strings.Contains(l, `"path":"/g/other.git/info/refs"`) || !strings.Contains(l, `"peer":"`) || strings.Contains(l, key) {
+		t.Errorf("refused request: status %d, log %q", w.Code, l)
+	}
+	w = httptest.NewRecorder()
+	gateHandler(w, httptest.NewRequest("GET", "/s/"+strings.Repeat("cd", 16)+"/g/api.git/info/refs", nil))
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "unknown sandbox") {
+		t.Errorf("unknown key: status %d, body %q", w.Code, w.Body)
+	}
+
+	// a body announced larger than the limit is refused before it is read
+	post := func() *http.Request {
+		return httptest.NewRequest("POST", "/s/"+key+"/g/api.git/git-receive-pack", strings.NewReader("0000"))
+	}
+	r := post()
+	r.ContentLength = maxPushBytes + 1
+	w = httptest.NewRecorder()
+	gateHandler(w, r)
+	if !strings.Contains(w.Body.String(), "push denied: push larger than") || !strings.Contains(gateLog(), "push larger than") {
+		t.Errorf("large push: body %q", w.Body)
+	}
+
+	// no more than maxPushes pushes of one sandbox at a time
+	var frees []func()
+	for range maxPushes {
+		free, ok := pushSlot("zero-team")
+		if !ok {
+			t.Fatal("no slot although below the limit")
+		}
+		frees = append(frees, free)
+	}
+	if _, ok := pushSlot("zero-other"); !ok {
+		t.Error("another sandbox got no slot")
+	}
+	w = httptest.NewRecorder()
+	gateHandler(w, post())
+	if !strings.Contains(w.Body.String(), "pushes of this sandbox are running") {
+		t.Errorf("push beyond the limit: body %q", w.Body)
+	}
+	for _, free := range frees {
+		free()
+	}
+	if free, ok := pushSlot("zero-team"); !ok {
+		t.Error("no slot after the pushes ended")
+	} else {
+		free()
+	}
+
+	// limitReader stops at the limit and reports it
+	touched := 0
+	l := &limitReader{r: strings.NewReader("0123456789"), n: 4, touch: func() { touched++ }}
+	b, err := io.ReadAll(l)
+	if string(b) != "0123" || err != errPushTooLarge || !l.hit || touched == 0 {
+		t.Errorf("limitReader: %q, %v, hit %v, touched %d", b, err, l.hit, touched)
+	}
+	l = &limitReader{r: strings.NewReader("0123"), n: 4}
+	if b, err := io.ReadAll(l); string(b) != "0123" || err != nil || l.hit {
+		t.Errorf("limitReader at the limit: %q, %v", b, err)
+	}
+}
+
 func writeTree(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for name, body := range files {
