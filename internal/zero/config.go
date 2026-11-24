@@ -400,8 +400,11 @@ func Ctx(out io.Writer, flag string, args []string) error {
 	case "rm":
 		yes := slices.Contains(args, "-y")
 		args = slices.DeleteFunc(args, func(a string) bool { return a == "-y" })
-		if len(args) != 1 || c.Workspaces[args[0]] == nil {
+		if len(args) != 1 {
 			return fmt.Errorf("usage: zero ctx rm [-y] NAME (zero ctx lists them)")
+		}
+		if c.Workspaces[args[0]] == nil {
+			return rmLeftover(out, args[0], yes)
 		}
 		s := c.sandbox(args[0])
 		if err := s.Rm(out, yes); err != nil {
@@ -416,4 +419,22 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		return fmt.Errorf("usage: zero ctx [use NAME | new NAME [PATH...] | add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt]")
 	}
 	return c.save()
+}
+
+// rmLeftover removes what a workspace that is no longer in the config left
+// behind (zero ls: leftover): sandbox, token, input copy, state.
+func rmLeftover(out io.Writer, name string, yes bool) error {
+	sb := "zero-" + name
+	s := &Sandbox{Name: sb, State: filepath.Join(stateRoot(), sb), Host: rt.HostAlias(sb)}
+	if !wsNameRe.MatchString(name) {
+		return fmt.Errorf("no workspace %q (zero ls lists them)", name)
+	}
+	s.setGateway(s.read("gateway"))
+	if !fileExists(s.State) && !s.exists() {
+		s.setGateway(vmGateway)
+	}
+	if !fileExists(s.State) && !fileExists(s.stage()) && !s.exists() {
+		return fmt.Errorf("no workspace %q and nothing left of one (zero ls lists them)", name)
+	}
+	return s.Rm(out, yes)
 }

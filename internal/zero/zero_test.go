@@ -1391,3 +1391,28 @@ func TestPolicyState(t *testing.T) {
 		t.Errorf("file that cannot be read: got %s, want changed", got)
 	}
 }
+
+func TestRmLeftover(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	bin := filepath.Join(dir, "bin")
+	os.MkdirAll(bin, 0o755)
+	os.WriteFile(filepath.Join(bin, "openshell"), []byte("#!/bin/sh\nexit 1\n"), 0o755)
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	var out strings.Builder
+	if err := Ctx(&out, "", []string{"rm", "-y", "gone"}); err == nil || !strings.Contains(err.Error(), "nothing left") {
+		t.Errorf("nothing there: %v", err)
+	}
+	if err := Ctx(&out, "", []string{"rm", "-y", "../x"}); err == nil {
+		t.Error("name with a path accepted")
+	}
+	state := filepath.Join(stateRoot(), "zero-gone")
+	os.MkdirAll(state, 0o700)
+	if err := Ctx(&out, "", []string{"rm", "-y", "gone"}); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(state) || !strings.Contains(out.String(), "removed sandbox zero-gone") {
+		t.Errorf("state left or no message: %q", out.String())
+	}
+}

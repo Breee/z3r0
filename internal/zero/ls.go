@@ -166,7 +166,7 @@ func (s *Sandbox) policyState() string {
 
 // lsLegend explains the table; it goes to stderr, the rows stay as they are
 // for scripts.
-const lsLegend = "legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = zero up applies the folders' .zero/policy.yaml"
+const lsLegend = "legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = the folders' .zero/policy.yaml differs from what runs; zero up applies it or says why not"
 
 // writeRows prints the workspace table.
 func writeRows(out io.Writer, rows []wsRow) error {
@@ -198,10 +198,8 @@ func Ls(out io.Writer) error {
 		n, ok := strings.CutPrefix(sb, "zero-")
 		return ok && c.Workspaces[n] != nil
 	}
-	// What takes a leftover away: adopting it as a workspace and deleting that.
 	adopt := func(sb string) string {
-		n := strings.TrimPrefix(sb, "zero-")
-		return fmt.Sprintf("; to remove it: zero ctx new %s PATH && zero ctx rm %s", n, n)
+		return "; to remove it: zero ctx rm " + strings.TrimPrefix(sb, "zero-")
 	}
 	var orphans []string
 	suffix := tokenLabel("")

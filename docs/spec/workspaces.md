@@ -90,7 +90,7 @@ zero ls                          all workspaces + live status + orphans
 leftover: token 29481100 zero-old@io (no sandbox); zero-cp revokes it within 10 minutes, else revoke it on the forge
 ```
 
-Built in #79, columns and leftover lines changed in #145. STATUS is `running`, `paused`, `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is `ok`, or `changed` when the policy in the folders differs from the one the sandbox runs with (the next `zero up` applies it), `-` without a sandbox. One `leftover:` line per thing without a workspace, with the commands that remove it: a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy. `zero ls` only lists; `zero-cp` revokes tokens without a sandbox. A legend line goes to stderr.
+Built in #79, columns and leftover lines changed in #145. STATUS is `running`, `paused`, `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is `ok`, or `changed` when the policy in the folders differs from the one the sandbox runs with (the next `zero up` applies it), `-` when no policy is recorded. One `leftover:` line per thing without a workspace, with the command that removes it (`zero ctx rm NAME` also takes such a name): a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy. `zero ls` only lists; `zero-cp` revokes tokens without a sandbox. A legend line goes to stderr.
 
 ## 5. Examples
 
@@ -254,7 +254,7 @@ Decisions:
 
 | # | Flaw | Decision in this spec |
 |---|---|---|
-| F1 | Hidden current context → wrong `rm` | cwd first, `ctx:` line, type-name confirm (5.7) |
+| F1 | Hidden current context → wrong `rm` | cwd first, `workspace:` line, type-name confirm (5.7) |
 | F2 | Folder in several workspaces | ambiguity error unless current matches (5.8) |
 | F3 | Input folders leak host secrets (`.env`) into sandbox | **decided**: secret patterns (`.env*` etc.) never copied, not overridable; extra excludes via `.zeroignore`; file summary on `up` (5.3) |
 | F4 | Permission union: capability for repo A applies to repo B | **decided**: accepted, one token per forge per workspace; `zero status` prints its projects and capabilities (#117) |

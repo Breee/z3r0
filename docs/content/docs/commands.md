@@ -88,7 +88,7 @@ zero run "add a test for the parser and push"
 | `zero ctx new NAME [PATH...]` | new workspace with these folders |
 | `zero ctx add [PATH...]` | adds folders to the workspace |
 | `zero ctx remove [PATH...]` | removes folders from the workspace |
-| `zero ctx rm [-y] NAME` | deletes the workspace and its sandbox |
+| `zero ctx rm [-y] NAME` | deletes the workspace and its sandbox; also takes a name from a `leftover:` line of `zero ls` |
 | `zero ctx --prompt` | prints the name of the workspace a command would act on, for a shell prompt |
 
 ```sh
@@ -99,15 +99,15 @@ zero ls
   WORKSPACE  STATUS   FOLDERS  TOKEN       POLICY
   developer  running  2        gitlab 38h  ok
 * z3r0       none     1        -           -
-legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = zero up applies the folders' .zero/policy.yaml
+legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = the folders' .zero/policy.yaml differs from what runs; zero up applies it or says why not
 ```
 
-`STATUS` is `running`, `paused`, `none` (no sandbox) or `unknown` (gateway not reachable). `POLICY` is `changed` when the `.zero/policy.yaml` in the folders differs from what the sandbox runs with; the next `zero up` applies it. The legend goes to the error output, so a script reads rows only.
+`STATUS` is `running`, `paused`, `none` (no sandbox) or `unknown` (gateway not reachable). `POLICY` is `changed` when the `.zero/policy.yaml` in the folders differs from what the sandbox runs with; the next `zero up` applies it or says why it cannot; `-` when no policy is recorded (no sandbox yet). The legend goes to the error output, so a script reads rows only.
 
-What is left over without a workspace gets a line each, with the commands that remove it:
+What is left over without a workspace gets a line each, with the command that removes it:
 
 ```
-leftover: state /home/bree/.local/state/zero/zero-left145 (no workspace); to remove it: zero ctx new left145 PATH && zero ctx rm left145
+leftover: state /home/bree/.local/state/zero/zero-left145 (no workspace); to remove it: zero ctx rm left145
 ```
 
 A token without a sandbox is revoked by `zero-cp` within 10 minutes.
