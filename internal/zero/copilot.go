@@ -3,10 +3,8 @@ package zero
 import (
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
 //go:embed copilot-profile.yaml
@@ -25,25 +23,15 @@ func modelLogin() string {
 	if _, err := exec.LookPath("opencode"); err != nil {
 		return "opencode is not on PATH; install it, then: opencode auth login"
 	}
+	// The output holds secrets: nothing of it goes into the message.
 	out, err := exec.Command("opencode", "auth", "export").Output()
 	if err != nil {
-		return "opencode auth export failed (" + clean(firstLine(err, out)) + "); check: opencode auth list"
+		return "opencode auth export failed; check: opencode auth list"
 	}
 	if copilotToken(out) == "" {
 		return "the host's opencode has no GitHub Copilot login: opencode auth login"
 	}
 	return ""
-}
-
-func firstLine(err error, out []byte) string {
-	var ee *exec.ExitError
-	if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-		out = ee.Stderr
-	}
-	if l, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n"); l != "" {
-		return l
-	}
-	return err.Error()
 }
 
 // hostCopilotToken returns the Copilot OAuth token of the host's opencode, or

@@ -1321,7 +1321,7 @@ func TestDoctorLines(t *testing.T) {
 	for remote, want := range map[string]string{
 		"":                                "has no origin",
 		"/srv/git/x.git":                  "is not on GitLab",
-		"git@github.com:Breee/z3r0.git\n": "glab auth login --hostname github.com",
+		"git@github.com:Breee/z3r0.git\n": "github.com:Breee/z3r0.git is not on GitLab",
 		"https://git.example.org/a/b.git": "glab auth login --hostname git.example.org",
 		"\x1b[2Jgit@github.com:a/b.git":   "",
 	} {
@@ -1350,8 +1350,8 @@ func TestDoctorLines(t *testing.T) {
 	if p := modelLogin(); !strings.Contains(p, "opencode auth login") {
 		t.Errorf("no login: %q", p)
 	}
-	fake("echo boom >&2; exit 1")
-	if p := modelLogin(); !strings.Contains(p, "boom") || !strings.Contains(p, "opencode auth list") {
+	fake("echo secret; echo secret >&2; exit 1")
+	if p := modelLogin(); strings.Contains(p, "secret") || !strings.Contains(p, "opencode auth list") {
 		t.Errorf("export fails: %q", p)
 	}
 	fake("echo '" + export + "'")

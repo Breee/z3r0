@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -31,10 +32,10 @@ func Doctor(out io.Writer) error {
 	// The gateway state belongs to the dedicated user; only root can read it.
 	if os.Getuid() == 0 {
 		check("credential store", credentialStore())
+		fmt.Fprintln(out, "skip  all other checks: run `zero doctor` without sudo")
 		if fails > 0 {
 			return fmt.Errorf("%d check(s) failed", fails)
 		}
-		fmt.Fprintln(out, "skip  all other checks: run `zero doctor` without sudo")
 		return nil
 	}
 	fmt.Fprintln(out, "skip  credential store: run `sudo zero doctor`")
@@ -82,6 +83,9 @@ func Doctor(out io.Writer) error {
 	return nil
 }
 
+// notGitlab are hosts for which a glab login is no fix.
+var notGitlab = []string{"github.com", "bitbucket.org", "codeberg.org", "dev.azure.com"}
+
 // noForgeHere says why a repository has no forge checks. It is no failure of
 // the host setup: the sandbox works, the agent cannot push.
 func noForgeHere(remote string) string {
@@ -90,10 +94,10 @@ func noForgeHere(remote string) string {
 		return "this repository has no origin; a sandbox for it cannot push"
 	}
 	host, _, ok := parseRemote(remote)
-	if !ok {
+	if !ok || slices.Contains(notGitlab, host) {
 		return "origin " + remote + " is not on GitLab; a sandbox for it cannot push"
 	}
-	return "origin is on " + host + ", no glab login for it; if it is a GitLab: glab auth login --hostname " + host + " --use-keyring. Without it a sandbox cannot push"
+	return "origin is on " + host + ", no glab login for it; if it is a GitLab: glab auth login --hostname " + host + " --use-keyring. Without it a sandbox cannot push and the project's guardrails are not checked"
 }
 
 // credentialStore fails unless every running gateway has an owner-only
