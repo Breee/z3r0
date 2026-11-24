@@ -22,3 +22,5 @@ Expected: a documented way to say where the web UI opens, one of:
 What we do meanwhile (documented API only): create one session with `POST /api/session` and `{"location":{"directory":"<path>"}}`; Home then lists it under "Recent sessions".
 
 Versions: opencode 2.2.6 (server and web UI), Linux x86_64, Chromium.
+
+Checked on 2026-11-25 without a sandbox (opencode 2.2.6 on the host, own service, fresh browser profile, link from `opencode pair`): the same. The page opens on Home with the recent sessions of all projects; no project or session is open. This is how the web UI works, not an effect of the sandbox.
