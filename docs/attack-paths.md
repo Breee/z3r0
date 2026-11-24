@@ -152,6 +152,9 @@ Added 2026-11-16 (#108). Reasoning, not tested. Every path in sections 2–5 sta
 Not built. Decision 2026-11-16: record it, build later; follow-up issue #110. Trusted instructions (P27, #109) were dropped on 2026-11-18 (ADR 0041).
 
 **Trusted instructions (P27) — not built, ADR 0041.** Agent configuration (`AGENTS.md`, skills, `.opencode/`, MCP config) would be taken from the protected default branch, not from the working branch. Rejected: which branch the agent runs on, and review of repo instructions, belong to the DevOps process.
+- Mechanism as it was proposed: at `zero up` zero copies these paths from `origin/<default branch>` of the host checkout into the sandbox and makes them read-only for the agent; changes to them on a session branch take effect only after merge.
+- Unknowns it left: which paths opencode and VS Code read (global and per project); whether the sandbox filesystem policy can make single paths inside the checkout read-only; how the developer tests a change to these files.
+- Cost: a list of paths per agent tool that must be maintained; friction when working on the instructions themselves.
 
 **Input provenance (P26).** Forge content written by people who are not project members is not handed to the agent, or is handed over marked as untrusted.
 - Mechanism: a filter between the agent and the forge API/MCP that looks up the author of each issue, comment and MR description and drops or labels content from non-members.
