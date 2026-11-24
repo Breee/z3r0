@@ -218,7 +218,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 	seen := map[string]string{}
 	for _, f := range s.Folders {
 		if _, err := os.Stat(f); err != nil {
-			return nil, fmt.Errorf("folder %s missing; zero ctx remove it or restore it", f)
+			return nil, fmt.Errorf("folder %s is missing; restore it, or take it out of the workspace: zero -c %s ctx remove %s", f, name, f)
 		}
 		if other, ok := seen[filepath.Base(f)]; ok {
 			return nil, fmt.Errorf("folders %s and %s have the same name; a workspace needs distinct folder names", other, f)
@@ -276,6 +276,25 @@ func paths(args []string) ([]string, error) {
 		}
 		if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
 			return nil, fmt.Errorf("%s is not a folder", a)
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// listed resolves the folders to take out of a workspace. A folder that no
+// longer exists is matched by its path as written in the workspace.
+func listed(args []string) ([]string, error) {
+	if len(args) == 0 {
+		args = []string{"."}
+	}
+	var out []string
+	for _, a := range args {
+		p, err := realPath(a)
+		if err != nil {
+			if p, err = filepath.Abs(a); err != nil {
+				return nil, err
+			}
 		}
 		out = append(out, p)
 	}
@@ -343,20 +362,23 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			return err
 		}
 		if name == "" {
-			return fmt.Errorf("no workspace selected; use -c NAME or zero ctx use NAME")
+			return fmt.Errorf("no workspace selected; name one: zero -c NAME ctx %s [PATH...] (zero ls lists them)", sub)
 		}
+		w := c.Workspaces[name]
 		ps, err := paths(args)
+		if sub == "remove" {
+			ps, err = listed(args)
+		}
 		if err != nil {
 			return err
 		}
-		w := c.Workspaces[name]
 		for _, p := range ps {
 			i := slices.Index(w.Folders, p)
 			switch {
 			case sub == "add" && i < 0:
 				w.Folders = append(w.Folders, p)
 			case sub == "remove" && i < 0:
-				return fmt.Errorf("%s is not in workspace %s", p, name)
+				return fmt.Errorf("%s is not in workspace %s; its folders: %s", p, name, strings.Join(w.Folders, " "))
 			case sub == "remove":
 				if !isInput(p) {
 					if s := c.sandbox(name); s.exists() {
@@ -367,7 +389,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			}
 		}
 		if len(w.Folders) == 0 {
-			return fmt.Errorf("a workspace needs at least one folder; zero ctx rm %s deletes it", name)
+			return fmt.Errorf("a workspace needs at least one folder; to delete the workspace: zero ctx rm %s", name)
 		}
 		fmt.Fprintf(out, "%s: %s\n", name, strings.Join(w.Folders, " "))
 	case "rm":
@@ -381,6 +403,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			return err
 		}
 		delete(c.Workspaces, args[0])
+		fmt.Fprintf(out, "deleted workspace %s\n", args[0])
 		if c.Current == args[0] {
 			c.Current = ""
 		}

@@ -149,7 +149,9 @@ func main() {
 				break
 			}
 		}
-		_, err = z.Up(os.Stdout)
+		if _, err = z.Up(os.Stdout); err == nil {
+			fmt.Println("next: zero attach")
+		}
 	case "attach":
 		err = z.Attach(os.Stdout)
 	case "run":
@@ -167,7 +169,10 @@ func main() {
 	case "pause":
 		err = z.Pause(os.Stdout)
 	case "rm":
-		err = z.Rm(os.Stdout, slices.Contains(args, "-y"))
+		if err = z.Rm(os.Stdout, slices.Contains(args, "-y")); err == nil {
+			ws := strings.TrimPrefix(z.Name, "zero-")
+			fmt.Printf("workspace %s is kept; to delete it: zero ctx rm %s\n", ws, ws)
+		}
 	}
 	if err != nil {
 		// Propagate the exit code of interactive children (attach/run/code).

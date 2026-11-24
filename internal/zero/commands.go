@@ -170,6 +170,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		return 0, err
 	}
 	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, link(out, s.url(port)), strings.Join(s.dirs(), " "))
+	if s.forge() == nil {
+		fmt.Fprintln(out, noForge)
+	}
 	return port, nil
 }
 
@@ -445,6 +448,15 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 	return passthrough("opencode", args...)
 }
 
+// noForge is the line for a workspace whose repositories are on no forge
+// zero knows: there is no token and no push gate.
+const noForge = "forge: none, the agent cannot push (zero supports GitLab repositories)"
+
+// errNoSandbox is the error of a command that needs an existing sandbox.
+func (s *Sandbox) errNoSandbox() error {
+	return fmt.Errorf("sandbox %s does not exist; start it: zero up", s.Name)
+}
+
 // Status prints sandbox / forward / serve state.
 func (s *Sandbox) Status(out io.Writer) error {
 	up := s.exists()
@@ -455,7 +467,8 @@ func (s *Sandbox) Status(out io.Writer) error {
 	if up {
 		fmt.Fprintf(out, "sandbox %s: up\n", s.Name)
 	} else {
-		fmt.Fprintf(out, "sandbox %s: none\n", s.Name)
+		fmt.Fprintf(out, "sandbox %s: none\nnext: zero up\n", s.Name)
+		return nil
 	}
 	if f := s.currentForward(); f != nil {
 		fmt.Fprintf(out, "forward: %s\n", link(out, s.url(f.port)))
@@ -467,6 +480,10 @@ func (s *Sandbox) Status(out io.Writer) error {
 		if t := strings.Fields(s.read("tools")); len(t) > 0 {
 			fmt.Fprintf(out, "%s tools: %s\n", f.Name(), strings.Join(t, ", "))
 		}
+	} else if f != nil {
+		fmt.Fprintf(out, "%s token: none; zero up makes a new one\n", f.Name())
+	} else {
+		fmt.Fprintln(out, noForge)
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {
@@ -508,11 +525,11 @@ func (s *Sandbox) Pause(out io.Writer) error {
 	}
 	defer lk.release()
 	if !s.exists() {
-		return fmt.Errorf("sandbox %s: none", s.Name)
+		return s.errNoSandbox()
 	}
 	if s.gw != "" {
 		// The VM driver loses /tmp, and with it the checkout, on stop (C50).
-		return fmt.Errorf("pause is not supported with --vm: the checkout would be lost (C50)")
+		return fmt.Errorf("pause is not supported with --vm: the checkout would be lost; zero rm removes the sandbox")
 	}
 	if err := s.stopForward(io.Discard); err != nil {
 		return err
@@ -562,7 +579,7 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 	if err := os.RemoveAll(s.State); err != nil {
 		return fmt.Errorf("remove state: %w", err)
 	}
-	fmt.Fprintf(out, "removed %s\n", s.Name)
+	fmt.Fprintf(out, "removed sandbox %s\n", s.Name)
 	return nil
 }
 
@@ -641,7 +658,7 @@ func (s *Sandbox) ensureHostSSHConfig() error {
 // Logs prints the opencode service log from inside the sandbox; follow tails it live.
 func (s *Sandbox) Logs(out io.Writer, follow bool) error {
 	if !s.exists() {
-		return fmt.Errorf("sandbox %s: none", s.Name)
+		return s.errNoSandbox()
 	}
 	if follow {
 		cmd := exec.Command("ssh", "-F", s.path("ssh.conf"), s.Host,

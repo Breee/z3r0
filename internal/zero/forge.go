@@ -111,7 +111,7 @@ func (s *Sandbox) folderForge() (Forge, map[string]string, error) {
 			continue
 		}
 		if forge != nil && f.Host() != forge.Host() {
-			return nil, nil, fmt.Errorf("folders are on %s and %s; a workspace has one forge host", forge.Host(), f.Host())
+			return nil, nil, fmt.Errorf("folders are on %s and %s; a workspace has one forge host: move one folder to its own workspace (zero ctx remove PATH, zero ctx new NAME PATH)", forge.Host(), f.Host())
 		}
 		forge, paths[top] = f, path
 	}

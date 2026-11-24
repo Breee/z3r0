@@ -69,7 +69,7 @@ With `ci.run` a push starts the pipeline, with one exception: while the agent's 
 A merge request starts a merge request pipeline, and GitLab has no way to skip it. That is why this capability is refused without `ci.run`:
 
 ```
-.zero/policy.yaml: gitlab.mr.create needs ci.run: a merge request opened by the agent starts a pipeline (ADR 0044)
+.zero/policy.yaml: gitlab.mr.create needs ci.run: a merge request opened by the agent starts a pipeline; add ci.run or take gitlab.mr.create out
 ```
 
 With the default policy you open the merge request yourself.

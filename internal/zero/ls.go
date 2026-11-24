@@ -72,7 +72,7 @@ func loadOverview() (*overview, error) {
 		withGateway(gw, func() {
 			if !rt.Reachable() {
 				if gw == "" {
-					warn = append(warn, "gateway not reachable: sandbox status unknown")
+					warn = append(warn, "gateway not reachable: sandbox status unknown; check: zero doctor")
 				}
 				return
 			}
@@ -98,7 +98,7 @@ func loadOverview() (*overview, error) {
 			status = "running"
 			withGateway(gw, func() {
 				if rt.Stopped(sb) {
-					status = "stopped"
+					status = "paused"
 				}
 			})
 		}

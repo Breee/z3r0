@@ -233,7 +233,7 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 	}
 	if len(inputs) > 0 {
 		if s.gw != "" {
-			return fmt.Errorf("%s is an input folder (no git repo); input folders are not supported on the %s gateway (ADR 0039)", inputs[0], s.gw)
+			return fmt.Errorf("%s is an input folder (no git repo); input folders are not supported on the %s gateway; use zero up without --vm", inputs[0], s.gw)
 		}
 		if s.exists() && s.read("input.mount") == "" {
 			return fmt.Errorf("%s was created without the input mount; recreate: zero rm && zero up", s.Name)

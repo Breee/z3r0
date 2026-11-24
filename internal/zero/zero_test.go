@@ -1194,8 +1194,8 @@ func TestApprovePolicy(t *testing.T) {
 		want     policyChange
 	}{
 		{name: "default needs nothing", p: pol(nil)},
-		{name: "wider without a terminal is refused", p: pol([]string{"a.example"}), err: "not approved (no terminal"},
-		{name: "wider capability without a terminal is refused", p: pol(nil, "ci.run"), err: "not approved (no terminal"},
+		{name: "wider without a terminal is refused", p: pol([]string{"a.example"}), err: "no terminal to ask at"},
+		{name: "wider capability without a terminal is refused", p: pol(nil, "ci.run"), err: "no terminal to ask at"},
 		{name: "wider with --approve", p: pol([]string{"a.example"}, "ci.run"), approve: true,
 			want: policyChange{caps: true, newHosts: []string{"a.example"}}},
 		{name: "narrower needs nothing", approved: pol([]string{"a.example", "b.example"}, "ci.run"), p: pol([]string{"a.example"}),
@@ -1254,5 +1254,39 @@ func TestProjectPolicy(t *testing.T) {
 	}
 	if out := string(b); strings.Contains(out, "project") || !strings.Contains(out, "zen") {
 		t.Errorf("rule not removed:\n%s", out)
+	}
+}
+
+func TestCtxRemoveMissingFolder(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("PATH", t.TempDir())
+	root, err := realPath(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := filepath.Join(root, "a"), filepath.Join(root, "b")
+	for _, d := range []string{a, b} {
+		if err := os.Mkdir(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out bytes.Buffer
+	if err := Ctx(&out, "", []string{"new", "w", a, b}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(b); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ctx(&out, "w", []string{"remove", b}); err != nil {
+		t.Fatalf("remove of a folder that is gone: %v", err)
+	}
+	c, err := loadConfig()
+	if err != nil || !slices.Equal(c.Workspaces["w"].Folders, []string{a}) {
+		t.Fatalf("folders = %v, %v", c.Workspaces["w"], err)
+	}
+	err = Ctx(&out, "w", []string{"remove", filepath.Join(root, "c")})
+	if err == nil || !strings.Contains(err.Error(), "its folders: "+a) {
+		t.Errorf("unknown folder: %v", err)
 	}
 }

@@ -63,7 +63,7 @@ func (s *Sandbox) loadPolicy() (*Policy, error) {
 		}
 	}
 	if slices.Contains(u.Capabilities, capMRCreate) && !slices.Contains(u.Capabilities, capCIRun) {
-		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline (ADR 0044)", capMRCreate, capCIRun)
+		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline; add %s or take %s out", capMRCreate, capCIRun, capCIRun, capMRCreate)
 	}
 	if f, _, err := s.folderForge(); err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (s *Sandbox) loadPolicy() (*Policy, error) {
 func checkForgeHost(host string, allow []string) error {
 	for _, h := range allow {
 		if h == host || strings.HasPrefix(h, "*.") && strings.HasSuffix(host, h[1:]) {
-			return fmt.Errorf(".zero/policy.yaml: network.allow: %s covers the forge host; zero limits it to the workspace's projects (ADR 0046)", h)
+			return fmt.Errorf(".zero/policy.yaml: network.allow: %s covers the forge host; zero limits that host to the workspace's projects; take the entry out", h)
 		}
 	}
 	return nil
@@ -216,18 +216,20 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 		}
 	}
 	w := widened(old, p)
-	if len(w) > 0 && !s.Approve {
+	if len(w) > 0 {
 		fmt.Fprintf(os.Stderr, "policy widens for %s:\n", s.Name)
 		for _, l := range w {
 			fmt.Fprintln(os.Stderr, "  + "+l)
 		}
+	}
+	if len(w) > 0 && !s.Approve {
 		if !isTerminal(os.Stdin) {
-			return policyChange{}, errors.New("policy widening not approved (no terminal; use `zero up --approve`)")
+			return policyChange{}, errors.New("policy widening not approved: no terminal to ask at; to accept the lines above: zero up --approve")
 		}
 		fmt.Fprint(os.Stderr, "approve? [y/N] ")
 		ans, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		if a := strings.ToLower(strings.TrimSpace(ans)); a != "y" && a != "yes" {
-			return policyChange{}, errors.New("policy widening not approved")
+			return policyChange{}, errors.New("policy widening not approved; nothing changed")
 		}
 	}
 	ch := policyChange{}
