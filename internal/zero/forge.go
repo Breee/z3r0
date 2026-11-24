@@ -219,14 +219,24 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// The state names the forge before a token exists, so zero rm finds
+	// the token of a setup that stopped half way.
+	for k, v := range map[string]string{"forge": f.Name(), "forge.host": f.Host()} {
+		if err := s.write(k, v, 0o600); err != nil {
+			return "", err
+		}
+	}
 	tok, id, err := f.Mint(tokenLabel(s.Name), paths, perms)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", f.Name(), err)
 	}
-	for k, v := range map[string]string{"forge": f.Name(), "forge.host": f.Host(), "forge.id": id, "forge.path": strings.Join(paths, "\n")} {
-		if err := s.write(k, v, 0o600); err != nil {
-			return "", err
-		}
+	if err := s.write("forge.id", id, 0o600); err != nil {
+		// The id is lost: revoke at once, the label would find it later.
+		f.Revoke(id)
+		return "", err
+	}
+	if err := s.write("forge.path", strings.Join(paths, "\n"), 0o600); err != nil {
+		return "", err
 	}
 	prov := s.forgeProvider(f)
 	if err := rt.BindCredential(prov, f.ProfileID(), f.TokenEnv(), tok); err != nil {
@@ -276,11 +286,27 @@ func importProfile(f Forge) error {
 func (s *Sandbox) revokeForge() error {
 	f, id := s.forge(), s.read("forge.id")
 	if f == nil {
+		if id != "" {
+			return fmt.Errorf("token %s is recorded but its forge is not (state file forge missing); revoke it on the forge", id)
+		}
 		return nil
 	}
 	if id != "" {
 		if err := f.Revoke(id); err != nil {
 			return fmt.Errorf("revoke %s token %s: %w", f.Name(), id, err)
+		}
+	}
+	// A token minted by a setup that stopped before its id was written
+	// carries this sandbox's label.
+	toks, err := f.Tokens()
+	if err != nil {
+		return err
+	}
+	for _, t := range toks {
+		if t.Name == tokenLabel(s.Name) && t.ID != id {
+			if err := f.Revoke(t.ID); err != nil {
+				return fmt.Errorf("revoke %s token %s: %w", f.Name(), t.ID, err)
+			}
 		}
 	}
 	rt.UnbindCredential(s.forgeProvider(f))

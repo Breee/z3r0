@@ -975,3 +975,37 @@ func TestCheckedPushParts(t *testing.T) {
 		t.Errorf("note without side band %q", b)
 	}
 }
+
+// A token minted by a setup that stopped before its id was written is found
+// by its label and revoked (#138).
+func TestRevokeForgeByLabel(t *testing.T) {
+	bin, state := t.TempDir(), t.TempDir()
+	calls := filepath.Join(bin, "calls")
+	list := fmt.Sprintf(`[{"id":77,"name":%q,"expires_at":"2099-01-01"},{"id":78,"name":"other@host","expires_at":"2099-01-01"}]`, tokenLabel("zero-x"))
+	glab := "#!/bin/sh\necho \"$*\" >> " + calls + "\ncase \"$*\" in *paginate*) cat <<'J'\n" + list + "\nJ\n;; esac\n"
+	for name, body := range map[string]string{"glab": glab, "openshell": "#!/bin/sh\n"} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	s := &Sandbox{Name: "zero-x", State: state}
+
+	s.write("forge.id", "5", 0o600)
+	if err := s.revokeForge(); err == nil {
+		t.Error("token id without a recorded forge: no error")
+	}
+	if !fileExists(s.path("forge.id")) {
+		t.Error("state dropped although nothing was revoked")
+	}
+
+	os.Remove(s.path("forge.id"))
+	s.write("forge", "gitlab", 0o600)
+	if err := s.revokeForge(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(calls)
+	if got := string(b); !strings.Contains(got, "/personal_access_tokens/77") || strings.Contains(got, "/personal_access_tokens/78") {
+		t.Errorf("glab calls:\n%s", got)
+	}
+}
