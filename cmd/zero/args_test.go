@@ -9,7 +9,7 @@ import (
 func TestCheckArgs(t *testing.T) {
 	ok := [][]string{
 		{"up"}, {"up", "--approve", "--vm", "--max-input", "200"},
-		{"opencode"}, {"vscode"}, {"web"}, {"status"}, {"stop"}, {"pause"},
+		{"opencode"}, {"opencode", "--tui"}, {"opencode", "--web"}, {"vscode"}, {"web"}, {"status"}, {"stop"}, {"pause"},
 		{"logs"}, {"logs", "-f"}, {"logs", "--follow"},
 		{"rm"}, {"rm", "-y"}, {"ls"}, {"switch"}, {"switch", "api"},
 		{"completion", "bash"}, {"install"}, {"doctor"}, {"version"}, {"help"},
@@ -29,12 +29,13 @@ func TestCheckArgs(t *testing.T) {
 		want string
 	}{
 		{[]string{"up", "--bogus"}, `zero up: unknown option "--bogus" (options: --approve, --vm, --max-input N)`},
+		{[]string{"opencode", "--tui", "--web"}, "--tui or --web, not both"},
 		{[]string{"up", "--aprove"}, `unknown option "--aprove"`},
 		{[]string{"up", "x"}, `zero up: takes no argument, got "x"`},
 		{[]string{"up", "--max-input"}, "--max-input needs a value"},
 		{[]string{"up", "--max-input", "big"}, "needs a number above 0"},
 		{[]string{"up", "--max-input", "0"}, "needs a number above 0"},
-		{[]string{"opencode", "-x"}, `zero opencode: unknown option "-x" (options: none)`},
+		{[]string{"opencode", "-x"}, `zero opencode: unknown option "-x" (options: --tui, --web)`},
 		{[]string{"vscode", "x"}, "takes no argument"},
 		{[]string{"web", "--x"}, "unknown option"},
 		{[]string{"status", "-v"}, "unknown option"},

@@ -24,5 +24,5 @@ opencode 2.2.6 has a background service (`opencode service …`) and `opencode p
 - No long-lived secret for the web UI in zero's state. The link is in the terminal output and the browser history, but it is dead after one use or 5 minutes.
 - The service is reachable only through the SSH tunnel on 127.0.0.1; without pairing the API answers 401.
 - Not known: what the paired browser stores and how a pairing is revoked other than recreating the sandbox.
-- `zero attach` and `zero run` send no credential and stay unusable (C38, #55).
+- `zero attach` and `zero run` send no credential and stay unusable (C38, #55). Changed by ADR 0048 (2026-11-25): both start opencode inside the sandbox over ssh and need no credential.
 - The agent runs in the same sandbox as the service and can create pairing links itself; they are only usable by someone who can reach the tunnel port on the developer's machine (P22).

@@ -67,8 +67,8 @@ Other lines you can see there:
 
 | Command | What it does |
 |---|---|
-| `zero opencode` | `up`, then opencode in the terminal, connected to the sandbox (`zero attach` still works) |
-| `zero run <prompt>` | `up`, then one prompt without the UI |
+| `zero opencode` | `up`, then opencode in this terminal; it runs inside the sandbox, in the first repository. Needs a terminal. `--web` opens the browser instead, like `zero web` (`zero attach` still works) |
+| `zero run <prompt>` | `up`, then one prompt without the UI; opencode runs inside the sandbox and uses its default model |
 | `zero web` | `up`, then the opencode web UI in the browser. Home lists one session of the workspace's first repository under "Recent sessions"; open it to work in that folder. Other repositories: "Add project" with the path `/tmp/zero/<folder>` |
 | `zero vscode` | `up`, then VS Code with Remote-SSH on the sandbox (`zero code` still works) |
 

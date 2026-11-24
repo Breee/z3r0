@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -17,7 +18,7 @@ type argSpec struct {
 
 var argSpecs = map[string]argSpec{
 	"up":         {flags: []string{"--approve", "--vm"}, values: []string{"--max-input"}},
-	"opencode":   {},
+	"opencode":   {flags: []string{"--tui", "--web"}},
 	"vscode":     {},
 	"web":        {},
 	"status":     {},
@@ -54,6 +55,9 @@ func checkArgs(cmd string, args []string) error {
 			return usageError("zero run: needs a prompt")
 		}
 		return nil
+	}
+	if cmd == "opencode" && slices.Contains(args, "--tui") && slices.Contains(args, "--web") {
+		return usageError("zero opencode: --tui or --web, not both")
 	}
 	if cmd == "ctx" && len(args) > 0 {
 		if args[0] == "--prompt" {

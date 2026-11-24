@@ -73,7 +73,7 @@ zero up
 zero creates a workspace named after the folder, a sandbox `zero-api`, clones the repository into it and creates the token. Then open the agent:
 
 ```sh
-zero opencode   # opencode in the terminal
+zero opencode   # opencode in this terminal (runs inside the sandbox)
 zero web        # opencode in the browser
 zero vscode     # VS Code on the sandbox
 ```

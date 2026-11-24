@@ -464,23 +464,29 @@ func hasSession(list string) (bool, error) {
 	return len(*r.Data) > 0, nil
 }
 
-// Attach is up + the opencode TUI attached to the sandbox.
+// Attach is up + the opencode TUI, started inside the sandbox over ssh with
+// this terminal (ADR 0048): the host's opencode cannot open a folder that
+// exists only in the sandbox (C38).
 func (s *Sandbox) Attach(out io.Writer) error {
-	port, err := s.Up(out)
-	if err != nil {
+	if !isTerminal(os.Stdin) || !isTerminal(os.Stdout) {
+		return fmt.Errorf("zero opencode needs a terminal; without one: zero run PROMPT, or zero opencode --web")
+	}
+	if _, err := s.Up(out); err != nil {
 		return err
 	}
-	return passthrough("opencode", "--server", s.url(port), s.Dir)
+	return passthrough("ssh", "-t", "-F", s.path("ssh.conf"), s.Host, "cd "+shellQuote(s.Dir)+" && exec opencode")
 }
 
-// Run is up (silent) + a one-shot opencode run.
+// Run is up (silent) + a one-shot opencode run inside the sandbox.
 func (s *Sandbox) Run(out io.Writer, prompt []string) error {
-	port, err := s.Up(io.Discard)
-	if err != nil {
+	if _, err := s.Up(io.Discard); err != nil {
 		return err
 	}
-	args := append([]string{"run", "--server", s.url(port)}, prompt...)
-	return passthrough("opencode", args...)
+	script := "cd " + shellQuote(s.Dir) + " && exec opencode run"
+	for _, p := range prompt {
+		script += " " + shellQuote(p)
+	}
+	return passthrough("ssh", "-F", s.path("ssh.conf"), s.Host, script)
 }
 
 // noForge is the line for a workspace whose repositories are on no forge

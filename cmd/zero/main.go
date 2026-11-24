@@ -19,8 +19,8 @@ const usageText = `zero: an opencode agent in a sandbox per workspace; it pushes
 Usage: zero [-c WORKSPACE] COMMAND
 Work in the workspace
   up [--approve] [--vm] [--max-input MiB]  create or continue the sandbox
-  opencode      up, then opencode in this terminal
-  web           up, then opencode in the browser
+  opencode      up, then opencode in this terminal (--tui, default) or the browser (--web)
+  web           same as opencode --web
   vscode        up, then VS Code on the sandbox
   run PROMPT    up, then one prompt
   status        sandbox, token, policy and forward
@@ -157,7 +157,12 @@ func main() {
 			fmt.Println("next: zero opencode")
 		}
 	case "opencode":
-		err = z.Attach(os.Stdout)
+		web := slices.Contains(args, "--web")
+		if web {
+			err = z.Web(os.Stdout)
+		} else {
+			err = z.Attach(os.Stdout)
+		}
 	case "run":
 		err = z.Run(os.Stdout, args)
 	case "vscode":
