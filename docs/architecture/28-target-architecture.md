@@ -69,7 +69,7 @@ An addition names its seam to the core (sandbox identity, workspace config, sess
 sudo zero install          # once: OpenShell + zero-cp, one sudo
 zero doctor                # checks the host, the model login and, in a repo, the forge guardrails
 zero up                    # in any repo: workspace, sandbox, token, policy, push gate
-zero attach                # work with the agent (or: zero web, zero code)
+zero opencode              # work with the agent (or: zero web, zero vscode)
 zero pause                 # stop the sandbox, revoke the token; zero up continues
 zero rm                    # revoke + delete the sandbox
 ```

@@ -76,9 +76,9 @@ zero up
 zero creates a workspace named after the folder, a sandbox `zero-api`, clones the repository into it and creates the token. Then open the agent:
 
 ```sh
-zero attach     # opencode in the terminal
+zero opencode   # opencode in the terminal
 zero web        # opencode in the browser
-zero code       # VS Code on the sandbox
+zero vscode     # VS Code on the sandbox
 ```
 
 The agent commits in the sandbox and pushes to the branch `zero/api`. Fetch that branch on the host, review it and open the merge request yourself.

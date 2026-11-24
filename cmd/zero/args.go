@@ -17,8 +17,8 @@ type argSpec struct {
 
 var argSpecs = map[string]argSpec{
 	"up":         {flags: []string{"--approve", "--vm"}, values: []string{"--max-input"}},
-	"attach":     {},
-	"code":       {},
+	"opencode":   {},
+	"vscode":     {},
 	"web":        {},
 	"status":     {},
 	"stop":       {},

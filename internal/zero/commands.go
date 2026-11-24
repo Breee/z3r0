@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// copilotEndpoints are added to the sandbox policy on first `zero code` use;
+// copilotEndpoints are added to the sandbox policy on first `zero vscode` use;
 // Copilot endpoints only apply to binaries under the VS Code server dir (F05).
 var copilotEndpoints = []string{
 	"*.githubcopilot.com",

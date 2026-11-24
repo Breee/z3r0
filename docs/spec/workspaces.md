@@ -57,7 +57,7 @@ First match wins:
 4. `current` in config.yaml
 5. none → commands that need a workspace fail with a hint; `zero up` creates one (§5.1).
 
-Exception (built in #75): `zero up|web|code|attach|run` inside a git repo that belongs to no workspace creates a new workspace for that repo instead of acting on `current`.
+Exception (built in #75): `zero up|opencode|vscode|web|run` inside a git repo that belongs to no workspace creates a new workspace for that repo instead of acting on `current`.
 
 Every command that acts on a workspace prints its first line to stderr:
 `workspace: team (cwd)` — source is one of `flag`, `env`, `cwd`, `current`, `new`.
@@ -264,7 +264,7 @@ Decisions:
 | F8 | Name collisions in `/tmp/zero` (`a/api`, `b/api`) | built in #76: error, a workspace needs distinct folder names (no suffix) |
 | F9 | Larger blast radius per workspace | only explicitly listed folders; docs |
 | F10 | opencode multi-folder: one serve, sessions per directory | **verified 2026-11-16 (#73)**, opencode 2.2.6: one background service (port 4096) ran `opencode run` from two folders; each session has its own `location.directory`, each file landed in its folder. A folder without commits gets `projectID: global`. Not checked: the web UI project switcher |
-| F11 | `zero code` multi-root | **verified 2026-11-16 (#74)**, VS Code 1.145.2: a generated `/tmp/zero/zero.code-workspace` with relative folder paths, opened with `code --file-uri vscode-remote://ssh-remote+<host>/tmp/zero/zero.code-workspace`; the git extension in the sandbox opened both repositories. Not checked: the Explorer by eye |
+| F11 | `zero vscode` multi-root | **verified 2026-11-16 (#74)**, VS Code 1.145.2: a generated `/tmp/zero/zero.code-workspace` with relative folder paths, opened with `code --file-uri vscode-remote://ssh-remote+<host>/tmp/zero/zero.code-workspace`; the git extension in the sandbox opened both repositories. Not checked: the Explorer by eye |
 | F12 | Config edited by hand to invalid state | strict parse (KnownFields), clear error |
 
 ## 9. Out of scope

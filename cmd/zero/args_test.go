@@ -9,7 +9,7 @@ import (
 func TestCheckArgs(t *testing.T) {
 	ok := [][]string{
 		{"up"}, {"up", "--approve", "--vm", "--max-input", "200"},
-		{"attach"}, {"code"}, {"web"}, {"status"}, {"stop"}, {"pause"},
+		{"opencode"}, {"vscode"}, {"web"}, {"status"}, {"stop"}, {"pause"},
 		{"logs"}, {"logs", "-f"}, {"logs", "--follow"},
 		{"rm"}, {"rm", "-y"}, {"ls"}, {"switch"}, {"switch", "api"},
 		{"completion", "bash"}, {"install"}, {"doctor"}, {"version"}, {"help"},
@@ -34,8 +34,8 @@ func TestCheckArgs(t *testing.T) {
 		{[]string{"up", "--max-input"}, "--max-input needs a value"},
 		{[]string{"up", "--max-input", "big"}, "needs a number above 0"},
 		{[]string{"up", "--max-input", "0"}, "needs a number above 0"},
-		{[]string{"attach", "-x"}, `zero attach: unknown option "-x" (options: none)`},
-		{[]string{"code", "x"}, "takes no argument"},
+		{[]string{"opencode", "-x"}, `zero opencode: unknown option "-x" (options: none)`},
+		{[]string{"vscode", "x"}, "takes no argument"},
 		{[]string{"web", "--x"}, "unknown option"},
 		{[]string{"status", "-v"}, "unknown option"},
 		{[]string{"stop", "now"}, "takes no argument"},

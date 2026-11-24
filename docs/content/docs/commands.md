@@ -23,7 +23,7 @@ Every command that acts on a workspace prints the workspace and where it came fr
 workspace: developer (cwd)
 ```
 
-`zero up`, `attach`, `run`, `code` and `web` in a git repository that belongs to no workspace create a new workspace for it.
+`zero up`, `opencode`, `vscode`, `run` and `web` in a git repository that belongs to no workspace create a new workspace for it.
 
 ## Sandbox
 
@@ -61,16 +61,16 @@ Other lines you can see there:
 | `gitlab token: none; zero up makes a new one` | the token was revoked |
 | `forge: none, the agent cannot push ...` | no repository of the workspace is on GitLab, or the sandbox was created without a `glab` login for a self-hosted GitLab |
 
-`zero up` ends with `next: zero attach`. `zero rm` ends with `workspace NAME is kept; to delete it: zero ctx rm NAME`.
+`zero up` ends with `next: zero opencode`. `zero rm` ends with `workspace NAME is kept; to delete it: zero ctx rm NAME`.
 
 ## Working with the agent
 
 | Command | What it does |
 |---|---|
-| `zero attach` | `up`, then opencode in the terminal, connected to the sandbox |
+| `zero opencode` | `up`, then opencode in the terminal, connected to the sandbox (`zero attach` still works) |
 | `zero run <prompt>` | `up`, then one prompt without the UI |
 | `zero web` | `up`, then the opencode web UI in the browser |
-| `zero code` | `up`, then VS Code with Remote-SSH on the sandbox |
+| `zero vscode` | `up`, then VS Code with Remote-SSH on the sandbox (`zero code` still works) |
 
 ```sh
 zero run "add a test for the parser and push"

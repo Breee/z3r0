@@ -19,9 +19,9 @@ const usageText = `zero: an opencode agent in a sandbox per workspace; it pushes
 Usage: zero [-c WORKSPACE] COMMAND
 Work in the workspace
   up [--approve] [--vm] [--max-input MiB]  create or continue the sandbox
-  attach        up, then opencode in this terminal
+  opencode      up, then opencode in this terminal
   web           up, then opencode in the browser
-  code          up, then VS Code on the sandbox
+  vscode        up, then VS Code on the sandbox
   run PROMPT    up, then one prompt
   status        sandbox, token, policy and forward
   logs [-f]     opencode log of the sandbox
@@ -40,7 +40,7 @@ This machine
   help          this text
   completion bash  bash completion: source <(zero completion bash)
 Examples
-  cd ~/repos/app && zero attach      zero -c app status      zero up --approve
+  cd ~/repos/app && zero opencode    zero -c app status      zero up --approve
   zero ctx new both ~/repos/api ~/repos/web      zero switch both
 The workspace is -c, else ZERO_CONTEXT, else the one of the current folder, else the current one.
 Exit codes: 0 done, 1 failed, 2 wrong command or option (nothing ran).
@@ -54,7 +54,7 @@ const bashCompletion = `_zero() {
     ctx)
       COMPREPLY=($(compgen -W "use new add remove rm" -- "$cur")) ;;
     zero)
-      COMPREPLY=($(compgen -W "up attach run code web status stop logs pause rm ls switch ctx install doctor version completion" -- "$cur")) ;;
+      COMPREPLY=($(compgen -W "up opencode vscode web run status stop logs pause rm ls switch ctx install doctor version completion" -- "$cur")) ;;
   esac
 }
 complete -F _zero zero
@@ -80,6 +80,10 @@ func main() {
 		cmd = "help"
 	case "--version":
 		cmd = "version"
+	case "attach": // name before #148
+		cmd = "opencode"
+	case "code":
+		cmd = "vscode"
 	}
 	if _, ok := argSpecs[cmd]; !ok && cmd != "run" {
 		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
@@ -131,7 +135,7 @@ func main() {
 		return
 	}
 
-	create := slices.Contains([]string{"up", "attach", "run", "code", "web"}, cmd)
+	create := slices.Contains([]string{"up", "opencode", "run", "vscode", "web"}, cmd)
 	z, err := zero.Open(ctx, create)
 	if err != nil {
 		fatal(err)
@@ -150,13 +154,13 @@ func main() {
 			}
 		}
 		if _, err = z.Up(os.Stdout); err == nil {
-			fmt.Println("next: zero attach")
+			fmt.Println("next: zero opencode")
 		}
-	case "attach":
+	case "opencode":
 		err = z.Attach(os.Stdout)
 	case "run":
 		err = z.Run(os.Stdout, args)
-	case "code":
+	case "vscode":
 		err = z.Code(os.Stdout)
 	case "web":
 		err = z.Web(os.Stdout)

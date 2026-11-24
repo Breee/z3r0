@@ -15,7 +15,7 @@ sudo bin/zero install
 zero doctor
 
 cd ~/src/your-gitlab-project
-zero attach
+zero opencode
 ```
 
 ## Documentation
