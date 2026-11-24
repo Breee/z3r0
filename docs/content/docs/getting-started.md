@@ -25,9 +25,7 @@ glab auth login --hostname gitlab.com --use-keyring
 ```sh
 git clone https://github.com/Breee/z3r0 && cd z3r0
 mkdir -p bin
-go build -o bin/zero ./cmd/zero
-go build -o bin/zero-cp ./cmd/zero-cp
-sudo bin/zero install
+make install   # builds bin/zero and bin/zero-cp, then sudo bin/zero install
 ```
 
 `zero install` can be run again at any time. It does this:
