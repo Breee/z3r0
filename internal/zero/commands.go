@@ -647,8 +647,10 @@ func (s *Sandbox) Logs(out io.Writer, follow bool) error {
 		return fmt.Errorf("sandbox %s: none", s.Name)
 	}
 	if follow {
-		return passthrough("ssh", "-F", s.path("ssh.conf"), s.Host,
+		cmd := exec.Command("ssh", "-F", s.path("ssh.conf"), s.Host,
 			"tail -n 200 -f ~/.local/share/opencode/log/opencode.log")
+		cmd.Stdout, cmd.Stderr = &cleanWriter{w: out}, &cleanWriter{w: os.Stderr}
+		return cmd.Run()
 	}
 	text, err := s.ssh("if test -f ~/.local/share/opencode/log/opencode.log; then tail -n 200 ~/.local/share/opencode/log/opencode.log; " +
 		"else echo 'no serve log (serve not started)'; fi")

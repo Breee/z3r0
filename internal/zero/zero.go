@@ -5,6 +5,7 @@ package zero
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -198,9 +199,15 @@ func (s *Sandbox) exists() bool {
 	return rt.Exists(s.Name)
 }
 
-// ssh runs a script on the sandbox via the generated ssh config.
+// ssh runs a script on the sandbox via the generated ssh config. Output and
+// error text come from the sandbox and are returned without control
+// characters.
 func (s *Sandbox) ssh(script string) (string, error) {
-	return sh("ssh", "-F", s.path("ssh.conf"), s.Host, script)
+	out, err := sh("ssh", "-F", s.path("ssh.conf"), s.Host, script)
+	if err != nil {
+		err = errors.New(clean(err.Error()))
+	}
+	return clean(out), err
 }
 
 // sh runs a command capturing stdout and stderr. On failure the error carries

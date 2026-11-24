@@ -1146,3 +1146,31 @@ func TestSyncForgePathsRevokes(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestClean(t *testing.T) {
+	for in, want := range map[string]string{
+		"main\n\tahead 2":                      "main\n\tahead 2",
+		"grüße 日本 ✓":                           "grüße 日本 ✓",
+		"a\x1b[2J\x1b[Hb":                      "a[2J[Hb",                    // CSI: clear screen, home
+		"a\x1b]0;title\x07b":                   "a]0;titleb",                 // OSC: window title
+		"a\u009b2Jb\u009d0;t\u009cc":           "a2Jb0;tc",                   // C1 forms of CSI, OSC, ST
+		"line\rdelete zero-api? [y/N]\x08\x7f": "linedelete zero-api? [y/N]", // carriage return, backspace, DEL
+		"a\x00b":                               "ab",
+		"é\xc2":                                "é\xc2", // cut-off sequence stays as it is
+	} {
+		if got := clean(in); got != want {
+			t.Errorf("clean(%q) = %q, want %q", in, got, want)
+		}
+	}
+	// a C1 character split across two writes is removed all the same
+	var b bytes.Buffer
+	w := &cleanWriter{w: &b}
+	for _, p := range []string{"a\xc2", "\x9b31mb\xc2", "\xa9\x1b"} {
+		if n, err := w.Write([]byte(p)); n != len(p) || err != nil {
+			t.Fatalf("Write(%q) = %d, %v", p, n, err)
+		}
+	}
+	if b.String() != "a31mb©" {
+		t.Errorf("cleanWriter = %q", b.String())
+	}
+}
