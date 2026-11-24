@@ -75,7 +75,7 @@ func (openshell) Start(name string) error {
 		}
 		time.Sleep(time.Second)
 	}
-	return fmt.Errorf("sandbox %s not ready 60s after start (phase %s)", name, sandboxPhase(name))
+	return fmt.Errorf("sandbox %s not ready 60s after start (phase %s); check: zero doctor", name, sandboxPhase(name))
 }
 
 func (openshell) Stopped(name string) bool { return sandboxPhase(name) == "Stopped" }

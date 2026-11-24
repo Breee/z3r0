@@ -221,7 +221,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 			return nil, fmt.Errorf("folder %s is missing; restore it, or take it out of the workspace: zero -c %s ctx remove %s", f, name, f)
 		}
 		if other, ok := seen[filepath.Base(f)]; ok {
-			return nil, fmt.Errorf("folders %s and %s have the same name; a workspace needs distinct folder names", other, f)
+			return nil, fmt.Errorf("folders %s and %s have the same name; a workspace needs distinct folder names: rename one or put it in its own workspace (zero ctx new NAME PATH)", other, f)
 		}
 		seen[filepath.Base(f)] = f
 	}
@@ -282,21 +282,25 @@ func paths(args []string) ([]string, error) {
 	return out, nil
 }
 
-// listed resolves the folders to take out of a workspace. A folder that no
-// longer exists is matched by its path as written in the workspace.
-func listed(args []string) ([]string, error) {
+// listed resolves the folders to take out of a workspace. A path that is in
+// the workspace as written wins over what it links to now; a folder that no
+// longer exists is matched the same way.
+func listed(folders, args []string) ([]string, error) {
 	if len(args) == 0 {
 		args = []string{"."}
 	}
 	var out []string
 	for _, a := range args {
-		p, err := realPath(a)
+		abs, err := filepath.Abs(a)
 		if err != nil {
-			if p, err = filepath.Abs(a); err != nil {
-				return nil, err
+			return nil, err
+		}
+		if !slices.Contains(folders, abs) {
+			if p, err := realPath(a); err == nil {
+				abs = p
 			}
 		}
-		out = append(out, p)
+		out = append(out, abs)
 	}
 	return out, nil
 }
@@ -367,7 +371,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		w := c.Workspaces[name]
 		ps, err := paths(args)
 		if sub == "remove" {
-			ps, err = listed(args)
+			ps, err = listed(w.Folders, args)
 		}
 		if err != nil {
 			return err
@@ -378,9 +382,9 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			case sub == "add" && i < 0:
 				w.Folders = append(w.Folders, p)
 			case sub == "remove" && i < 0:
-				return fmt.Errorf("%s is not in workspace %s; its folders: %s", p, name, strings.Join(w.Folders, " "))
+				return fmt.Errorf("%s is not in workspace %s (folders: %s); name one of them: zero -c %s ctx remove PATH", p, name, strings.Join(w.Folders, " "), name)
 			case sub == "remove":
-				if !isInput(p) {
+				if !isInput(p) || !fileExists(p) {
 					if s := c.sandbox(name); s.exists() {
 						fmt.Fprintf(out, "%s: unpushed: %s -> kept in sandbox, not reachable via token\n", sandboxDir(p), s.unpushedIn(p))
 					}

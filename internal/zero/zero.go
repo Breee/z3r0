@@ -137,7 +137,7 @@ func (s *Sandbox) acquireLock() (*lock, error) {
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		f.Close()
-		return nil, fmt.Errorf("another zero command is running for %s", s.Name)
+		return nil, fmt.Errorf("another zero command is running for %s; run this one again when it has ended", s.Name)
 	}
 	return &lock{f: f}, nil
 }

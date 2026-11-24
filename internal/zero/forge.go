@@ -459,9 +459,9 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 		}
 		if i == 60 {
 			if id == "" {
-				return fmt.Errorf("sandbox did not pick up new %s token in 60s", f.Name())
+				return fmt.Errorf("sandbox did not pick up new %s token in 60s; check: zero logs, then zero up", f.Name())
 			}
-			return fmt.Errorf("sandbox did not pick up new %s token in 60s; old token %s kept", f.Name(), id)
+			return fmt.Errorf("sandbox did not pick up new %s token in 60s; old token %s kept; check: zero logs, then zero up", f.Name(), id)
 		}
 		time.Sleep(time.Second)
 	}

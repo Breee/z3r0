@@ -49,8 +49,19 @@ sandbox zero-developer: up
 forward: off
 gitlab token: corewire/technology-and-research/developer, corewire/technology-and-research/developer2; capabilities: git.read, git.commit, git.push, gitlab.issue.read, gitlab.mr.read, gitlab.pipeline.read
 push gate: on (zero/developer and below)
-serve: stopped
+serve: running
 ```
+
+Other lines you can see there:
+
+| Line | Meaning |
+|---|---|
+| `sandbox zero-developer: none` and `next: zero up` | the workspace has no sandbox yet |
+| `sandbox zero-developer: paused` | stopped by `zero pause`; `zero up` continues |
+| `gitlab token: none; zero up makes a new one` | the token was revoked |
+| `forge: none, the agent cannot push ...` | no repository of the workspace is on GitLab, or the sandbox was created without a `glab` login for a self-hosted GitLab |
+
+`zero up` ends with `next: zero attach`. `zero rm` ends with `workspace NAME is kept; to delete it: zero ctx rm NAME`.
 
 ## Working with the agent
 

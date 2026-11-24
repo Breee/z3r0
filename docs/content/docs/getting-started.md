@@ -97,6 +97,8 @@ zero pause      # stops the sandbox and revokes the token; zero up continues (no
 zero rm         # deletes the sandbox; lists work that is not pushed and asks for the name
 ```
 
+`zero rm` keeps the workspace, so `zero up` makes a new sandbox for it. `zero ctx rm NAME` deletes the workspace too.
+
 ## Shell completion
 
 ```sh

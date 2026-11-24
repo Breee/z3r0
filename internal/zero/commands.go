@@ -240,7 +240,7 @@ func (s *Sandbox) create() error {
 		mount = s.stage()
 	}
 	if err := rt.Create(s.Name, image(), policy, creds, env, mount, inputMount); err != nil {
-		return fmt.Errorf("create sandbox (image %s): %w", image(), err)
+		return fmt.Errorf("create sandbox (image %s): %w; check: zero doctor", image(), err)
 	}
 	if mount != "" {
 		if err := s.write("input.mount", mount, 0o600); err != nil {
@@ -423,7 +423,7 @@ func (s *Sandbox) Web(out io.Writer) error {
 	}
 	pair := pairLink.FindString(text)
 	if pair == "" {
-		return fmt.Errorf("no pairing link in opencode pair output: %s", text)
+		return fmt.Errorf("no pairing link in opencode pair output: %s; run zero web again", text)
 	}
 	fmt.Fprintf(out, "open (works once, 5 minutes): %s\n", link(out, pair))
 	return exec.Command("xdg-open", pair).Run()
@@ -450,7 +450,7 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 
 // noForge is the line for a workspace whose repositories are on no forge
 // zero knows: there is no token and no push gate.
-const noForge = "forge: none, the agent cannot push (zero supports GitLab repositories)"
+const noForge = "forge: none, the agent cannot push (zero pushes to GitLab; a self-hosted GitLab needs a glab login before the sandbox is created)"
 
 // errNoSandbox is the error of a command that needs an existing sandbox.
 func (s *Sandbox) errNoSandbox() error {
@@ -496,7 +496,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 		running, err := s.serveRunning()
 		switch {
 		case err != nil:
-			fmt.Fprintln(out, "serve: unreachable")
+			fmt.Fprintln(out, "serve: unreachable; check: zero logs")
 		case running:
 			fmt.Fprintln(out, "serve: running")
 		default:

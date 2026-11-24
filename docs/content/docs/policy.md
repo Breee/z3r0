@@ -27,13 +27,15 @@ Without the file a project gets the capabilities above and no extra host. The Gi
 
 zero reads the file from your checkout on the host, never from the sandbox. The agent can edit its copy and push it. That has no effect until you check out its branch on the host and run `zero up`.
 
-When the file allows more than before (a new host or capability), `zero up` asks:
+When the file allows more than before (a new host or capability), `zero up` prints what is new and asks:
 
 ```
+policy widens for zero-developer:
+  + network example.com
 approve? [y/N]
 ```
 
-`zero up --approve` answers yes. Without a terminal and without `--approve`, `zero up` refuses. A policy that allows less is applied without a question. An unknown key or capability stops `zero up`; zero never falls back to a wider policy.
+`zero up --approve` prints the same lines and answers yes. Without a terminal and without `--approve`, `zero up` refuses. A policy that allows less is applied without a question. An unknown key or capability stops `zero up`; zero never falls back to a wider policy.
 
 A workspace with several repositories gets the union of their policies.
 

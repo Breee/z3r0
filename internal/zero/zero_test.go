@@ -1286,7 +1286,33 @@ func TestCtxRemoveMissingFolder(t *testing.T) {
 		t.Fatalf("folders = %v, %v", c.Workspaces["w"], err)
 	}
 	err = Ctx(&out, "w", []string{"remove", filepath.Join(root, "c")})
-	if err == nil || !strings.Contains(err.Error(), "its folders: "+a) {
+	if err == nil || !strings.Contains(err.Error(), "zero -c w ctx remove PATH") {
 		t.Errorf("unknown folder: %v", err)
 	}
+	// A folder that was replaced by a link to another folder of the
+	// workspace is taken out itself, not the folder it links to.
+	if err := Ctx(&out, "w", []string{"add", b2(t, root)}); err != nil {
+		t.Fatal(err)
+	}
+	d := filepath.Join(root, "d")
+	if err := os.RemoveAll(d); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(a, d); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ctx(&out, "w", []string{"remove", d}); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := loadConfig(); !slices.Equal(c.Workspaces["w"].Folders, []string{a}) {
+		t.Errorf("after removing the linked folder: %v", c.Workspaces["w"].Folders)
+	}
+}
+
+func b2(t *testing.T, root string) string {
+	d := filepath.Join(root, "d")
+	if err := os.Mkdir(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return d
 }
