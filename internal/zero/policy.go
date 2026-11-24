@@ -141,11 +141,42 @@ func (s *Sandbox) recordPolicy() error {
 // the sandbox (go, git, curl) may read from the listed hosts.
 const projectBinary = "/**"
 
+// projectRule is the name of the network rule for network.allow.
+const projectRule = "project"
+
+// projectPolicy is the network rule for the hosts of network.allow; nil
+// when there is none.
+func projectPolicy(hosts []string) map[string]any {
+	if len(hosts) == 0 {
+		return nil
+	}
+	var eps []map[string]any
+	for _, h := range hosts {
+		eps = append(eps, map[string]any{
+			"host": h, "port": 443, "protocol": "rest", "enforcement": "enforce", "access": "read-only",
+		})
+	}
+	return map[string]any{
+		"name":      projectRule,
+		"endpoints": eps,
+		"binaries":  []map[string]any{{"path": projectBinary}},
+	}
+}
+
+// syncProjectPolicy replaces the rule of a running sandbox, so a host taken
+// out of network.allow is no longer reachable.
+func (s *Sandbox) syncProjectPolicy(p *Policy) error {
+	if err := rt.SetRule(s.Name, projectRule, projectPolicy(p.Network.Allow)); err != nil {
+		return fmt.Errorf("apply .zero/policy.yaml: %w", err)
+	}
+	return nil
+}
+
 func (s *Sandbox) applyProjectPolicy(p *Policy) error {
 	if len(p.Network.Allow) == 0 {
 		return nil
 	}
-	if err := rt.AllowEgress(s.Name, "project", projectBinary, "read-only", p.Network.Allow); err != nil {
+	if err := rt.AllowEgress(s.Name, projectRule, projectBinary, "read-only", p.Network.Allow); err != nil {
 		return fmt.Errorf("apply .zero/policy.yaml: %w", err)
 	}
 	return nil
@@ -155,7 +186,7 @@ func (s *Sandbox) applyProjectPolicy(p *Policy) error {
 type policyChange struct {
 	caps      bool     // capability set differs → token must be re-minted
 	newHosts  []string // hosts to open
-	goneHosts bool     // hosts removed (takes effect on recreate)
+	goneHosts bool     // hosts removed
 }
 
 // widened returns the entries of p that old does not grant, as "kind value".

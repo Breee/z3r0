@@ -61,7 +61,8 @@ func matcher(r EgressRule) map[string]any {
 	return m
 }
 
-// policyWith returns the policy file base with network rule name set to rule.
+// policyWith returns the policy file base with network rule name set to
+// rule; a nil rule removes it.
 func policyWith(base []byte, name string, rule map[string]any) ([]byte, error) {
 	var p map[string]any
 	if err := yaml.Unmarshal(base, &p); err != nil {
@@ -71,7 +72,11 @@ func policyWith(base []byte, name string, rule map[string]any) ([]byte, error) {
 	if np == nil {
 		np = map[string]any{}
 	}
-	np[name] = rule
+	if rule == nil {
+		delete(np, name)
+	} else {
+		np[name] = rule
+	}
 	p["network_policies"] = np
 	return yaml.Marshal(p)
 }

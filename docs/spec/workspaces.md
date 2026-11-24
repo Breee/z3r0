@@ -154,11 +154,10 @@ $ zero ctx remove ~/src/infra
 $ zero up
 ctx: team (current)
 gitlab token: rotated (api, web)
-network rules for infra remain until recreate (zero rm && zero up)
 /tmp/zero/infra: unpushed: feat/x (1 commits) -> kept in sandbox, not reachable via token
 ```
 
-Token narrowing is immediate; the push gate refuses the removed repo at once. Egress narrowing needs recreate (OpenShell rules are additive). Built in #76: the checkout of a removed folder stays in the sandbox; the unpushed line is printed if the sandbox is running (#79). All repo folders of a workspace must be on the same forge host.
+Token narrowing is immediate; the push gate refuses the removed repo at once. Egress narrowing is immediate too: `zero up` replaces the forge rule (#52) and the rule for `network.allow` (#141). Built in #76: the checkout of a removed folder stays in the sandbox; the unpushed line is printed if the sandbox is running (#79). All repo folders of a workspace must be on the same forge host.
 
 ### 5.6 cwd wins over current
 
@@ -259,7 +258,7 @@ Decisions:
 | F2 | Folder in several workspaces | ambiguity error unless current matches (5.8) |
 | F3 | Input folders leak host secrets (`.env`) into sandbox | **decided**: secret patterns (`.env*` etc.) never copied, not overridable; extra excludes via `.zeroignore`; file summary on `up` (5.3) |
 | F4 | Permission union: capability for repo A applies to repo B | **decided**: accepted, one token per forge per workspace; `zero status` prints its projects and capabilities (#117) |
-| F5 | Egress narrowing not live | print "until recreate" (5.5) |
+| F5 | Egress narrowing not live | closed: `zero up` replaces the rules (#52, #141) |
 | F6 | Removed repo keeps unpushed work in sandbox | warn; token no longer covers it (5.5) |
 | F7 | Uncommitted host changes silently missing in sandbox | built in #117: `zero up` prints a note with the file count when it makes a fresh checkout of a folder with uncommitted or untracked files |
 | F8 | Name collisions in `/tmp/zero` (`a/api`, `b/api`) | built in #76: error, a workspace needs distinct folder names (no suffix) |

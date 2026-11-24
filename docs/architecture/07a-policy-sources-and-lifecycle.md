@@ -49,7 +49,7 @@ zero reads `.zero/policy.yaml` from the developer's **host checkout**, never fro
 ### Lifecycle
 
 - `zero up` (new sandbox): read, compile, create.
-- Policy changed: applied on recreate (`zero rm && zero up`).
+- Policy changed: applied by the next `zero up` on the running sandbox: the token is re-minted for changed capabilities, the network rule `project` is replaced, so a removed host is refused from then on (#141).
 - Invalid file: refuse, never fall back to broader.
 
 ### Later (not now)

@@ -106,13 +106,10 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		if s.forge() != nil && !fileExists(s.path("forge.rule")) {
 			fmt.Fprintln(out, "forge: this sandbox reaches the whole forge host, not only its projects, until `zero rm` + `zero up`")
 		}
-		if len(ch.newHosts) > 0 {
-			if err := s.applyProjectPolicy(pol); err != nil {
+		if len(ch.newHosts) > 0 || ch.goneHosts {
+			if err := s.syncProjectPolicy(pol); err != nil {
 				return 0, err
 			}
-		}
-		if ch.goneHosts {
-			fmt.Fprintln(out, "policy: removed hosts stay reachable until `zero rm` + `zero up`")
 		}
 		if err := s.saveApproved(pol); err != nil {
 			return 0, err

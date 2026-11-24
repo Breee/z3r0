@@ -41,6 +41,8 @@ A workspace with several repositories gets the union of their policies.
 
 Each entry under `network.allow` opens HTTPS (port 443) to that host, read-only. Everything else is blocked.
 
+A change to the file takes effect at the next `zero up`, also on a running sandbox: a new host is reachable after the approval, a removed host is refused from then on.
+
 ## Capabilities
 
 | Capability | Default | What the agent can do |

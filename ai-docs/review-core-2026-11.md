@@ -56,7 +56,7 @@ Scenario: an agent that finds a key from a removed sandbox or tries another proj
 Invariant: Z-INV-3.
 Fix: log the peer address, the first 4 hex of the key and the refused path/method to the journal (not to the sandbox, which receives only the 403).
 
-### R7 — low — a host removed from `network.allow` stays reachable until the sandbox is recreated
+### R7 — low — a host removed from `network.allow` stays reachable until the sandbox is recreated (closed, #141)
 `internal/zero/commands.go:108-115`, `internal/zero/policy.go:144-152`, `internal/zero/openshell.go:104-119`.
 `applyProjectPolicy` adds endpoints (`--add-endpoint`) and is only called when `ch.newHosts` is non-empty; removed hosts are only reported.
 Scenario: the human deletes a host from the policy and runs `zero up`; the sandbox keeps the old endpoint rule, and nothing removes it (only `zero rm` + `zero up` does). The code prints that, but the narrowing is not applied.

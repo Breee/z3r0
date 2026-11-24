@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -1174,5 +1175,74 @@ func TestClean(t *testing.T) {
 	}
 	if b.String() != "a31mb©" {
 		t.Errorf("cleanWriter = %q", b.String())
+	}
+}
+
+func TestApprovePolicy(t *testing.T) {
+	pol := func(hosts []string, caps ...string) *Policy {
+		p := &Policy{Capabilities: append(slices.Clone(defaultCaps), caps...)}
+		p.Network.Allow = hosts
+		return p
+	}
+	for _, c := range []struct {
+		name     string
+		approved *Policy // nil: nothing approved yet
+		damaged  bool
+		p        *Policy
+		approve  bool
+		err      string
+		want     policyChange
+	}{
+		{name: "default needs nothing", p: pol(nil)},
+		{name: "wider without a terminal is refused", p: pol([]string{"a.example"}), err: "not approved (no terminal"},
+		{name: "wider capability without a terminal is refused", p: pol(nil, "ci.run"), err: "not approved (no terminal"},
+		{name: "wider with --approve", p: pol([]string{"a.example"}, "ci.run"), approve: true,
+			want: policyChange{caps: true, newHosts: []string{"a.example"}}},
+		{name: "narrower needs nothing", approved: pol([]string{"a.example", "b.example"}, "ci.run"), p: pol([]string{"a.example"}),
+			want: policyChange{caps: true, goneHosts: true}},
+		{name: "host swapped is wider", approved: pol([]string{"a.example"}), p: pol([]string{"b.example"}), err: "not approved"},
+		{name: "same as approved", approved: pol([]string{"a.example"}), p: pol([]string{"a.example"})},
+		{name: "damaged record is refused", damaged: true, p: pol(nil), approve: true, err: "policy.approved"},
+	} {
+		s := &Sandbox{Name: "zero-x", State: t.TempDir(), Approve: c.approve}
+		if c.approved != nil {
+			if err := s.saveApproved(c.approved); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if c.damaged {
+			s.write("policy.approved", "capabilities: [\n", 0o600)
+		}
+		ch, err := s.approvePolicy(c.p)
+		if c.err != "" {
+			if err == nil || !strings.Contains(err.Error(), c.err) {
+				t.Errorf("%s: err = %v, want %q", c.name, err, c.err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+		} else if !reflect.DeepEqual(ch, c.want) {
+			t.Errorf("%s: change = %+v, want %+v", c.name, ch, c.want)
+		}
+	}
+}
+
+func TestProjectPolicy(t *testing.T) {
+	base := []byte("version: 1\nnetwork_policies:\n  zen:\n    name: zen\n  project:\n    name: project\n    endpoints:\n      - host: old.example\n")
+	b, err := policyWith(base, projectRule, projectPolicy([]string{"a.example"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := string(b); strings.Contains(out, "old.example") || !strings.Contains(out, "host: a.example") ||
+		!strings.Contains(out, "access: read-only") || !strings.Contains(out, "zen") {
+		t.Errorf("rule not replaced:\n%s", out)
+	}
+	b, err = policyWith(base, projectRule, projectPolicy(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := string(b); strings.Contains(out, "project") || !strings.Contains(out, "zen") {
+		t.Errorf("rule not removed:\n%s", out)
 	}
 }
