@@ -1230,6 +1230,16 @@ func TestApprovePolicy(t *testing.T) {
 
 func TestProjectPolicy(t *testing.T) {
 	base := []byte("version: 1\nnetwork_policies:\n  zen:\n    name: zen\n  project:\n    name: project\n    endpoints:\n      - host: old.example\n")
+	rule := projectPolicy([]string{"a.example", "b.example"})
+	eps := rule["endpoints"].([]map[string]any)
+	if len(eps) != 2 || fmt.Sprint(rule["binaries"]) != "[map[path:/**]]" {
+		t.Fatalf("rule = %v", rule)
+	}
+	for _, e := range eps {
+		if e["port"] != 443 || e["protocol"] != "rest" || e["enforcement"] != "enforce" || e["access"] != "read-only" || len(e) != 5 {
+			t.Errorf("endpoint = %v", e)
+		}
+	}
 	b, err := policyWith(base, projectRule, projectPolicy([]string{"a.example"}))
 	if err != nil {
 		t.Fatal(err)

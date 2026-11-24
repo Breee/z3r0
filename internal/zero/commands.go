@@ -83,9 +83,14 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			// opencode's credential db is stale.
 			os.Remove(s.path("copilot-auth.done"))
 		}
-		// Rule before token: a failure in between leaves the narrower side.
+		// Rules before token: a failure in between leaves the narrower side.
 		if rerule {
 			if err := s.syncForgeRule(); err != nil {
+				return 0, err
+			}
+		}
+		if len(ch.newHosts) > 0 || ch.goneHosts {
+			if err := s.syncProjectPolicy(pol); err != nil {
 				return 0, err
 			}
 		}
@@ -105,11 +110,6 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		}
 		if s.forge() != nil && !fileExists(s.path("forge.rule")) {
 			fmt.Fprintln(out, "forge: this sandbox reaches the whole forge host, not only its projects, until `zero rm` + `zero up`")
-		}
-		if len(ch.newHosts) > 0 || ch.goneHosts {
-			if err := s.syncProjectPolicy(pol); err != nil {
-				return 0, err
-			}
 		}
 		if err := s.saveApproved(pol); err != nil {
 			return 0, err
