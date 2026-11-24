@@ -467,9 +467,18 @@ func hasSession(list string) (bool, error) {
 // Attach is up + the opencode TUI, started inside the sandbox over ssh with
 // this terminal (ADR 0048): the host's opencode cannot open a folder that
 // exists only in the sandbox (C38).
-func (s *Sandbox) Attach(out io.Writer) error {
+// NeedTerminal is the check of `zero opencode`, exported so that the command
+// can refuse before a workspace is made.
+func NeedTerminal() error {
 	if !isTerminal(os.Stdin) || !isTerminal(os.Stdout) {
 		return fmt.Errorf("zero opencode needs a terminal; without one: zero run PROMPT, or zero opencode --web")
+	}
+	return nil
+}
+
+func (s *Sandbox) Attach(out io.Writer) error {
+	if err := NeedTerminal(); err != nil {
+		return err
 	}
 	if _, err := s.Up(out); err != nil {
 		return err
@@ -482,7 +491,7 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 	if _, err := s.Up(io.Discard); err != nil {
 		return err
 	}
-	script := "cd " + shellQuote(s.Dir) + " && exec opencode run"
+	script := "cd " + shellQuote(s.Dir) + " && exec opencode run --"
 	for _, p := range prompt {
 		script += " " + shellQuote(p)
 	}

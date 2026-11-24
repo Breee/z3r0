@@ -1,7 +1,7 @@
 # Z3R0 dev image (F11): golang + git + tools. Base and tools pinned by digest.
 # Tools come from uniget (https://uniget.dev) images: each is a layer of
 # bin/, share/, etc/ meant to be copied to /usr/local. Bump with `uniget describe <tool>`.
-# opencode must match the host version (zero attaches the host TUI).
+# opencode runs inside the sandbox (terminal UI over ssh, web UI through the forward; ADR 0048).
 FROM ghcr.io/uniget-org/tools/opencode:2.2.6@sha256:5e0d67ecab7429faf809abc904a53f008b91ac77bf30e2bb8270f9817ad36ea9 AS opencode
 FROM ghcr.io/uniget-org/tools/glab:1.128.0@sha256:e45f834a8801d5aae77950cfd1e3733dbd90049f3f62056338c8e4cfdabfde5a AS glab
 FROM ghcr.io/uniget-org/tools/ripgrep:15.2.0@sha256:067c5fa538ad254643b5e44cdb6a254b748353e7f7364f61d79bf39eece85b81 AS ripgrep

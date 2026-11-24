@@ -1,5 +1,5 @@
 // Package zero implements the zero CLI: a per-repo OpenShell sandbox running
-// `opencode serve`, with a local SSH forward the host opencode attaches to (F17).
+// `opencode serve`, with a local SSH forward for the web UI; the terminal UI runs inside the sandbox over ssh (ADR 0048).
 package zero
 
 import (

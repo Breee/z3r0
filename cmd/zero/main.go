@@ -1,5 +1,5 @@
-// zero: per-repo OpenShell sandbox with `opencode serve` inside; the host
-// opencode attaches over an SSH tunnel (F17).
+// zero: an OpenShell sandbox per workspace with opencode inside; the terminal
+// UI runs in the sandbox over ssh, the web UI through a local forward.
 package main
 
 import (
@@ -51,6 +51,8 @@ const bashCompletion = `_zero() {
   case ${COMP_WORDS[COMP_CWORD-1]} in
     switch|use|-c|--context)
       COMPREPLY=($(compgen -W "$(zero ctx 2>/dev/null | cut -c3- | cut -d' ' -f1)" -- "$cur")) ;;
+    opencode)
+      COMPREPLY=($(compgen -W "--tui --web" -- "$cur")) ;;
     ctx)
       COMPREPLY=($(compgen -W "use new add remove rm" -- "$cur")) ;;
     zero)
@@ -136,6 +138,11 @@ func main() {
 	}
 
 	create := slices.Contains([]string{"up", "opencode", "run", "vscode", "web"}, cmd)
+	if cmd == "opencode" && !slices.Contains(args, "--web") {
+		if err := zero.NeedTerminal(); err != nil {
+			fatal(err)
+		}
+	}
 	z, err := zero.Open(ctx, create)
 	if err != nil {
 		fatal(err)

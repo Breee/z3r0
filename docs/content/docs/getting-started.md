@@ -12,7 +12,7 @@ description: Install zero and start the first workspace.
 | `podman`, `newuidmap`, `newgidmap`, `curl` | Debian/Ubuntu: `apt install podman uidmap passt curl` |
 | `go` 1.26, `make` | to build zero |
 | `glab`, logged in to your GitLab host | zero creates the agent's token with it |
-| `opencode`, connected to GitHub Copilot | the terminal UI on the host; the sandbox uses its Copilot login for the model |
+| `opencode`, connected to GitHub Copilot | zero copies its Copilot login into the sandbox for the model |
 
 Log in to GitLab with the keyring, otherwise `zero doctor` warns that the login is stored in plain text:
 

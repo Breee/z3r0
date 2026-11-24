@@ -24,7 +24,7 @@ Focus: **opencode and VS Code only.** Every integration uses the same core comma
 
 | Client | Status | Next |
 |---|---|---|
-| **opencode** | `zero web` works; `zero attach/run` postponed (opencode #47665) | Re-enable attach/run after upstream fix |
+| **opencode** | `zero web` works; `zero opencode` and `zero run` start opencode inside the sandbox (ADR 0048; opencode #47665 still open) | Default model for the sandbox |
 | **VS Code** | `zero code` (Remote-SSH, Copilot) — not re-tested since Go rewrite | Re-test, one-command open |
 | **Paperclip** | Evaluated | `paperclip-plugin-zero` sandbox provider (orchestration + UI) |
 | Others (Claude Code, Codex, Copilot CLI) | out of scope for now | — |
