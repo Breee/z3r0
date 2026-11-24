@@ -173,6 +173,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if s.forge() == nil {
 		fmt.Fprintln(out, noForge)
 	}
+	if s.read("copilot") == "" {
+		fmt.Fprintln(out, noModel)
+	}
 	return port, nil
 }
 

@@ -34,6 +34,7 @@ func Doctor(out io.Writer) error {
 		if fails > 0 {
 			return fmt.Errorf("%d check(s) failed", fails)
 		}
+		fmt.Fprintln(out, "skip  all other checks: run `zero doctor` without sudo")
 		return nil
 	}
 	fmt.Fprintln(out, "skip  credential store: run `sudo zero doctor`")
@@ -57,6 +58,8 @@ func Doctor(out io.Writer) error {
 		check("zero-cp", "not running: systemctl --user start zero-cp (or zero up)")
 	}
 
+	check("model login", modelLogin())
+
 	if top := gitTop(); top != "" {
 		remote, _ := sh("git", "-C", top, "remote", "get-url", "origin")
 		f, path := forgeFor(remote)
@@ -64,7 +67,7 @@ func Doctor(out io.Writer) error {
 			fmt.Fprintf(out, "warn  glab login for %s is stored in plain text: glab auth login --hostname %s --use-keyring\n", g.host, g.host)
 		}
 		if f == nil {
-			check("forge", "origin "+strings.TrimSpace(remote)+" is not a supported forge (GitLab hosts need a glab login)")
+			fmt.Fprintf(out, "na    forge: %s\n", noForgeHere(remote))
 		} else if err := f.LoggedIn(); err != nil {
 			check("forge login", err.Error())
 		} else if missing, err := f.Guardrails(path); err != nil {
@@ -77,6 +80,20 @@ func Doctor(out io.Writer) error {
 		return fmt.Errorf("%d check(s) failed", fails)
 	}
 	return nil
+}
+
+// noForgeHere says why a repository has no forge checks. It is no failure of
+// the host setup: the sandbox works, the agent cannot push.
+func noForgeHere(remote string) string {
+	remote = clean(strings.TrimSpace(remote))
+	if remote == "" {
+		return "this repository has no origin; a sandbox for it cannot push"
+	}
+	host, _, ok := parseRemote(remote)
+	if !ok {
+		return "origin " + remote + " is not on GitLab; a sandbox for it cannot push"
+	}
+	return "origin is on " + host + ", no glab login for it; if it is a GitLab: glab auth login --hostname " + host + " --use-keyring. Without it a sandbox cannot push"
 }
 
 // credentialStore fails unless every running gateway has an owner-only

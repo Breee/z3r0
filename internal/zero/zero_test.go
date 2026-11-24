@@ -1316,3 +1316,46 @@ func b2(t *testing.T, root string) string {
 	}
 	return d
 }
+
+func TestDoctorLines(t *testing.T) {
+	for remote, want := range map[string]string{
+		"":                                "has no origin",
+		"/srv/git/x.git":                  "is not on GitLab",
+		"git@github.com:Breee/z3r0.git\n": "glab auth login --hostname github.com",
+		"https://git.example.org/a/b.git": "glab auth login --hostname git.example.org",
+		"\x1b[2Jgit@github.com:a/b.git":   "",
+	} {
+		got := noForgeHere(remote)
+		if !strings.Contains(got, want) || strings.ContainsRune(got, 0x1b) || !strings.Contains(got, "cannot push") {
+			t.Errorf("noForgeHere(%q) = %q", remote, got)
+		}
+	}
+	export := `[{"integrationID":"github-copilot","active":true,"value":{"type":"oauth","access":"tok"}}]`
+	if copilotToken([]byte(export)) != "tok" || copilotToken([]byte(`[]`)) != "" || copilotToken([]byte(`x`)) != "" {
+		t.Error("copilotToken")
+	}
+	// The check names the fix for each way the login can be missing.
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	if p := modelLogin(); !strings.Contains(p, "not on PATH") {
+		t.Errorf("no opencode: %q", p)
+	}
+	fake := func(script string) {
+		if err := os.WriteFile(filepath.Join(bin, "opencode"), []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+":/usr/bin:/bin")
+	fake("echo '[]'")
+	if p := modelLogin(); !strings.Contains(p, "opencode auth login") {
+		t.Errorf("no login: %q", p)
+	}
+	fake("echo boom >&2; exit 1")
+	if p := modelLogin(); !strings.Contains(p, "boom") || !strings.Contains(p, "opencode auth list") {
+		t.Errorf("export fails: %q", p)
+	}
+	fake("echo '" + export + "'")
+	if p := modelLogin(); p != "" {
+		t.Errorf("login present: %q", p)
+	}
+}

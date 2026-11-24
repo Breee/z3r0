@@ -3,8 +3,10 @@ package zero
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 //go:embed copilot-profile.yaml
@@ -14,6 +16,36 @@ const copilotEnv = "COPILOT_TOKEN"
 
 func (s *Sandbox) copilotProvider() string { return s.Name + "-copilot" }
 
+// noModel is the line for a sandbox that was created without a model login.
+const noModel = "model: the host's opencode had no GitHub Copilot login when this sandbox was created; log in (opencode auth login), then zero rm && zero up"
+
+// modelLogin is the doctor check: "" when the host's opencode is connected to
+// GitHub Copilot, else the problem with the command that fixes it.
+func modelLogin() string {
+	if _, err := exec.LookPath("opencode"); err != nil {
+		return "opencode is not on PATH; install it, then: opencode auth login"
+	}
+	out, err := exec.Command("opencode", "auth", "export").Output()
+	if err != nil {
+		return "opencode auth export failed (" + clean(firstLine(err, out)) + "); check: opencode auth list"
+	}
+	if copilotToken(out) == "" {
+		return "the host's opencode has no GitHub Copilot login: opencode auth login"
+	}
+	return ""
+}
+
+func firstLine(err error, out []byte) string {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+		out = ee.Stderr
+	}
+	if l, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n"); l != "" {
+		return l
+	}
+	return err.Error()
+}
+
 // hostCopilotToken returns the Copilot OAuth token of the host's opencode, or
 // "" when opencode is missing or not connected to Copilot.
 func hostCopilotToken() string {
@@ -21,6 +53,11 @@ func hostCopilotToken() string {
 	if err != nil {
 		return ""
 	}
+	return copilotToken(out)
+}
+
+// copilotToken reads the token from the output of `opencode auth export`.
+func copilotToken(out []byte) string {
 	var creds []struct {
 		IntegrationID string `json:"integrationID"`
 		Active        bool   `json:"active"`
