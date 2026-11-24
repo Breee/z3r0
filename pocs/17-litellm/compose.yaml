@@ -1,0 +1,24 @@
+# PoC 17: LiteLLM as a model proxy next to the sandbox. Works with `podman compose` and `docker compose`.
+services:
+  backend:
+    image: docker.io/library/python@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    command: ["python", "/backend.py"]
+    volumes:
+      - ./backend.py:/backend.py:ro
+    ports:
+      - "127.0.0.1:18101:18101"
+
+  litellm:
+    # v1.110.3
+    image: ghcr.io/berriai/litellm@sha256:1050d2c9ca58399de9cd51df6eb503812af697717f54d2f08c1c30589c75e1f7
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set by run.sh}
+      GITHUB_COPILOT_TOKEN_DIR: /copilot
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ${COPILOT_DIR:?set by run.sh}:/copilot
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      - backend
