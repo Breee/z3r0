@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -420,6 +421,9 @@ func (s *Sandbox) Web(out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := s.webSession(); err != nil {
+		fmt.Fprintf(out, "web: no session prepared (%v); in the browser: Add project, %s\n", err, s.Dir)
+	}
 	text, err := s.ssh("opencode pair --url " + shellQuote(s.url(port)))
 	if err != nil {
 		return fmt.Errorf("pairing link: %w", err)
@@ -430,6 +434,34 @@ func (s *Sandbox) Web(out io.Writer) error {
 	}
 	fmt.Fprintf(out, "open (works once, 5 minutes): %s\n", link(out, pair))
 	return exec.Command("xdg-open", pair).Run()
+}
+
+// webSession makes sure the service has a session in the workspace's first
+// folder. The web UI opens on a page that lists sessions, and a pairing link
+// cannot name a folder (C56).
+func (s *Sandbox) webSession() error {
+	list, err := s.ssh("opencode api get " + shellQuote("/api/session?limit=1&directory="+url.QueryEscape(s.Dir)))
+	if err != nil {
+		return err
+	}
+	has, err := hasSession(list)
+	if err != nil || has {
+		return err
+	}
+	body, _ := json.Marshal(map[string]any{"location": map[string]string{"directory": s.Dir}})
+	_, err = s.ssh("opencode api post /api/session --data " + shellQuote(string(body)))
+	return err
+}
+
+// hasSession reads the answer of the session list.
+func hasSession(list string) (bool, error) {
+	var r struct {
+		Data *[]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(list), &r); err != nil || r.Data == nil {
+		return false, fmt.Errorf("session list not readable")
+	}
+	return len(*r.Data) > 0, nil
 }
 
 // Attach is up + the opencode TUI attached to the sandbox.

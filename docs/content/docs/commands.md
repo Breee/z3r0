@@ -69,7 +69,7 @@ Other lines you can see there:
 |---|---|
 | `zero opencode` | `up`, then opencode in the terminal, connected to the sandbox (`zero attach` still works) |
 | `zero run <prompt>` | `up`, then one prompt without the UI |
-| `zero web` | `up`, then the opencode web UI in the browser |
+| `zero web` | `up`, then the opencode web UI in the browser. Home lists one session of the workspace's first folder under "Recent sessions"; open it to work in that folder. Other folders: "Add project" with the path `/tmp/zero/<folder>` |
 | `zero vscode` | `up`, then VS Code with Remote-SSH on the sandbox (`zero code` still works) |
 
 ```sh

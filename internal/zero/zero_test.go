@@ -1416,3 +1416,19 @@ func TestRmLeftover(t *testing.T) {
 		t.Errorf("state left or no message: %q", out.String())
 	}
 }
+
+func TestHasSession(t *testing.T) {
+	for in, want := range map[string]bool{
+		`{"data":[],"cursor":{"previous":null,"next":null}}`: false,
+		`{"data":[{"id":"ses_1"}]}`:                          true,
+	} {
+		if got, err := hasSession(in); err != nil || got != want {
+			t.Errorf("hasSession(%s) = %v, %v", in, got, err)
+		}
+	}
+	for _, in := range []string{"", "Unauthorized", `{"error":"x"}`, `{"data":null}`} {
+		if _, err := hasSession(in); err == nil {
+			t.Errorf("hasSession(%q): no error", in)
+		}
+	}
+}
