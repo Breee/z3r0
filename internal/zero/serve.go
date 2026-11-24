@@ -68,6 +68,14 @@ func readState(dir, name string) string {
 func upkeep() {
 	ids, _ := filepath.Glob(filepath.Join(stateRoot(), "*", "forge.id"))
 	used := map[string]Forge{}
+	// A sandbox whose token could not be revoked has no forge.id left; its
+	// forge is still swept for orphans.
+	marks, _ := filepath.Glob(filepath.Join(stateRoot(), "*", "forge"))
+	for _, p := range marks {
+		if f := forgeOf(filepath.Dir(p)); f != nil {
+			used[f.Name()+"@"+f.Host()] = f
+		}
+	}
 	for _, p := range ids {
 		dir := filepath.Dir(p)
 		s := &Sandbox{Name: filepath.Base(dir), State: dir}

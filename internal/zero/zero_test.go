@@ -1051,4 +1051,21 @@ func TestSyncForgePathsRevokes(t *testing.T) {
 	if b, _ := os.ReadFile(calls); strings.Count(string(b), "\n") != 1 {
 		t.Errorf("upkeep asked the forge:\n%s", b)
 	}
+
+	// The revoke fails: forge.id goes all the same, so nothing renews the token.
+	os.WriteFile(filepath.Join(bin, "glab"), []byte("#!/bin/sh\nexit 1\n"), 0o755)
+	s.write("forge.id", "10", 0o600)
+	if _, err := s.syncForgePaths(); err == nil || !strings.Contains(err.Error(), "could not be revoked") {
+		t.Fatalf("err = %v", err)
+	}
+	if fileExists(s.path("forge.id")) {
+		t.Error("forge.id kept after a failed revoke")
+	}
+
+	// Forge not recorded: the message does not claim a revoke.
+	os.Remove(s.path("forge"))
+	s.write("forge.id", "11", 0o600)
+	if _, err := s.syncForgePaths(); err == nil || !strings.Contains(err.Error(), "token 11 is not revoked") {
+		t.Fatalf("err = %v", err)
+	}
 }

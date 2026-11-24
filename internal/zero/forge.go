@@ -135,6 +135,9 @@ func (s *Sandbox) orderedPaths(paths map[string]string) []string {
 func (s *Sandbox) syncForgePaths() (bool, error) {
 	f, byTop, err := s.folderForge()
 	if err != nil {
+		if s.forge() != nil {
+			err = fmt.Errorf("%w; %s", err, s.dropToken())
+		}
 		return false, err
 	}
 	paths, old := s.orderedPaths(byTop), s.forgePaths()
@@ -143,19 +146,33 @@ func (s *Sandbox) syncForgePaths() (bool, error) {
 	}
 	cur := s.forge()
 	if cur == nil || len(paths) == 0 || f.Host() != cur.Host() {
-		// The token no longer fits the workspace: it must not stay valid, and
-		// without forge.id zero-cp does not renew it.
-		gone := "its token is revoked"
-		if err := s.pauseForge(); err != nil {
-			gone = "its token could not be revoked: " + err.Error()
-		}
 		return false, fmt.Errorf("the repositories of %s changed (was %s, now %s); %s; restore the folders and run zero up, or recreate: zero rm && zero up",
-			s.Name, pathList(old), pathList(paths), gone)
+			s.Name, pathList(old), pathList(paths), s.dropToken())
 	}
 	if err := s.write("forge.stale", "1", 0o600); err != nil {
 		return false, err
 	}
 	return true, s.write("forge.path", strings.Join(paths, "\n"), 0o600)
+}
+
+// dropToken revokes the token of a sandbox whose workspace no longer fits it
+// and says what happened. forge.id goes in every case the forge is known:
+// without it zero-cp does not renew the token, and revokes it as an orphan if
+// the revoke failed here.
+func (s *Sandbox) dropToken() string {
+	id := s.read("forge.id")
+	if id == "" {
+		return "it holds no token"
+	}
+	f := s.forge()
+	if f == nil {
+		return "its token " + id + " is not revoked, the forge is not recorded: revoke it on the forge"
+	}
+	if err := s.pauseForge(); err != nil {
+		os.Remove(s.path("forge.id"))
+		return fmt.Sprintf("its token could not be revoked (%v), zero-cp tries again", err)
+	}
+	return "its token is revoked"
 }
 
 func pathList(paths []string) string {
@@ -441,6 +458,9 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 			break
 		}
 		if i == 60 {
+			if id == "" {
+				return fmt.Errorf("sandbox did not pick up new %s token in 60s", f.Name())
+			}
 			return fmt.Errorf("sandbox did not pick up new %s token in 60s; old token %s kept", f.Name(), id)
 		}
 		time.Sleep(time.Second)
