@@ -143,12 +143,26 @@ func (s *Sandbox) syncForgePaths() (bool, error) {
 	}
 	cur := s.forge()
 	if cur == nil || len(paths) == 0 || f.Host() != cur.Host() {
-		return false, fmt.Errorf("the forge of %s changed (was %v, now %v); recreate: zero rm && zero up", s.Name, old, paths)
+		// The token no longer fits the workspace: it must not stay valid, and
+		// without forge.id zero-cp does not renew it.
+		gone := "its token is revoked"
+		if err := s.pauseForge(); err != nil {
+			gone = "its token could not be revoked: " + err.Error()
+		}
+		return false, fmt.Errorf("the repositories of %s changed (was %s, now %s); %s; restore the folders and run zero up, or recreate: zero rm && zero up",
+			s.Name, pathList(old), pathList(paths), gone)
 	}
 	if err := s.write("forge.stale", "1", 0o600); err != nil {
 		return false, err
 	}
 	return true, s.write("forge.path", strings.Join(paths, "\n"), 0o600)
+}
+
+func pathList(paths []string) string {
+	if len(paths) == 0 {
+		return "none"
+	}
+	return strings.Join(paths, ", ")
 }
 
 // mcpTools expands a workspace's tool list: "default" stands for the default
@@ -386,7 +400,8 @@ func (s *Sandbox) resumeForge(caps []string) error {
 // renewBefore. New processes get the new token; running ones keep the old (C44).
 func (s *Sandbox) renewForge(caps []string, force bool) error {
 	f, id, paths := s.forge(), s.read("forge.id"), s.forgePaths()
-	if f == nil || id == "" {
+	// Without a token only zero up (force) mints one; upkeep does not.
+	if f == nil || id == "" && !force {
 		return nil
 	}
 	toks, err := f.Tokens()
@@ -429,6 +444,9 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 			return fmt.Errorf("sandbox did not pick up new %s token in 60s; old token %s kept", f.Name(), id)
 		}
 		time.Sleep(time.Second)
+	}
+	if id == "" {
+		return nil
 	}
 	if err := f.Revoke(id); err != nil {
 		return fmt.Errorf("revoke old %s token %s: %w", f.Name(), id, err)

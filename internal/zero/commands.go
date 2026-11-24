@@ -89,7 +89,8 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 				return 0, err
 			}
 		}
-		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools); err != nil {
+		revoked := s.forge() != nil && s.read("forge.id") == ""
+		if err := s.renewForge(pol.Capabilities, ch.caps || repaths || retools || revoked); err != nil {
 			return 0, err
 		}
 		if repaths || retools {

@@ -1019,3 +1019,36 @@ func TestRevokeForgeByLabel(t *testing.T) {
 		t.Errorf("glab calls:\n%s", got)
 	}
 }
+
+// A workspace whose repositories are gone keeps no token: zero up revokes it,
+// and without forge.id upkeep has nothing to renew (#147).
+func TestSyncForgePathsRevokes(t *testing.T) {
+	bin, state := t.TempDir(), t.TempDir()
+	calls := filepath.Join(bin, "calls")
+	if err := os.WriteFile(filepath.Join(bin, "glab"), []byte("#!/bin/sh\necho \"$*\" >> "+calls+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	s := &Sandbox{Name: "zero-x", State: state}
+	s.write("forge", "gitlab", 0o600)
+	s.write("forge.host", "gitlab.example", 0o600)
+	s.write("forge.path", "g/p", 0o600)
+	s.write("forge.id", "9", 0o600)
+
+	_, err := s.syncForgePaths()
+	if err == nil || !strings.Contains(err.Error(), "its token is revoked") || !strings.Contains(err.Error(), "was g/p, now none") {
+		t.Fatalf("err = %v", err)
+	}
+	if fileExists(s.path("forge.id")) {
+		t.Error("forge.id kept: zero-cp would renew the token")
+	}
+	if b, _ := os.ReadFile(calls); !strings.Contains(string(b), "/personal_access_tokens/9") {
+		t.Errorf("glab calls:\n%s", b)
+	}
+	if err := s.renewForge([]string{"git.read"}, false); err != nil {
+		t.Errorf("upkeep renew without a token: %v", err)
+	}
+	if b, _ := os.ReadFile(calls); strings.Count(string(b), "\n") != 1 {
+		t.Errorf("upkeep asked the forge:\n%s", b)
+	}
+}
