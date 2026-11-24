@@ -1004,6 +1004,16 @@ func TestRevokeForgeByLabel(t *testing.T) {
 	if err := s.revokeForge(); err != nil {
 		t.Fatal(err)
 	}
+	if b, _ := os.ReadFile(calls); strings.Contains(string(b), "personal_access_tokens") {
+		t.Errorf("no mint was open, yet the forge was asked:\n%s", b)
+	}
+	s.write("forge.minting", "", 0o600)
+	if err := s.pauseForge(); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(s.path("forge.minting")) {
+		t.Error("marker kept after the revoke")
+	}
 	b, _ := os.ReadFile(calls)
 	if got := string(b); !strings.Contains(got, "/personal_access_tokens/77") || strings.Contains(got, "/personal_access_tokens/78") {
 		t.Errorf("glab calls:\n%s", got)

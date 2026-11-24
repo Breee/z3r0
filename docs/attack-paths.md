@@ -101,7 +101,7 @@ P01–P12 source: F02, F03, F08 runs. P18, P22, P24: recorded 2026-11-10 for the
 | P04 | high | Placeholder laundering: agent puts placeholder in query / any other header / basic auth on the bound endpoint; upstream echoes or stores it | Real secret returned to agent | `tests/attacks/run.sh` launder:* GAP | Never bind creds to reflecting endpoints; tight path/query rules | C17, C27, X04 |
 | P07 | inherent | Data in query/path/body of any allowed endpoint | Source/arch exfil | exfil:data-in-query GAP | Few endpoints, read-only, tight path/query rules, Z3R0 audit | C19, A11, X03 |
 | P10 | low | Non-HTTP / `tls: skip` endpoints: no L7 check, no credential rewrite | Uninspected channel if such endpoint is allowed | docs only | Don't allow such endpoints | C15, C19(cat) |
-| P21 | low | Sandbox crash or host loss without `zero rm` → token not revoked | Valid token in gateway credential store up to 1 day | by design (expiry) | — | C35 |
+| P21 | low | Sandbox crash or host loss without `zero rm` → token not revoked | Valid token in gateway credential store up to 1 day | by design (expiry); a token of a setup or renewal that stopped half way is found by its label and revoked by the next `zero up`, `zero pause` or `zero rm` (#138) | — | C35 |
 
 ## 4. Forge, CI and the developer's checkout
 

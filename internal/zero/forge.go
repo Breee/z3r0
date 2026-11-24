@@ -226,11 +226,11 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 			return "", err
 		}
 	}
-	tok, id, err := f.Mint(tokenLabel(s.Name), paths, perms)
+	tok, id, err := s.mint(f, paths, perms)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", f.Name(), err)
 	}
-	if err := s.write("forge.id", id, 0o600); err != nil {
+	if err := s.recordToken(id); err != nil {
 		// The id is lost: revoke at once, the label would find it later.
 		f.Revoke(id)
 		return "", err
@@ -287,7 +287,7 @@ func (s *Sandbox) revokeForge() error {
 	f, id := s.forge(), s.read("forge.id")
 	if f == nil {
 		if id != "" {
-			return fmt.Errorf("token %s is recorded but its forge is not (state file forge missing); revoke it on the forge", id)
+			return fmt.Errorf("token %s is recorded but its forge is not (state file forge missing); revoke it on the forge, then delete %s", id, s.path("forge.id"))
 		}
 		return nil
 	}
@@ -296,12 +296,41 @@ func (s *Sandbox) revokeForge() error {
 			return fmt.Errorf("revoke %s token %s: %w", f.Name(), id, err)
 		}
 	}
-	// A token minted by a setup that stopped before its id was written
-	// carries this sandbox's label.
+	if err := s.revokeUnrecorded(f); err != nil {
+		return err
+	}
+	rt.UnbindCredential(s.forgeProvider(f))
+	os.Remove(s.path("forge.id"))
+	return nil
+}
+
+// mint creates the token. The marker forge.minting stays until its id is
+// recorded, so a token of a mint that stopped half way is found by its label.
+func (s *Sandbox) mint(f Forge, paths, perms []string) (tok, id string, err error) {
+	if err := s.write("forge.minting", "", 0o600); err != nil {
+		return "", "", err
+	}
+	return f.Mint(tokenLabel(s.Name), paths, perms)
+}
+
+func (s *Sandbox) recordToken(id string) error {
+	if err := s.write("forge.id", id, 0o600); err != nil {
+		return err
+	}
+	return os.Remove(s.path("forge.minting"))
+}
+
+// revokeUnrecorded revokes tokens with this sandbox's label after a mint whose
+// id was not written (state marker forge.minting).
+func (s *Sandbox) revokeUnrecorded(f Forge) error {
+	if !fileExists(s.path("forge.minting")) {
+		return nil
+	}
 	toks, err := f.Tokens()
 	if err != nil {
 		return err
 	}
+	id := s.read("forge.id")
 	for _, t := range toks {
 		if t.Name == tokenLabel(s.Name) && t.ID != id {
 			if err := f.Revoke(t.ID); err != nil {
@@ -309,16 +338,20 @@ func (s *Sandbox) revokeForge() error {
 			}
 		}
 	}
-	rt.UnbindCredential(s.forgeProvider(f))
-	os.Remove(s.path("forge.id"))
-	return nil
+	return os.Remove(s.path("forge.minting"))
 }
 
 // pauseForge revokes the token and keeps the binding: the stopped sandbox
 // still refers to it, resumeForge fills it again.
 func (s *Sandbox) pauseForge() error {
 	f, id := s.forge(), s.read("forge.id")
-	if f == nil || id == "" {
+	if f == nil {
+		return nil
+	}
+	if err := s.revokeUnrecorded(f); err != nil {
+		return err
+	}
+	if id == "" {
 		return nil
 	}
 	if err := f.Revoke(id); err != nil {
@@ -338,7 +371,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 	if err != nil {
 		return err
 	}
-	tok, id, err := f.Mint(tokenLabel(s.Name), paths, perms)
+	tok, id, err := s.mint(f, paths, perms)
 	if err != nil {
 		return fmt.Errorf("%s: %w", f.Name(), err)
 	}
@@ -346,7 +379,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 		f.Revoke(id)
 		return err
 	}
-	return s.write("forge.id", id, 0o600)
+	return s.recordToken(id)
 }
 
 // renewForge re-mints the token of a running sandbox when it expires within
@@ -369,7 +402,7 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 	if err != nil {
 		return err
 	}
-	tok, nid, err := f.Mint(tokenLabel(s.Name), paths, perms)
+	tok, nid, err := s.mint(f, paths, perms)
 	if err != nil {
 		return fmt.Errorf("%s: %w", f.Name(), err)
 	}
@@ -383,7 +416,7 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 		f.Revoke(nid)
 		return err
 	}
-	if err := s.write("forge.id", nid, 0o600); err != nil {
+	if err := s.recordToken(nid); err != nil {
 		return err
 	}
 	// The sandbox polls provider revisions; keep the old token valid until new
