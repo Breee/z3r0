@@ -77,6 +77,9 @@ func TestCheckArgs(t *testing.T) {
 		if strings.HasPrefix(cmd, "ctx ") {
 			continue
 		}
+		if n := strings.Count(usageText, "\n"); n > 30 {
+			t.Fatalf("usage text has %d lines, want at most 30", n)
+		}
 		if !strings.Contains(usageText, "\n  "+cmd) {
 			t.Errorf("%s is not in the usage text", cmd)
 		}

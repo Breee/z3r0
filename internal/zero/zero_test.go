@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -1357,5 +1358,36 @@ func TestDoctorLines(t *testing.T) {
 	fake("echo '" + export + "'")
 	if p := modelLogin(); p != "" {
 		t.Errorf("login present: %q", p)
+	}
+}
+
+func TestPolicyState(t *testing.T) {
+	top := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", top).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	s := &Sandbox{Name: "zero-x", State: t.TempDir(), Folders: []string{top}}
+	if got := s.policyState(); got != "ok" {
+		t.Errorf("no file, nothing approved: got %s, want ok", got)
+	}
+	os.MkdirAll(filepath.Join(top, ".zero"), 0o755)
+	file := filepath.Join(top, ".zero", "policy.yaml")
+	os.WriteFile(file, []byte("network:\n  allow: [a.example]\n"), 0o644)
+	if got := s.policyState(); got != "changed" {
+		t.Errorf("host not approved: got %s, want changed", got)
+	}
+	p, err := s.loadPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.saveApproved(p); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.policyState(); got != "ok" {
+		t.Errorf("approved: got %s, want ok", got)
+	}
+	os.WriteFile(file, []byte("nonsense: 1\n"), 0o644)
+	if got := s.policyState(); got != "changed" {
+		t.Errorf("file that cannot be read: got %s, want changed", got)
 	}
 }

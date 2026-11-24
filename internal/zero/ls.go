@@ -55,16 +55,21 @@ func loadOverview() (*overview, error) {
 			forges[f.Name()+"@"+f.Host()] = f
 		}
 	}
-	var warn []string
-	tokens := map[string][]Token{}
-	for k, f := range forges {
-		toks, err := f.Tokens()
-		if err != nil {
-			warn = append(warn, fmt.Sprintf("%s tokens not listed: %v", k, err))
-			continue
-		}
-		tokens[k] = toks
+	// The forges are asked while the gateways are: they take the longest.
+	type listed struct {
+		toks []Token
+		err  error
 	}
+	asked := map[string]chan listed{}
+	for k, f := range forges {
+		ch := make(chan listed, 1)
+		asked[k] = ch
+		go func() {
+			toks, err := f.Tokens()
+			ch <- listed{toks, err}
+		}()
+	}
+	var warn []string
 
 	// Sandboxes per gateway ("" = default).
 	sandboxes := map[string][]string{}
@@ -83,6 +88,16 @@ func loadOverview() (*overview, error) {
 			}
 			sandboxes[gw] = l
 		})
+	}
+
+	tokens := map[string][]Token{}
+	for _, k := range slices.Sorted(mapKeys(asked)) {
+		l := <-asked[k]
+		if l.err != nil {
+			warn = append(warn, fmt.Sprintf("%s tokens not listed: %v", k, l.err))
+			continue
+		}
+		tokens[k] = l.toks
 	}
 
 	var rows []wsRow
@@ -117,11 +132,8 @@ func loadOverview() (*overview, error) {
 			}
 		}
 		policy := "-"
-		if lines := strings.Split(readState(dir, "policy.sha"), "\n"); len(lines[0]) >= 6 {
-			policy = lines[0][:6]
-			if slices.ContainsFunc(lines, func(l string) bool { return slices.Contains(strings.Fields(l), "dirty") }) {
-				policy += " dirty"
-			}
+		if fileExists(filepath.Join(dir, "policy.sha")) {
+			policy = c.sandbox(n).policyState()
 		}
 		rows = append(rows, wsRow{Name: n, Status: status, Token: token, Policy: policy,
 			Folders: len(c.Workspaces[n].Folders), Current: n == c.Current})
@@ -129,10 +141,37 @@ func loadOverview() (*overview, error) {
 	return &overview{c, rows, tokens, liveTokens, sandboxes, dirs, warn}, nil
 }
 
+// policyState compares the policy in the workspace's folders with the one
+// the sandbox runs with: "ok", or "changed" until the next zero up applies it
+// (also when the policy cannot be read; zero up says why).
+func (s *Sandbox) policyState() string {
+	p, err := s.loadPolicy()
+	if err != nil {
+		return "changed"
+	}
+	old := &Policy{Capabilities: defaultCaps}
+	if b, err := os.ReadFile(s.path("policy.approved")); err == nil {
+		if old, err = parsePolicy(b); err != nil {
+			return "changed"
+		}
+	}
+	same := func(a, b []string) bool {
+		return slices.Equal(slices.Sorted(slices.Values(a)), slices.Sorted(slices.Values(b)))
+	}
+	if same(old.Capabilities, p.Capabilities) && same(old.Network.Allow, p.Network.Allow) {
+		return "ok"
+	}
+	return "changed"
+}
+
+// lsLegend explains the table; it goes to stderr, the rows stay as they are
+// for scripts.
+const lsLegend = "legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = zero up applies the folders' .zero/policy.yaml"
+
 // writeRows prints the workspace table.
 func writeRows(out io.Writer, rows []wsRow) error {
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "  NAME\tSTATUS\tFOLDERS\tTOKEN\tPOLICY")
+	fmt.Fprintln(tw, "  WORKSPACE\tSTATUS\tFOLDERS\tTOKEN\tPOLICY")
 	for _, r := range rows {
 		mark := " "
 		if r.Current {
@@ -159,6 +198,11 @@ func Ls(out io.Writer) error {
 		n, ok := strings.CutPrefix(sb, "zero-")
 		return ok && c.Workspaces[n] != nil
 	}
+	// What takes a leftover away: adopting it as a workspace and deleting that.
+	adopt := func(sb string) string {
+		n := strings.TrimPrefix(sb, "zero-")
+		return fmt.Sprintf("; to remove it: zero ctx new %s PATH && zero ctx rm %s", n, n)
+	}
 	var orphans []string
 	suffix := tokenLabel("")
 	for _, k := range slices.Sorted(mapKeys(tokens)) {
@@ -167,37 +211,38 @@ func Ls(out io.Writer) error {
 			if !ok || !strings.HasPrefix(name, "zero-") || liveTokens[k+"/"+t.ID] {
 				continue
 			}
-			why := "no sandbox"
+			why := "no sandbox); zero-cp revokes it within 10 minutes, else revoke it on the forge"
 			if readState(filepath.Join(stateRoot(), name), "forge.id") == t.ID {
-				why = "no workspace"
+				why = "no workspace)" + adopt(name)
 			}
-			orphans = append(orphans, fmt.Sprintf("token %s %s (%s)", t.ID, t.Name, why))
+			orphans = append(orphans, fmt.Sprintf("token %s %s (%s", t.ID, t.Name, why))
 		}
 	}
 	for _, gw := range []string{"", vmGateway} {
 		for _, sb := range sandboxes[gw] {
 			if strings.HasPrefix(sb, "zero-") && !known(sb) {
-				orphans = append(orphans, fmt.Sprintf("sandbox %s (no workspace)", sb))
+				orphans = append(orphans, fmt.Sprintf("sandbox %s (no workspace)%s", sb, adopt(sb)))
 			}
 		}
 	}
 	for _, d := range dirs {
 		if fi, err := os.Stat(d); err == nil && fi.IsDir() && !known(filepath.Base(d)) {
-			orphans = append(orphans, fmt.Sprintf("state %s (no workspace)", d))
+			orphans = append(orphans, fmt.Sprintf("state %s (no workspace)%s", d, adopt(filepath.Base(d))))
 		}
 	}
 	staged, _ := filepath.Glob(filepath.Join(inputRoot, "zero-*"))
 	for _, d := range staged {
 		if !known(filepath.Base(d)) {
-			orphans = append(orphans, fmt.Sprintf("input copy %s (no workspace)", d))
+			orphans = append(orphans, fmt.Sprintf("input copy %s (no workspace)%s", d, adopt(filepath.Base(d))))
 		}
 	}
 	for _, o := range orphans {
-		fmt.Fprintf(out, "orphans: %s\n", o)
+		fmt.Fprintf(out, "leftover: %s\n", o)
 	}
 	for _, w := range warn {
 		fmt.Fprintf(out, "warning: %s\n", w)
 	}
+	fmt.Fprintln(os.Stderr, lsLegend)
 	return nil
 }
 

@@ -99,7 +99,7 @@ func Switch(in, out *os.File, args []string) error {
 	if err := c.save(); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "ctx: %s (switch)\n", name)
+	fmt.Fprintf(os.Stderr, "workspace: %s (switch)\n", name)
 	return nil
 }
 

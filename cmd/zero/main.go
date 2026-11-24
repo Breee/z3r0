@@ -14,36 +14,36 @@ import (
 	"github.com/Breee/z3r0/internal/zero"
 )
 
-const usageText = `zero: per-repo OpenShell sandbox with opencode serve inside; host opencode attaches.
+const usageText = `zero: an opencode agent in a sandbox per workspace; it pushes only to its own branch.
 
-Usage: zero [-c WORKSPACE] <command>
-  up            create-or-reuse sandbox, clone repo in (first time only), start serve + forward
-  up --vm       same, new sandbox as MicroVM (gateway openshell-vm; or Z3R0_DRIVER=vm)
-  up --approve  accept a wider .zero/policy.yaml without the y/N question
-  up --max-input MiB  size limit for input folders (default 100)
-  attach        up + opencode TUI attached to the sandbox
-  run <prompt>  up + one-shot opencode run against the sandbox
-  code          up + VS Code Remote-SSH on the same sandbox (Copilot runs inside)
-  web           up + open the opencode web UI in the browser
-  status        show sandbox / forward / serve state
-  stop          end the host port forward (sandbox keeps running)
-  logs [-f]     opencode service log from inside the sandbox
+Usage: zero [-c WORKSPACE] COMMAND
+Work in the workspace
+  up [--approve] [--vm] [--max-input MiB]  create or continue the sandbox
+  attach        up, then opencode in this terminal
+  web           up, then opencode in the browser
+  code          up, then VS Code on the sandbox
+  run PROMPT    up, then one prompt
+  status        sandbox, token, policy and forward
+  logs [-f]     opencode log of the sandbox
+  stop          end the port forward; the sandbox keeps running
   pause         stop the sandbox and revoke its token; files stay, zero up continues
-  rm [-y]       stop + delete sandbox; lists work not pushed, asks for the workspace name
-  ls            all workspaces with status, token, policy; leftovers without a workspace
-  switch [NAME] make NAME the current workspace; without NAME pick it from the ls list
-  ctx           list workspaces (* current, + here); ctx use NAME | new NAME [PATH...] |
-                add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt
-  completion bash  bash completion for commands and workspace names: source <(zero completion bash)
-  install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
-  doctor        check host setup and, inside a repo, forge guardrails
+  rm [-y]       delete the sandbox, after listing work not pushed; the workspace is kept
+Workspaces
+  ls            all workspaces with status, token, policy; leftovers
+  switch [NAME] make NAME the current workspace; without NAME pick from the list
+  ctx           list workspaces with folders; ctx new NAME [PATH...] | add [PATH...] |
+                remove [PATH...] | rm [-y] NAME | use NAME | --prompt
+This machine
+  install       (sudo) set up the host
+  doctor        check the host and, inside a repository, its forge
   version       version of this build
   help          this text
-
-An option or argument a command does not know is refused (exit 2) before anything runs.
-
-The workspace is picked by -c, then ZERO_CONTEXT, then the current folder, then
-zero ctx use. zero up in a git repo without a workspace creates one.
+  completion bash  bash completion: source <(zero completion bash)
+Examples
+  cd ~/repos/app && zero attach      zero -c app status      zero up --approve
+  zero ctx new both ~/repos/api ~/repos/web      zero switch both
+The workspace is -c, else ZERO_CONTEXT, else the one of the current folder, else the current one.
+Exit codes: 0 done, 1 failed, 2 wrong command or option (nothing ran).
 `
 
 const bashCompletion = `_zero() {

@@ -60,7 +60,7 @@ First match wins:
 Exception (built in #75): `zero up|web|code|attach|run` inside a git repo that belongs to no workspace creates a new workspace for that repo instead of acting on `current`.
 
 Every command that acts on a workspace prints its first line to stderr:
-`ctx: team (cwd)` — source is one of `flag`, `env`, `cwd`, `current`, `new`.
+`workspace: team (cwd)` — source is one of `flag`, `env`, `cwd`, `current`, `new`.
 
 cwd ambiguity (folder in several workspaces): if `current` is one of them use it, else fail and list them.
 
@@ -84,13 +84,13 @@ zero ls                          all workspaces + live status + orphans
 `ls` output:
 
 ```
-NAME        STATUS   FOLDERS  TOKEN      POLICY
-* team      running  3        gitlab 20h  a1b2c3
-  developer stopped  1        gitlab 6h   9e841a dirty
-orphans: token 29481100 zero-old@io (no sandbox)
+  WORKSPACE  STATUS   FOLDERS  TOKEN       POLICY
+* team       running  3        gitlab 20h  ok
+  developer  paused   1        gitlab 6h   changed
+leftover: token 29481100 zero-old@io (no sandbox); zero-cp revokes it within 10 minutes, else revoke it on the forge
 ```
 
-Built in #79. STATUS is `running`, `stopped` (paused), `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is the commit of the first repo folder's policy file, `dirty` if any folder had uncommitted policy changes. One `orphans:` line per leftover: a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy without a workspace. `zero ls` only lists; `zero-cp` revokes tokens without a sandbox.
+Built in #79, columns and leftover lines changed in #145. STATUS is `running`, `paused`, `none` or `unknown` (gateway not reachable). TOKEN is the forge and the time left (`none`: the recorded token is gone; `unknown`: the forge did not answer). POLICY is `ok`, or `changed` when the policy in the folders differs from the one the sandbox runs with (the next `zero up` applies it), `-` without a sandbox. One `leftover:` line per thing without a workspace, with the commands that remove it: a zero token of this host that no workspace uses (`no sandbox`, or `no workspace` when its sandbox is still there), a `zero-*` sandbox, a state directory or an input copy. `zero ls` only lists; `zero-cp` revokes tokens without a sandbox. A legend line goes to stderr.
 
 ## 5. Examples
 
@@ -99,7 +99,7 @@ Built in #79. STATUS is `running`, `stopped` (paused), `none` or `unknown` (gate
 ```
 $ cd ~/src/api
 $ zero up
-ctx: api (new)
+workspace: api (new)
 zero-api ready: http://127.0.0.1:31234 dir /tmp/zero/api
 ```
 
@@ -110,7 +110,7 @@ No context matched → workspace `api` created from cwd, set current. Same as to
 ```
 $ zero ctx new team ~/src/api ~/src/web
 $ zero up
-ctx: team (current)
+workspace: team (current)
 zero-team ready: http://127.0.0.1:31240 dir /tmp/zero/api /tmp/zero/web
 $ zero status
 ...
@@ -124,7 +124,7 @@ Sandbox layout: `/tmp/zero/api`, `/tmp/zero/web`. One GitLab token with `project
 ```
 $ zero ctx add ~/notes/specs
 $ zero up
-ctx: team (current)
+workspace: team (current)
 input specs: 14 files, 220 KiB, read-only
   excluded: .env (secret pattern)
 zero-team ready: http://127.0.0.1:31240 dir /tmp/zero/api /tmp/zero/web /tmp/zero-input/specs
@@ -137,7 +137,7 @@ zero copies the folder, filtered, to `/var/lib/zero/input/<sandbox>/specs` on th
 ```
 $ zero ctx add ~/src/infra
 $ zero up
-ctx: team (current)
+workspace: team (current)
 policy widens for zero-team:
   + network registry.terraform.io
   + capability gitlab.pipeline.read
@@ -152,7 +152,7 @@ Live: clone, new token (#70 rotate flow), egress added. The prompt lists new hos
 ```
 $ zero ctx remove ~/src/infra
 $ zero up
-ctx: team (current)
+workspace: team (current)
 gitlab token: rotated (api, web)
 /tmp/zero/infra: unpushed: feat/x (1 commits) -> kept in sandbox, not reachable via token
 ```
@@ -165,7 +165,7 @@ Token narrowing is immediate; the push gate refuses the removed repo at once. Eg
 $ zero ctx use team
 $ cd /tmp/opencode/developer
 $ zero status
-ctx: developer (cwd)
+workspace: developer (cwd)
 ```
 
 ### 5.7 Destructive command
@@ -173,7 +173,7 @@ ctx: developer (cwd)
 ```
 $ cd ~
 $ zero rm
-ctx: team (current)
+workspace: team (current)
 unpushed: api: feat/login (2 commits), uncommitted changes (1 files); web: none
 type workspace name to delete: team
 removed zero-team
@@ -200,7 +200,7 @@ Use git worktrees on the host: `~/src/api` and `~/src/api-hotfix` are different 
 
 ```
 $ zero up
-ctx: team (current)
+workspace: team (current)
 zero: folder /home/bree/src/web missing; zero ctx remove it or restore it
 ```
 

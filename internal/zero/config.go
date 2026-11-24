@@ -213,7 +213,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 			return nil, err
 		}
 	}
-	fmt.Fprintf(os.Stderr, "ctx: %s (%s)\n", name, source)
+	fmt.Fprintf(os.Stderr, "workspace: %s (%s)\n", name, source)
 	s := c.sandbox(name)
 	seen := map[string]string{}
 	for _, f := range s.Folders {
@@ -336,6 +336,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			}
 			fmt.Fprintf(out, "%s %-20s %s\n", mark, n, strings.Join(c.Workspaces[n].Folders, " "))
 		}
+		fmt.Fprintln(os.Stderr, "legend: * current workspace, + workspace of this folder")
 		return nil
 	case "--prompt":
 		if name, _, err := c.resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd); err == nil {

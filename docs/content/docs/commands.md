@@ -20,7 +20,7 @@ The first match wins:
 Every command that acts on a workspace prints the workspace and where it came from as its first line:
 
 ```
-ctx: developer (cwd)
+workspace: developer (cwd)
 ```
 
 `zero up`, `attach`, `run`, `code` and `web` in a git repository that belongs to no workspace create a new workspace for it.
@@ -44,7 +44,7 @@ zero status
 ```
 
 ```
-ctx: developer (cwd)
+workspace: developer (cwd)
 sandbox zero-developer: up
 forward: off
 gitlab token: corewire/technology-and-research/developer, corewire/technology-and-research/developer2; capabilities: git.read, git.commit, git.push, gitlab.issue.read, gitlab.mr.read, gitlab.pipeline.read
@@ -96,11 +96,21 @@ zero ls
 ```
 
 ```
-  NAME       STATUS   FOLDERS  TOKEN       POLICY
-* developer  running  2        gitlab 27h  9e841a
+  WORKSPACE  STATUS   FOLDERS  TOKEN       POLICY
+  developer  running  2        gitlab 38h  ok
+* z3r0       none     1        -           -
+legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = zero up applies the folders' .zero/policy.yaml
 ```
 
-`TOKEN` is the time until the token expires, `POLICY` the commit the policy was read from.
+`STATUS` is `running`, `paused`, `none` (no sandbox) or `unknown` (gateway not reachable). `POLICY` is `changed` when the `.zero/policy.yaml` in the folders differs from what the sandbox runs with; the next `zero up` applies it. The legend goes to the error output, so a script reads rows only.
+
+What is left over without a workspace gets a line each, with the commands that remove it:
+
+```
+leftover: state /home/bree/.local/state/zero/zero-left145 (no workspace); to remove it: zero ctx new left145 PATH && zero ctx rm left145
+```
+
+A token without a sandbox is revoked by `zero-cp` within 10 minutes.
 
 `zero switch` only changes the current workspace. It never starts or removes a sandbox.
 
@@ -129,3 +139,11 @@ A folder whose name starts with `-` is written as `./-name`.
 | `~/.config/zero/config.yaml` | workspaces, their folders and tools, the current workspace |
 | `~/.local/state/zero/zero-<name>/` | state of one sandbox (token id, capabilities, push gate log `gate.log`) |
 | `.zero/policy.yaml` in a repository | [policy](../policy) of the project |
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | done; also `zero status` and `zero ls` when there is no sandbox |
+| 1 | failed; the message says why and names the next command |
+| 2 | wrong command, option or argument; nothing ran |
