@@ -422,7 +422,7 @@ func (s *Sandbox) Web(out io.Writer) error {
 		return err
 	}
 	if err := s.webSession(); err != nil {
-		fmt.Fprintf(out, "web: no session prepared (%v); in the browser: Add project, %s\n", err, s.Dir)
+		fmt.Fprintf(out, "web: no session prepared (%v); in the browser: Add project, %s\n", err, clean(s.Dir))
 	}
 	text, err := s.ssh("opencode pair --url " + shellQuote(s.url(port)))
 	if err != nil {
