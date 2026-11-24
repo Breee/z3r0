@@ -49,6 +49,7 @@ sudo zero doctor   # also checks the gateway's credential store
 ```
 
 ```
+zero 4e756bd3724e 2026-11-24
 skip  credential store: run `sudo zero doctor`
 ok    openshell gateway
 ok    gateway user
@@ -57,7 +58,7 @@ ok    zero-cp
 ok    guardrails corewire/technology-and-research/developer
 ```
 
-The `guardrails` line appears inside a repository only: there `zero doctor` also checks the GitLab project. It reports a default branch that allows direct or force push, merging without a green pipeline and CI variables that are not protected. These settings are what keeps a pushed branch from doing damage, so fix them before the agent works on the project.
+The first line is the version of the build. The `guardrails` line appears inside a repository only: there `zero doctor` also checks the GitLab project. It reports a default branch that allows direct or force push, merging without a green pipeline and CI variables that are not protected. These settings are what keeps a pushed branch from doing damage, so fix them before the agent works on the project.
 
 ## The first workspace
 

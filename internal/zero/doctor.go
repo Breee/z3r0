@@ -26,6 +26,8 @@ func Doctor(out io.Writer) error {
 		fmt.Fprintf(out, "FAIL  %s: %s\n", name, problem)
 	}
 
+	fmt.Fprintf(out, "zero %s\n", Version())
+
 	// The gateway state belongs to the dedicated user; only root can read it.
 	if os.Getuid() == 0 {
 		check("credential store", credentialStore())

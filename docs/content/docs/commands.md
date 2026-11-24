@@ -100,6 +100,14 @@ zero ls
 | `sudo zero install` | sets up the gateway, podman and `zero-cp`; see [Getting started](../getting-started) |
 | `zero doctor` | checks the host setup and, inside a repository, the GitLab project settings |
 | `zero completion bash` | prints bash completion: `source <(zero completion bash)` |
+| `zero version` | prints the commit and date this build was made from; `zero --version` does the same |
+
+A command refuses an option or argument it does not know and exits with 2 before it starts anything:
+
+```
+$ zero up --bogus
+zero up: unknown option "--bogus" (options: --approve, --vm, --max-input N)
+```
 
 ## Files
 

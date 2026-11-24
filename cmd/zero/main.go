@@ -37,6 +37,9 @@ Usage: zero [-c WORKSPACE] <command>
   completion bash  bash completion for commands and workspace names: source <(zero completion bash)
   install       (sudo) gateway + rootless podman under user openshell, pinned OpenShell
   doctor        check host setup and, inside a repo, forge guardrails
+  version       version of this build
+
+An option or argument a command does not know is refused (exit 2) before anything runs.
 
 The workspace is picked by -c, then ZERO_CONTEXT, then the current folder, then
 zero ctx use. zero up in a git repo without a workspace creates one.
@@ -50,7 +53,7 @@ const bashCompletion = `_zero() {
     ctx)
       COMPREPLY=($(compgen -W "use new add remove rm" -- "$cur")) ;;
     zero)
-      COMPREPLY=($(compgen -W "up attach run code web status stop logs pause rm ls switch ctx install doctor completion" -- "$cur")) ;;
+      COMPREPLY=($(compgen -W "up attach run code web status stop logs pause rm ls switch ctx install doctor version completion" -- "$cur")) ;;
   esac
 }
 complete -F _zero zero
@@ -70,6 +73,22 @@ func main() {
 	switch cmd {
 	case "-h", "--help", "help":
 		fmt.Print(usageText)
+		return
+	case "--version":
+		cmd = "version"
+	}
+	if _, ok := argSpecs[cmd]; !ok && cmd != "run" {
+		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
+		fmt.Fprint(os.Stderr, usageText)
+		os.Exit(2)
+	}
+	if err := checkArgs(cmd, args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	switch cmd {
+	case "version":
+		fmt.Println("zero", zero.Version())
 		return
 	case "install":
 		if err := zero.Install(); err != nil {
@@ -92,8 +111,9 @@ func main() {
 		}
 		return
 	case "completion":
-		if len(args) != 1 || args[0] != "bash" {
-			fatal(fmt.Errorf("usage: zero completion bash"))
+		if args[0] != "bash" {
+			fmt.Fprintln(os.Stderr, "usage: zero completion bash")
+			os.Exit(2)
 		}
 		fmt.Print(bashCompletion)
 		return
@@ -104,11 +124,6 @@ func main() {
 		return
 	}
 
-	if !slices.Contains([]string{"up", "attach", "run", "code", "web", "status", "stop", "logs", "pause", "rm"}, cmd) {
-		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
-		fmt.Fprint(os.Stderr, usageText)
-		os.Exit(2)
-	}
 	create := slices.Contains([]string{"up", "attach", "run", "code", "web"}, cmd)
 	z, err := zero.Open(ctx, create)
 	if err != nil {
@@ -119,13 +134,7 @@ func main() {
 	case "up":
 		z.Approve = slices.Contains(args, "--approve")
 		if i := slices.Index(args, "--max-input"); i >= 0 {
-			mib := 0
-			if i+1 < len(args) {
-				mib, _ = strconv.Atoi(args[i+1])
-			}
-			if mib <= 0 {
-				fatal(fmt.Errorf("--max-input needs a size in MiB"))
-			}
+			mib, _ := strconv.Atoi(args[i+1])
 			z.MaxInput = int64(mib) << 20
 		}
 		if slices.Contains(args, "--vm") || os.Getenv("Z3R0_DRIVER") == "vm" {
@@ -147,8 +156,7 @@ func main() {
 	case "stop":
 		err = z.Stop(os.Stdout)
 	case "logs":
-		follow := len(args) > 0 && (args[0] == "-f" || args[0] == "--follow")
-		err = z.Logs(os.Stdout, follow)
+		err = z.Logs(os.Stdout, len(args) > 0)
 	case "pause":
 		err = z.Pause(os.Stdout)
 	case "rm":
