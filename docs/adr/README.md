@@ -48,3 +48,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [44](0044-merge-request-creation-needs-ci-run.md) | 2026-11-23 | The agent opens merge requests only where `ci.run` is granted; the push gate refuses push options | Z-INV-1, Z-INV-2 |
 | [45](0045-ci-run-skips-while-the-branch-changes-the-pipeline-definition.md) | 2026-11-23 | With `ci.run` the push gate skips the pipeline while the session branch changes a pipeline definition file | Z-INV-1..3 |
 | [46](0046-forge-egress-limited-to-the-workspaces-projects.md) | 2026-11-23 | The sandbox reaches the forge host for the workspace's projects only; the token profile has no endpoint; no MCP endpoint in the sandbox | Z-INV-1, Z-INV-2, Z-INV-5 |
+| [47](0047-personal-fine-grained-token-stays.md) | 2026-11-24 | The sandbox token stays a fine-grained token of the developer; service account mode not tested, not built | Z-INV-2..4 |

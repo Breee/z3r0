@@ -1,6 +1,6 @@
 # Gitops manifesto: the practices zero assumes
 
-Status: draft 2, 2026-11-19, #125. Rules come from the sources in section 9; none is tested by zero unless the
+Status: draft 2, 2026-11-19, section 6 and 8 brought to the state of 2026-11-24, #125. Rules come from the sources in section 9; none is tested by zero unless the
 "zero" column says so.
 Related: [scenarios/kubernetes-hardening.md](scenarios/kubernetes-hardening.md) (example manifests),
 [scenarios/kubernetes-access.md](scenarios/kubernetes-access.md), [scenarios/platform-engineer-usecases.md](scenarios/platform-engineer-usecases.md),
@@ -186,8 +186,8 @@ What zero does so that the rules above are enough. Details in [architecture/28-t
 
 | # | zero does | Closes | Status |
 |---|---|---|---|
-| Z1 | The agent pushes only to its session branch `zero/<name>`; no delete, no other ref. | [P25](attack-paths.md#p25) | built (push gate) |
-| Z2 | No agent push and no merge request opened by the agent starts a pipeline unless the policy grants `ci.run`. | [P14](attack-paths.md#p14) | built; the agent cannot open a merge request without `ci.run` (ADR 0044); with `ci.run` no pipeline starts while the session branch changes a pipeline definition file (ADR 0045) |
+| Z1 | The agent pushes only to its session branch `zero/<name>` and to refs below it; no delete, no other ref. | [P25](attack-paths.md#p25) | built (push gate) |
+| Z2 | No agent push and no merge request opened by the agent starts a pipeline unless the policy grants `ci.run`. | [P14](attack-paths.md#p14) | built; the agent cannot open a merge request without `ci.run` (ADR 0044); with `ci.run` no pipeline starts while the session branch changes a pipeline definition file (ADR 0045). Not covered: a merge request that a human opens for the agent's branch starts a merge request pipeline with the agent's code; from there gate 2 rests on C1 to C9, not on Z2 |
 | Z3 | A policy change that widens rights is shown and needs the human's approval. | [P16](attack-paths.md#p16) | built |
 | Z4 | Input folders are copied without files that look like credentials. | [P34](attack-paths.md#p34) | built |
 | Z5 | The agent's forge token cannot merge, approve or change project settings, and covers only the workspace's projects. | - | built |
@@ -217,7 +217,9 @@ What the human at the workstation does:
 - Candidates, in this order: F9 and F10 (code owners exist, are required, cover the control files), F4 to F8
   (approval settings), C2, C6, C12, C13, D1 to D4, K2, K3, K4 and K6 (only in namespaces that a zero policy grants
   to the agent), K11, G4.
-- zero does not check gates 4 and 5 today. It has no access to the delivery system or the cluster.
+- F and C candidates and G4 can be read through the forge API zero already uses. D1 to D4, K2, K3, K4, K6 and K11
+  cannot: zero has no access to the delivery system or the cluster today, so gates 4 and 5 are not checked and these
+  candidates need that access first (Kubernetes access: #123).
 
 ## 9. Sources
 
@@ -234,7 +236,7 @@ Read on 2026-11-19. A rule that names no attack path rests on these.
 | Kubernetes: [RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/), [good practices for Secrets](https://kubernetes.io/docs/concepts/security/secrets-good-practices/), [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) | K1, K2, K5, K11, K12 |
 | External Secrets: [security best practices](https://external-secrets.io/latest/guides/security-best-practices/) | K7, K8 |
 
-C3 to C5, C8, C9 and G6 rest on common runner and forge practice, not on a page read for this file.
+C3 to C5, C8, C9, F3, G4, G6 and K13 rest on common runner, forge and cluster practice, not on a page read for this file; their reason is the risk column.
 
 Not read: NSA/CISA Kubernetes Hardening Guide, SLSA source track, Kargo and Argo CD ApplicationSet security pages.
 
