@@ -4,12 +4,11 @@ zero runs a coding agent in a sandbox on your machine. The agent works on a copy
 
 ## Quick start
 
-Needs Linux on x86_64 with systemd, `podman`, `go`, `glab` (logged in) and `opencode` (connected to GitHub Copilot).
+Needs Linux on x86_64 with systemd, `podman`, `go`, `make`, `glab` (logged in) and `opencode` (connected to GitHub Copilot).
 
 ```sh
 git clone https://github.com/Breee/z3r0 && cd z3r0
-mkdir -p bin
-make install   # builds bin/zero and bin/zero-cp, then sudo bin/zero install
+make install   # as your user, not with sudo: builds bin/zero and bin/zero-cp, then runs sudo bin/zero install
 zero doctor
 
 cd ~/src/your-gitlab-project

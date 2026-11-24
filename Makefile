@@ -1,6 +1,7 @@
 .PHONY: build install test
 
 build:
+	mkdir -p bin
 	go build -o bin/zero ./cmd/zero
 	go build -o bin/zero-cp ./cmd/zero-cp
 

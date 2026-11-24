@@ -10,7 +10,7 @@ description: Install zero and start the first workspace.
 |---|---|
 | Linux on x86_64 with systemd | the installer pins OpenShell binaries for this platform |
 | `podman`, `newuidmap`, `newgidmap`, `curl` | Debian/Ubuntu: `apt install podman uidmap passt curl` |
-| `go` 1.26 | to build zero |
+| `go` 1.26, `make` | to build zero |
 | `glab`, logged in to your GitLab host | zero creates the agent's token with it |
 | `opencode`, connected to GitHub Copilot | the terminal UI on the host; the sandbox uses its Copilot login for the model |
 
@@ -24,8 +24,7 @@ glab auth login --hostname gitlab.com --use-keyring
 
 ```sh
 git clone https://github.com/Breee/z3r0 && cd z3r0
-mkdir -p bin
-make install   # builds bin/zero and bin/zero-cp, then sudo bin/zero install
+make install   # as your user, not with sudo: builds bin/zero and bin/zero-cp, then runs sudo bin/zero install
 ```
 
 `zero install` can be run again at any time. It does this:
