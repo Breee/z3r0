@@ -1,4 +1,4 @@
-# LiteLLM proxy without a database: models and key come from this file and the environment.
+# LiteLLM proxy: models, credentials and key come from this file and the environment.
 model_list:
   # Stand-in backend of this PoC: answers at once, used for the measurements.
   - model_name: claude-stand-in
@@ -6,13 +6,24 @@ model_list:
       model: openai/stand-in
       api_base: http://backend:18101/v1
       api_key: none
-  # GitHub Copilot: needs the device login once (see README), token kept in the mounted folder.
-  - model_name: claude-copilot
+  # Each user connects their own GitHub account (LLM Credentials > Your connections)
+  # and can use every Copilot model of their own plan. Needs the database (compose.ui.yaml).
+  - model_name: github_copilot/*
     litellm_params:
-      model: github_copilot/claude-haiku-4.5
+      model: github_copilot/*
+      litellm_credential_name: github-copilot
+      github_copilot_auth_type: per_user_oauth
+
+credential_list:
+  - credential_name: github-copilot
+    credential_values:
+      github_copilot_auth_type: per_user_oauth
+    credential_info:
+      custom_llm_provider: github_copilot
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
 
 litellm_settings:
   telemetry: false
+  check_provider_endpoint: true

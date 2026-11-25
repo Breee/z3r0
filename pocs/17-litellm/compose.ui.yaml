@@ -1,0 +1,25 @@
+# Adds a database, which the LiteLLM web UI (http://127.0.0.1:4000/ui/) needs. Used by `UI=1 ./run.sh`.
+services:
+  db:
+    # 17-alpine
+    image: docker.io/library/postgres@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_DB: litellm
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?set by run.sh}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litellm"]
+      interval: 2s
+      retries: 30
+
+  litellm:
+    environment:
+      DATABASE_URL: postgresql://litellm:${PG_PASSWORD:?set by run.sh}@db:5432/litellm
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db:
