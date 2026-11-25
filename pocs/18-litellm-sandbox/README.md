@@ -2,7 +2,7 @@
 
 Question: can a sandbox get its models and its MCP tools through one LiteLLM proxy with a key of its own, with the model list taken from LiteLLM and the tool list set per key?
 
-Result (2026-11-25, LiteLLM v1.110.3 with Postgres, opencode 2.2.6, OpenShell 0.1.8, Docker 29.5.2): **yes, with three things zero would have to do and two findings against it.** The proxy part runs by `run.sh` (21 PASS, 0 FAIL, 1 NOTE). The sandbox part was run by hand once and is marked so.
+Result (2026-11-25, LiteLLM v1.110.3 with Postgres, opencode 2.2.6, OpenShell 0.1.8, Docker 29.5.2): **yes, with three things zero would have to do and two findings against it.** The proxy part runs by `run.sh` (20 PASS, 0 FAIL, 1 NOTE). The sandbox part was run by hand once and is marked so.
 
 ## Chain
 
@@ -60,7 +60,7 @@ Only what was run. No claim beyond it.
 
 | Data flow | Shown |
 |---|---|
-| Personal data to the model provider | partly: masked or refused when a pattern or word list finds it (mail address shown). Free text without a pattern is not found; that needs Presidio (own containers, not run) |
+| Personal data to the model provider | partly: masked or refused when a pattern or word list finds it (mail address shown). Free text without a pattern is not found; that needs Presidio (own containers, not run; [docs](https://docs.litellm.ai/docs/proxy/guardrails/pii_masking_v2)) |
 | Personal data to tools | partly: blocked word refused on a tool call; masking on tool calls not run |
 | Personal data to the forge | not covered: git and forge traffic does not pass LiteLLM |
 | Record of what was sent | not looked at |
@@ -72,14 +72,15 @@ Only what was run. No claim beyond it.
 |---|---|---|
 | Models | fits: one key, one list, provider login stays outside | provider login in the sandbox as today |
 | MCP tool list | works, but needs Postgres, and identity is a key in the sandbox | agentgateway (ADR 0043, PoC 15): identity by SPIFFE, no database, list per request from zero-cp |
-| Guardrails | fits: declared in the config, no outside service | none in zero today |
-| Skills, instructions | not run. By the docs: skills only from the database and only for Claude Code and Codex; no delivery of instructions | read-only folder from zero's config |
+| Guardrails | fits for the built-in `litellm_content_filter` used here: declared in the config, no outside service ([docs](https://docs.litellm.ai/docs/proxy/guardrails/litellm_content_filter)). Other guardrails not looked at; by the docs Presidio needs its own containers and secret detection a licence | none in zero today |
+| Skills, instructions | not run. By the docs: skills only from the database and only for Claude Code and Codex; no delivery of instructions ([docs](https://docs.litellm.ai/docs/skills_gateway)) | read-only folder from zero's config |
 
 ## Limits
 
 - Sandbox part by hand, once. VS Code not run.
 - Run with rootful Docker (C57). Tools only against the stand-in server.
-- The sandbox still held zero's own Copilot login; the LiteLLM path does not use it, dropping it was not tried.
+- Not shown: "no provider token in the sandbox" and "model egress is the proxy only". The sandbox still held zero's own Copilot login and its egress rules; the LiteLLM path does not use them, dropping them was not tried.
+- Blocking as it stands: Copilot answers only for keys of the connected LiteLLM user, here the admin, and a key of the admin user without a tool list sees every tool. A workspace key is safe only when it always carries an explicit tool list, or when Copilot is connected as a normal LiteLLM user (not tried).
 - Weight as in PoC 17: 1.36 GB image, about 780 MiB with Postgres.
 
 ## Run

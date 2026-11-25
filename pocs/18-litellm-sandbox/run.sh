@@ -82,8 +82,9 @@ try: u.urlopen(u.Request('http://mcp:18102/mcp', b'{}'))
 except Exception as e: print(e)" 2>/dev/null)" '401'
 
 echo "== guardrails"
-chat "$B" claude-stand-in 'write to jane.doe@example.org please' >/dev/null
-l=$($C logs --tail 5 backend 2>/dev/null)
+M=mark$(date +%s)
+chat "$B" claude-stand-in "$M write to jane.doe@example.org please" >/dev/null
+l=$($C logs backend 2>/dev/null | grep "$M" || true)
 has "mail address masked before the model" "$l" 'EMAIL_REDACTED'
 hasnot "mail address not sent on" "$l" 'jane.doe@example.org'
 has "blocked word refused on a model call" "$(chat "$B" claude-stand-in 'say forbiddenmarker')" "Content blocked"
@@ -92,6 +93,9 @@ has "blocked word refused on a tool call" "$(call "$B" write_note forbiddenmarke
 echo "== keys"
 api /key/delete "{\"keys\":[\"$B\"]}" >/dev/null
 has "deleted key refused" "$(chat "$B" claude-stand-in ping)" 'Authentication Error'
-if $C logs litellm 2>&1 | grep -q -e "$LITELLM_MASTER_KEY" -e "$MCP_UPSTREAM_TOKEN"; then fail "no secret in the proxy log" ""; else pass "no master key or MCP token in the proxy log"; fi
+pl=$($C logs litellm 2>&1)
+if [ -z "$pl" ]; then fail "proxy log readable" ""
+elif printf %s "$pl" | grep -q -e "$LITELLM_MASTER_KEY" -e "$MCP_UPSTREAM_TOKEN"; then fail "no secret in the proxy log" ""
+else pass "no master key or MCP token in the proxy log"; fi
 echo "fails: $fails"
 [ $fails -eq 0 ]
