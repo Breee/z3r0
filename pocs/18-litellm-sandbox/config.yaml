@@ -1,0 +1,57 @@
+model_list:
+  - model_name: claude-stand-in
+    litellm_params:
+      model: openai/stand-in
+      api_base: http://backend:18101/v1
+      api_key: none
+  - model_name: github_copilot/*
+    litellm_params:
+      model: github_copilot/*
+      litellm_credential_name: github-copilot
+      github_copilot_auth_type: per_user_oauth
+
+credential_list:
+  - credential_name: github-copilot
+    credential_values:
+      github_copilot_auth_type: per_user_oauth
+    credential_info:
+      custom_llm_provider: github_copilot
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  require_key_mcp_access_defined: true
+
+litellm_settings:
+  telemetry: false
+  check_provider_endpoint: true
+
+# Tool server behind the proxy. Its credential stays here; keys name the tools they may use.
+mcp_servers:
+  notes:
+    url: "http://mcp:18102/mcp"
+    transport: "http"
+    auth_type: "bearer_token"
+    auth_value: os.environ/MCP_UPSTREAM_TOKEN
+
+guardrails:
+  # Personal data in model calls: mail addresses masked, a marked word refused. No outside service.
+  - guardrail_name: personal-data
+    litellm_params:
+      guardrail: litellm_content_filter
+      mode: "pre_call"
+      default_on: true
+      patterns:
+        - pattern_type: "prebuilt"
+          pattern_name: "email"
+          action: "MASK"
+      blocked_words:
+        - keyword: "forbiddenmarker"
+          action: "BLOCK"
+  - guardrail_name: personal-data-tools
+    litellm_params:
+      guardrail: litellm_content_filter
+      mode: "pre_mcp_call"
+      default_on: true
+      blocked_words:
+        - keyword: "forbiddenmarker"
+          action: "BLOCK"

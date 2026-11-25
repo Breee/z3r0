@@ -1,0 +1,22 @@
+# PoC 18: laid over PoC 17's compose files (same project, same database), adds a stand-in tool server.
+# run.sh sets POC18 to this folder (paths in an overlay file count from the first file's folder).
+services:
+  backend:
+    volumes:
+      - ${POC18:?set by run.sh}/backend.py:/backend.py:ro
+
+  mcp:
+    image: docker.io/library/python@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    command: ["python", "/mcp.py"]
+    environment:
+      MCP_UPSTREAM_TOKEN: ${MCP_UPSTREAM_TOKEN:?set by run.sh}
+    volumes:
+      - ${POC18:?set by run.sh}/mcp.py:/mcp.py:ro
+
+  litellm:
+    environment:
+      MCP_UPSTREAM_TOKEN: ${MCP_UPSTREAM_TOKEN:?set by run.sh}
+    volumes:
+      - ${POC18:?set by run.sh}/config.yaml:/app/config.yaml:ro
+    depends_on:
+      - mcp
