@@ -8,7 +8,7 @@ COMPOSE=${COMPOSE:-podman compose}
 ENGINE=${COMPOSE%% *}
 [ -z "${UI:-}" ] || COMPOSE="$COMPOSE -f compose.yaml -f compose.ui.yaml"
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/zero-poc17
-mkdir -p "$STATE/copilot"
+(umask 077; mkdir -p "$STATE/copilot")
 [ -f "$STATE/key" ] || (umask 077; printf 'sk-%s' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > "$STATE/key")
 [ -f "$STATE/pg" ] || (umask 077; head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$STATE/pg")
 export LITELLM_MASTER_KEY="$(cat "$STATE/key")" COPILOT_DIR="$STATE/copilot" PG_PASSWORD="$(cat "$STATE/pg")"
@@ -34,7 +34,9 @@ sleep 5; stats idle
 J='{"model":"claude-stand-in","max_tokens":16,"messages":[{"role":"user","content":"ping"}]}'
 post() { curl -s -H "authorization: Bearer $2" -H 'content-type: application/json' -d "$J" "$1"; }
 echo "openai form:    $(post $P/v1/chat/completions "$LITELLM_MASTER_KEY" | cut -c1-160)"
-echo "anthropic form: $(post $P/v1/messages "$LITELLM_MASTER_KEY" | tr -d "\n" | grep -o "\"text\": *\"[^\"]*\"" | head -1)"
+a=$(post $P/v1/messages "$LITELLM_MASTER_KEY" | tr -d "\n" | grep -o "\"text\": *\"pong\"" | head -1)
+[ -n "$a" ] || { echo "FAIL no answer in Anthropic form"; exit 1; }
+echo "anthropic form: $a"
 echo "no key:         $(curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json' -d "$J" $P/v1/chat/completions)"
 
 loop() { t=$(ms); i=0; while [ $i -lt 50 ]; do post "$1" "$2" >/dev/null; i=$((i+1)); done; echo $(( ($(ms) - t) / 50 )); }
