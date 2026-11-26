@@ -1,0 +1,19 @@
+# PoC 19: b starts only when a is healthy. Shows whether the container engine runs health checks by itself.
+services:
+  a:
+    image: docker.io/library/python@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    command: ["python", "-m", "http.server", "8000"]
+    stop_signal: SIGKILL
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000')"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+  b:
+    image: docker.io/library/python@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    command: ["sleep", "600"]
+    stop_signal: SIGKILL
+    depends_on:
+      a:
+        condition: service_healthy
