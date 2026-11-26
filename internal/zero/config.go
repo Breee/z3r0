@@ -63,6 +63,11 @@ func loadConfig() (*Config, error) {
 		if !wsNameRe.MatchString(name) || w == nil || len(w.Folders) == 0 {
 			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one folder", configPath(), name)
 		}
+		for _, f := range w.Folders {
+			if filepath.Base(f) == guidanceDir {
+				return nil, fmt.Errorf("%s: workspace %q: a folder cannot be named %s", configPath(), name, guidanceDir)
+			}
+		}
 		if _, err := mcpTools(w.Tools); err != nil {
 			return nil, fmt.Errorf("%s: workspace %q: %w", configPath(), name, err)
 		}

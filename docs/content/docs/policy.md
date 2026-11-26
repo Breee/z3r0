@@ -122,7 +122,8 @@ Limits:
 - Only opencode is told about them. Other tools in the sandbox find the files under `/tmp/zero-input/.zero/` and nothing more.
 - A skill is offered to the model only if its `SKILL.md` has a `description`.
 - They count into the size limit of input folders (`zero up --max-input`), need the folder `zero install` creates, and do not work with `--vm`.
-- What a repository sets in its own `opencode.json` is added to them, not replaced.
+- zero does not touch a repository's own `opencode.json`; opencode combines the lists of both.
+- A path that is a link is followed: the file or folder it points to is copied, under that name.
 - If the sandbox already has an opencode user config that zero did not write, zero leaves it alone and says so.
 
 ## Background

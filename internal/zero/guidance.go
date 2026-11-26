@@ -110,8 +110,10 @@ func (s *Sandbox) syncGuidance(out io.Writer) error {
 	if cur != "" && cur != mine {
 		if want != "" {
 			fmt.Fprintf(out, "instructions and skills: not announced to opencode, the sandbox has an opencode config zero did not write (~/.config/opencode/opencode.json); remove it there and run zero up\n")
+			return nil
 		}
-		return nil
+		fmt.Fprintf(out, "opencode config in the sandbox was changed there (~/.config/opencode/opencode.json); zero leaves it\n")
+		return os.Remove(s.path("opencode.sha"))
 	}
 	if want == "" {
 		if _, err := s.ssh("rm -f " + opencodeConfig); err != nil {
