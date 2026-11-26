@@ -291,6 +291,14 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]string, error
 	if err := rt.SetRule(s.Name, modelRule, modelPolicy()); err != nil {
 		return nil, err
 	}
+	// A sandbox that used the Copilot CLI before the workspace got models
+	// still has the rule to GitHub's model host: it goes.
+	if fileExists(s.path("copilot-cli.rule")) {
+		if err := rt.SetRule(s.Name, copilotRule, nil); err != nil {
+			return nil, err
+		}
+		os.Remove(s.path("copilot-cli.rule"))
+	}
 	if _, err := s.ssh("opencode service set env " + modelKeyEnv + " " + shellQuote(k.Key) + " >/dev/null && opencode service restart >/dev/null"); err != nil {
 		return nil, err
 	}

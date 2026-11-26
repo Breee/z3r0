@@ -146,7 +146,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err := s.syncGuidance(out, models); err != nil {
 		return 0, err
 	}
-	if s.read("copilot") != "" && !fileExists(s.path("copilot-auth.done")) {
+	if s.read("copilot") != "" && len(s.Models) == 0 && !fileExists(s.path("copilot-auth.done")) {
 		if err := s.importCopilotAuth(); err != nil {
 			return 0, err
 		}
@@ -567,7 +567,7 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 // hasModelArg reports whether the arguments for the Copilot CLI name a model.
 func hasModelArg(args []string) bool {
 	for i, a := range args {
-		if a == "--model" && i+1 < len(args) || strings.HasPrefix(a, "--model=") && a != "--model=" {
+		if a == "--model" && i+1 < len(args) && args[i+1] != "" || strings.HasPrefix(a, "--model=") && a != "--model=" {
 			return true
 		}
 	}
@@ -579,8 +579,8 @@ func hasModelArg(args []string) bool {
 // asks GitHub for nothing. The key is read inside the sandbox from the
 // opencode service settings, where zero put it.
 func copilotProxyScript(dir string, args []string) string {
-	key := `python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.config/opencode/service.json")))["env"]["` + modelKeyEnv + `"])'`
-	script := "cd " + shellQuote(dir) + " && KEY=$(" + key + ") && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=" +
+	key := `python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.config/opencode/service.json")))["env"]["` + modelKeyEnv + `"])' 2>/dev/null`
+	script := "cd " + shellQuote(dir) + " && KEY=$(" + key + "); [ -n \"$KEY\" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=" +
 		fmt.Sprintf("http://%s:%d/v1", gateHost, modelPort) + " COPILOT_PROVIDER_API_KEY=\"$KEY\" exec " + copilotBin + " --no-auto-update"
 	for _, a := range args {
 		script += " " + shellQuote(a)
