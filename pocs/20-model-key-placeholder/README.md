@@ -2,7 +2,7 @@
 
 Question: can the LiteLLM key of a sandbox stay outside the sandbox, with only a placeholder inside, the way the forge token does?
 
-Result (2026-11-26, OpenShell 0.1.8, LiteLLM v1.110.3, opencode 2.2.6, Copilot CLI 1.0.116): **yes**, for clients that send the key as `Authorization: Bearer`. `run.sh`: 10 PASS, 0 FAIL, 1 NOTE.
+Result (2026-11-26, OpenShell 0.1.8, LiteLLM v1.110.3, opencode 2.2.6, Copilot CLI 1.0.116): **yes**, for clients that send the key as `Authorization: Bearer`. `run.sh`: 12 PASS, 0 FAIL, 1 NOTE.
 
 ## Sources
 
@@ -30,7 +30,9 @@ client in the sandbox --Bearer <placeholder>--> supervisor (swaps in the key) --
 | Sandbox environment holds a placeholder, not a LiteLLM key | PASS |
 | curl: model list with the placeholder as Bearer | PASS |
 | curl: chat completion answered | PASS |
-| Placeholder in the `x-api-key` header | NOTE: refused by OpenShell, `credential_placement_mismatch` |
+| Placeholder in the `x-api-key` header | NOTE: http 403, body `{"error":"credential_placement_mismatch","message":"Credential is not authorized for this request location"}`. Seen in the run; this error name is not in the v0.1.8 docs (they name `credential_endpoint_mismatch` for a wrong destination). LiteLLM answers 401 for a bad key, so the 403 is OpenShell's |
+| Made-up key (`sk-...`) as Bearer | 401 from the proxy |
+| Real key in the sandbox (every process environment, `/tmp/poc20`, `~/.config`) | not found |
 | No key | PASS: 401 from the proxy |
 | Copilot CLI with the placeholder as `COPILOT_PROVIDER_API_KEY` | PASS: answers |
 | opencode (`--standalone`) with the placeholder as `LITELLM_API_KEY` | PASS: answers |
@@ -41,8 +43,8 @@ client in the sandbox --Bearer <placeholder>--> supervisor (swaps in the key) --
 ## Findings
 
 1. Order matters: attach the provider, then set the rule with the binding, then wait for the provider status. `attach --wait` alone fails with `withheld`, since no rule binds the credential yet, and a rule can only name an attached provider.
-2. The credential is swapped only where the profile says (here: `authorization`, bearer). A client that sends `x-api-key` is refused. Claude Code must use `ANTHROPIC_AUTH_TOKEN` (Bearer), not `ANTHROPIC_API_KEY`, or the profile needs a second placement.
-3. The placeholder is worthless elsewhere: any other host refuses it.
+2. The credential is swapped only where the profile says (here: `authorization`, bearer). A client that sends `x-api-key` is refused. For Claude Code (not run here) that means, by its docs (https://code.claude.com/docs/en/authentication: `ANTHROPIC_AUTH_TOKEN` is sent as Bearer, `ANTHROPIC_API_KEY` as `X-Api-Key`): use `ANTHROPIC_AUTH_TOKEN`, or give the profile a second placement (not tried).
+3. The placeholder is worthless elsewhere: an HTTP request with it to a host outside the binding is refused (forge: 403). Connections OpenShell does not read (`tls: skip`, tunnels that are not HTTP) are not swapped either, so the placeholder stays a placeholder there (docs, not run).
 4. No sandbox recreate is needed to move an existing sandbox to this.
 
 ## Limits
