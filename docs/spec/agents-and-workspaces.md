@@ -67,7 +67,7 @@ Short forms stay valid: a workspace with only `folders` (and today's `tools`, `i
 | `mcp` | agentgateway targets; tool list per sandbox identity from zero-cp per request | tool gateway | PoC 15 |
 | `secret://NAME` | lookup at the part that needs it | secret store | PoC 10, 12 (OpenBao) |
 
-The model path does not meet "no provider login in the sandbox" yet: in PoC 18 the sandbox kept its own Copilot login, the proxy key was readable in the sandbox, and keys of the proxy's admin user saw every tool. #162 has to show these closed before the path counts as built. Shown since: a key minted with `no-mcp-servers` sees no tool; the key can be a placeholder (PoC 20); the Copilot CLI needs no GitHub login behind the proxy (PoC 23).
+The model path does not meet "no provider login in the sandbox" yet: in PoC 18 the sandbox kept its own Copilot login, the proxy key was readable in the sandbox, and keys of the proxy's admin user saw every tool. #162 has to show these closed before the path counts as built. Shown since: a key minted with `no-mcp-servers` sees no tool; the key can be a placeholder (PoC 20); the Copilot CLI needs no GitHub login behind the proxy (PoC 23); opencode finds no model of the proxy by itself, so zero writes the list, with the token limits the proxy reports and without embedding models (PoC 21).
 
 zero-cp decides and hands out; the traffic itself goes from the sandbox to the part (model proxy, tool gateway) under an egress rule, as in PoC 15 and 18, not through zero-cp.
 

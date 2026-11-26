@@ -1602,15 +1602,15 @@ func TestModelProxyParts(t *testing.T) {
 			t.Errorf("key request lacks %s: %s", want, b)
 		}
 	}
-	ids, err := modelIDs([]byte(`{"data":[{"id":"github_copilot/*"},{"id":"github_copilot/gpt-5"},{"id":"github_copilot/claude-haiku-4.5"}]}`))
-	if err != nil || len(ids) != 2 || ids[0] != "github_copilot/claude-haiku-4.5" {
-		t.Errorf("ids: %v %v", ids, err)
+	ids, err := proxyModels([]byte(`{"data":[{"id":"github_copilot/*"},{"id":"github_copilot/gpt-5","max_input_tokens":400000,"max_output_tokens":128000},{"id":"github_copilot/emb","mode":"embedding"},{"id":"github_copilot/claude-haiku-4.5"}]}`))
+	if err != nil || len(ids) != 2 || ids[0].ID != "github_copilot/claude-haiku-4.5" || ids[1].In != 400000 {
+		t.Errorf("models: %v %v", ids, err)
 	}
-	if _, err := modelIDs([]byte("nope")); err == nil {
+	if _, err := proxyModels([]byte("nope")); err == nil {
 		t.Error("unreadable list accepted")
 	}
 	got := guidanceConfig(nil, nil, ids)
-	for _, want := range []string{`"litellm"`, `"baseURL": "http://host.openshell.internal:18096/v1"`, `"apiKey": "{env:LITELLM_API_KEY}"`, `"cacheFormat": "anthropic"`} {
+	for _, want := range []string{`"litellm"`, `"baseURL": "http://host.openshell.internal:18096/v1"`, `"apiKey": "{env:LITELLM_API_KEY}"`, `"cacheFormat": "anthropic"`, `"context": 400000`, `"output": 128000`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("opencode config lacks %s", want)
 		}

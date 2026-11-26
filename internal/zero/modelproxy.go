@@ -199,35 +199,52 @@ func (s *Sandbox) revokeModelKey() error {
 	return os.Remove(s.path("models.key"))
 }
 
-// modelIDs reads the model list a key sees; wildcard entries are dropped.
-func modelIDs(list []byte) ([]string, error) {
+// proxyModel is one model a key sees at the proxy, with the token limits the
+// proxy reports for it (0 when it reports none).
+type proxyModel struct {
+	ID      string
+	In, Out int
+}
+
+// proxyModels reads the model list a key sees. Wildcard entries and
+// embedding models are dropped: opencode cannot chat with them.
+func proxyModels(list []byte) ([]proxyModel, error) {
 	var v struct {
 		Data []struct {
-			ID string `json:"id"`
+			ID   string `json:"id"`
+			Mode string `json:"mode"`
+			In   int    `json:"max_input_tokens"`
+			Out  int    `json:"max_output_tokens"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(list, &v); err != nil {
 		return nil, fmt.Errorf("model list not readable")
 	}
-	var ids []string
+	var ms []proxyModel
 	for _, d := range v.Data {
-		if d.ID != "" && !strings.Contains(d.ID, "*") {
-			ids = append(ids, d.ID)
+		if d.ID == "" || strings.Contains(d.ID, "*") || d.Mode == "embedding" {
+			continue
 		}
+		ms = append(ms, proxyModel{d.ID, d.In, d.Out})
 	}
-	sort.Strings(ids)
-	return ids, nil
+	sort.Slice(ms, func(i, j int) bool { return ms[i].ID < ms[j].ID })
+	return ms, nil
 }
 
-// modelProvider is the opencode provider entry for the proxy.
-func modelProvider(ids []string) map[string]any {
+// modelProvider is the opencode provider entry for the proxy. opencode finds
+// no model of the proxy by itself (PoC 21), so every model is written, with
+// the proxy's limits where it reports them.
+func modelProvider(ms []proxyModel) map[string]any {
 	models := map[string]any{}
-	for _, id := range ids {
-		m := map[string]any{"name": id}
-		if strings.Contains(id, "claude") {
+	for _, pm := range ms {
+		m := map[string]any{"name": pm.ID}
+		if pm.In > 0 && pm.Out > 0 {
+			m["limit"] = map[string]any{"context": pm.In, "output": pm.Out}
+		}
+		if strings.Contains(pm.ID, "claude") {
 			m["compatibility"] = map[string]any{"cacheFormat": "anthropic"}
 		}
-		models[id] = m
+		models[pm.ID] = m
 	}
 	return map[string]any{
 		"name":    "LiteLLM",
@@ -252,9 +269,9 @@ func modelPolicy() map[string]any {
 }
 
 // syncModels sets up the model path of a running sandbox: proxy up, a fresh
-// key, the egress rule, the key in opencode's service. It returns the model
-// ids for the opencode config. Without models it takes the path away.
-func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]string, error) {
+// key, the egress rule, the key in opencode's service. It returns the models
+// for the opencode config. Without models it takes the path away.
+func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, error) {
 	if len(s.Models) == 0 {
 		if s.read("models.key") == "" {
 			return nil, nil
@@ -306,7 +323,7 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]string, error
 	if err != nil {
 		return nil, err
 	}
-	ids, err := modelIDs(list)
+	ids, err := proxyModels(list)
 	if err != nil {
 		return nil, err
 	}
