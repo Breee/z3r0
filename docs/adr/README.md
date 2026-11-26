@@ -51,3 +51,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [47](0047-personal-fine-grained-token-stays.md) | 2026-11-24 | The sandbox token stays a fine-grained token of the developer; service account mode not tested, not built | Z-INV-2..4 |
 | [48](0048-opencode-tui-runs-inside-the-sandbox.md) | 2026-11-25 | `zero opencode` and `zero run` start opencode inside the sandbox over ssh; `--web` for the browser | Z-INV-1, Z-INV-4 |
 | [49](0049-zero-cp-is-the-one-front-door-one-config-file.md) | 2026-11-26 | zero-cp is the one front door; agents and workspaces are defined in one config file | Z-INV-1, Z-INV-2, Z-INV-3, Z-INV-4, Z-INV-6 |
+| [50](0050-copilot-cli-runs-in-the-sandbox-with-the-login-zero-brings-in.md) | 2026-11-26 | `zero copilot` runs the GitHub Copilot CLI in the sandbox with the Copilot login zero already brings in | Z-INV-1, Z-INV-2, Z-INV-4 |

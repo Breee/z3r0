@@ -50,6 +50,9 @@ func (e usageError) Error() string { return string(e) }
 // checkArgs refuses what a command does not know, before anything runs.
 // The prompt of `run` is free text.
 func checkArgs(cmd string, args []string) error {
+	if cmd == "copilot" {
+		return nil // arguments go to the tool
+	}
 	if cmd == "run" {
 		if len(args) == 0 {
 			return usageError("zero run: needs a prompt")

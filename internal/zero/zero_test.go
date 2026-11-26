@@ -1512,3 +1512,11 @@ func TestGuidance(t *testing.T) {
 type noSandbox struct{ Runtime }
 
 func (noSandbox) Exists(string) bool { return false }
+
+func TestCopilotScript(t *testing.T) {
+	got := copilotScript("/tmp/zero/a b", []string{"-p", "it's; rm -rf /"})
+	want := `cd '/tmp/zero/a b' && COPILOT_AUTO_UPDATE=false COPILOT_GITHUB_TOKEN="$COPILOT_TOKEN" exec /usr/local/bin/copilot --no-auto-update '-p' 'it'\''s; rm -rf /'`
+	if got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+}

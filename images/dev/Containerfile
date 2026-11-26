@@ -5,12 +5,15 @@
 FROM ghcr.io/uniget-org/tools/opencode:2.2.6@sha256:5e0d67ecab7429faf809abc904a53f008b91ac77bf30e2bb8270f9817ad36ea9 AS opencode
 FROM ghcr.io/uniget-org/tools/glab:1.128.0@sha256:e45f834a8801d5aae77950cfd1e3733dbd90049f3f62056338c8e4cfdabfde5a AS glab
 FROM ghcr.io/uniget-org/tools/ripgrep:15.2.0@sha256:067c5fa538ad254643b5e44cdb6a254b748353e7f7364f61d79bf39eece85b81 AS ripgrep
+# GitHub Copilot CLI for `zero copilot` (ADR 0050): one binary, no Node.
+FROM ghcr.io/uniget-org/tools/copilot:1.0.116@sha256:57da4696f7c65a6dc325a40509fbbdeb8f709ba2ac6a772687f9f47c0203e45c AS copilot
 
 FROM docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80
 COPY --from=opencode / /usr/local/
 COPY --from=glab / /usr/local/
 COPY --from=ripgrep / /usr/local/
-RUN opencode --version && glab --version && rg --version
+COPY --from=copilot / /usr/local/
+RUN opencode --version && glab --version && rg --version && copilot --version
 # C09: `sandbox exec` login shell resets PATH; re-add go. GOPATH under writable HOME (/sandbox).
 RUN printf 'export PATH=/usr/local/go/bin:$PATH\nexport GOPATH=$HOME/go\n' > /etc/profile.d/z3r0-go.sh
 # VS Code server for `zero code` (#107), where Remote-SSH looks for it in the

@@ -47,6 +47,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		os.Remove(s.path("zen.done"))
 		os.Remove(s.path("copilot.done"))
 		os.Remove(s.path("copilot-auth.done"))
+		os.Remove(s.path("copilot-cli.rule"))
 	} else {
 		pol, err := s.loadPolicy()
 		if err != nil {
@@ -489,6 +490,58 @@ func (s *Sandbox) Attach(out io.Writer) error {
 	return passthrough("ssh", "-t", "-F", s.path("ssh.conf"), s.Host, "cd "+shellQuote(s.Dir)+" && exec opencode")
 }
 
+// copilotBin and copilotRule: the GitHub Copilot CLI of the image and the
+// egress rule that lets only that binary reach the Copilot API (ADR 0050).
+const (
+	copilotBin  = "/usr/local/bin/copilot"
+	copilotRule = "copilot-cli"
+	copilotHost = "api.githubcopilot.com"
+)
+
+// Copilot is up + the GitHub Copilot CLI inside the sandbox over ssh
+// (ADR 0050). It uses the Copilot login zero brought in at create: the
+// sandbox holds a placeholder, the token is put in outside of it. Arguments
+// go to the tool; without arguments it needs a terminal.
+func (s *Sandbox) Copilot(out io.Writer, args []string) error {
+	tty := isTerminal(os.Stdin) && isTerminal(os.Stdout)
+	if !tty && len(args) == 0 {
+		return fmt.Errorf("zero copilot needs a terminal; without one: zero copilot -p PROMPT")
+	}
+	if _, err := s.Up(out); err != nil {
+		return err
+	}
+	if s.read("copilot") == "" {
+		return fmt.Errorf("%s", noModel)
+	}
+	if _, err := s.ssh("test -x " + copilotBin); err != nil {
+		return fmt.Errorf("the image of %s has no Copilot CLI; recreate it: zero rm && zero up", s.Name)
+	}
+	if !fileExists(s.path("copilot-cli.rule")) {
+		if err := rt.AllowEgress(s.Name, copilotRule, copilotBin, "read-write", []string{copilotHost}); err != nil {
+			return err
+		}
+		if err := s.write("copilot-cli.rule", copilotHost, 0o600); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
+	}
+	ssh := []string{"-F", s.path("ssh.conf"), s.Host, copilotScript(s.Dir, args)}
+	if tty {
+		ssh = append([]string{"-t"}, ssh...)
+	}
+	return passthrough("ssh", ssh...)
+}
+
+// copilotScript is the command run in the sandbox. The CLI does not update
+// itself there: the image pins its version.
+func copilotScript(dir string, args []string) string {
+	script := "cd " + shellQuote(dir) + " && COPILOT_AUTO_UPDATE=false COPILOT_GITHUB_TOKEN=\"$" + copilotEnv + "\" exec " + copilotBin + " --no-auto-update"
+	for _, a := range args {
+		script += " " + shellQuote(a)
+	}
+	return script
+}
+
 // Run is up (silent) + a one-shot opencode run inside the sandbox.
 func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 	if _, err := s.Up(io.Discard); err != nil {
@@ -543,6 +596,9 @@ func (s *Sandbox) Status(out io.Writer) error {
 	}
 	if len(s.Skills) > 0 {
 		fmt.Fprintf(out, "skills: %s\n", baseNames(s.Skills))
+	}
+	if fileExists(s.path("copilot-cli.rule")) {
+		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {
