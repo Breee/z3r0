@@ -9,6 +9,14 @@ If you hit a limitation that may be a bug, a design flaw, or something that woul
 3. Write a submittable bug report: `ai-docs/upstream/<project>-<slug>.md` (upstream issue template, repro, expected vs actual, versions). Check for an existing upstream issue first and link it.
 4. Tell the user and let them decide. A documented, intended config option may only be used if the user approves it as a decision (new ADR in `docs/adr/`).
 
+## HARD RULE: research and PoC before building
+
+Instead of hacking you MUST research and you MUST do a PoC.
+
+1. Research first: read the docs of the tool (and its own help output) before you build on it or say what it can or cannot do. Sources go into the issue.
+2. PoC second: show it works in `pocs/NN-name/` (run script, README with result) before it goes into zero's code.
+3. Only then build it into zero, from what the PoC showed.
+
 ## HARD RULE: project management
 
 GitHub issues + GitHub Project **zero** (https://github.com/users/Breee/projects/2) are the source of truth and must be up to date at all times. Milestones are not used. Load skill `project-management` before creating, starting, or closing work.
