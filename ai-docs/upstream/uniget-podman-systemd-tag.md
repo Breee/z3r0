@@ -1,6 +1,6 @@
 # uniget podman: built without the `systemd` build tag, so container health checks never run
 
-**Target:** new issue at https://github.com/uniget-org/tools (searched "podman systemd healthcheck" on 2026-11-26: none found). Related: `uniget-podman-quadlet-musl.md`. Tracked in Breee/z3r0#174.
+**Filed:** https://github.com/uniget-org/tools/issues/30167 (2026-11-26). Related: `uniget-podman-quadlet-musl.md`. Tracked in Breee/z3r0#174.
 
 ---
 
