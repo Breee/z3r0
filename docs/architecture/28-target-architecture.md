@@ -116,5 +116,6 @@ The CLI, policy file and layers are identical; only where `zero-cp` runs changes
 | Lower environment pointed at live data by a merged change | not zero | #124, postponed |
 | Systems beyond the forge (Argo CD, Kargo, Grafana), gaps G1–G9 | addition | `docs/scenarios/platform-engineer-usecases.md`, not filed |
 | Data-flow guardrail, access broker | addition | #129, #133 |
+| Runtime for agents as pods (OpenShell Kubernetes driver first; Substrate, AX, kagent read) | addition, not run | #160, `ai-docs/tool-eval-k8s-agent-runtimes.md` |
 | Decision log to a sink | L8 | none yet |
 | Team deployment of `zero-cp` | §28.5 | #92 (use cases and flows) |
