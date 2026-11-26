@@ -33,7 +33,7 @@ So the check itself works under podman and compose reacts to it; only the timer 
 
 - A podman built with the `systemd` tag is needed for any compose file that waits for a healthy service. Not run here: such a build (it needs an install with sudo).
 - A loop that calls `podman healthcheck run` from outside would hide the missing part; not used.
-- Until a decision: the parts run with `ZERO_COMPOSE="docker compose"` (C58).
+- Decided (ADR 0051): the parts run with `docker compose` until a podman with health checks is on the host; reported upstream as uniget-org/tools#30167.
 
 ## Limits
 

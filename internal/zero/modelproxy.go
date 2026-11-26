@@ -36,12 +36,13 @@ func partsDir() string { return filepath.Join(stateRoot(), "parts") }
 
 func modelURL() string { return fmt.Sprintf("http://127.0.0.1:%d", modelPort) }
 
-// compose is the compose command; ZERO_COMPOSE overrides it.
+// compose is the compose command for the opt-in parts: Docker, until the
+// podman here runs health checks (ADR 0051, C58); ZERO_COMPOSE overrides it.
 func compose() []string {
 	if v := strings.Fields(os.Getenv("ZERO_COMPOSE")); len(v) > 0 {
 		return v
 	}
-	return []string{"podman", "compose"}
+	return []string{"docker", "compose"}
 }
 
 // modelConfig is the proxy's config file for the given providers.
