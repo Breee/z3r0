@@ -1598,3 +1598,14 @@ func TestModelProxyParts(t *testing.T) {
 		t.Error("key in the opencode config")
 	}
 }
+
+func TestCompose(t *testing.T) {
+	t.Setenv("ZERO_COMPOSE", "")
+	if got := strings.Join(compose(), " "); got != "docker compose" {
+		t.Errorf("default: %q", got)
+	}
+	t.Setenv("ZERO_COMPOSE", "podman compose")
+	if got := strings.Join(compose(), " "); got != "podman compose" {
+		t.Errorf("override: %q", got)
+	}
+}

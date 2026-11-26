@@ -86,9 +86,9 @@ Sources: `ai-docs/tool-eval-litellm.md`, `pocs/15-gitlab-mcp`, `pocs/17-litellm`
 
 ## 4. Packaging
 
-One compose file shipped with zero, one profile per part (`models`, `tools`, `secrets`); images pinned by digest; every port bound to 127.0.0.1. `zero up` starts the profiles named under `parts` with the compose command of the installed runtime and renders their config from this file into zero's state directory. zero-cp itself stays the user unit it is today.
+One compose file shipped with zero, one profile per part (`models`, `tools`, `secrets`); images pinned by digest; every port bound to 127.0.0.1. `zero up` starts the profiles named under `parts` with `docker compose` (ADR 0051; `ZERO_COMPOSE` names another compose command) and renders their config from this file into zero's state directory. zero-cp itself stays the user unit it is today.
 
-Not settled: the runtime. `podman compose down` fails on Ubuntu 26.04 (C57), so the PoCs ran with Docker only; zero's sandboxes run on rootless podman. The parts are therefore shown with Docker only until C57 is fixed or the runtime issue decides.
+Decided (ADR 0051): the parts run under Docker until the podman on the host runs container health checks (C58, #174); zero's sandboxes stay on rootless podman. `podman compose down` also fails on Ubuntu 26.04 (C57).
 
 ## 5. First UI (read-only)
 

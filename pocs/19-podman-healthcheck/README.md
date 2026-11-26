@@ -10,7 +10,7 @@ Result (2026-11-26, podman 6.2.0 installed with uniget, docker-compose v5.3.1 as
 | --- | --- |
 | podman runs health checks only through a transient systemd timer (`systemd-run [--user] --on-unit-inactive=<interval> … podman healthcheck run <id>`). This code is compiled only with the `systemd` build tag | [libpod/healthcheck_linux.go](https://github.com/containers/podman/blob/v6.2.0/libpod/healthcheck_linux.go) |
 | Without the tag, making and starting the timer do nothing and report no error | [libpod/healthcheck_nosystemd_linux.go](https://github.com/containers/podman/blob/v6.2.0/libpod/healthcheck_nosystemd_linux.go) |
-| The same tag decides the defaults seen on this host: cgroup manager `cgroupfs`, events `file` | containers/common `pkg/config/nosystemd.go` |
+| The same tag (together with cgo) decides the defaults seen on this host: cgroup manager `cgroupfs`, events `file` | containers/common `pkg/config/nosystemd.go` |
 | containers.conf has no setting that turns the timers on | containers.conf(5) |
 | Compose waits for `service_healthy` by reading the container's health status from the engine | docker/compose v5.3.1 `pkg/compose/convergence.go` |
 | uniget builds podman static on Alpine with `BUILDTAGS='seccomp selinux apparmor exclude_graphdriver_devicemapper containers_image_openpgp'` | [tools/podman/Dockerfile.template](https://github.com/uniget-org/tools/blob/main/tools/podman/Dockerfile.template), line 53 |
