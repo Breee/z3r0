@@ -139,7 +139,7 @@ LiteLLM's "agent" is a remote agent service reached through the proxy, not a cod
 | Instructions | nothing | no | read-only folder by zero |
 | MCP servers | `mcp_servers:` | yes | none beyond the proxy |
 | Tool list per workspace | `object_permission` on the key | partly | database; key in the sandbox; admin-user keys fail open |
-| Credentials outside the sandbox | provider logins and MCP tokens stay in the proxy | yes | the LiteLLM key itself is readable in the sandbox (placeholder not tried) |
+| Credentials outside the sandbox | provider logins and MCP tokens stay in the proxy | yes | the LiteLLM key can be a placeholder for clients that send it as Bearer (PoC 20, #170); zero's code still puts the key in the sandbox (#162) |
 | Identity of a sandbox | virtual key per sandbox; `custom_auth` could take zero's identity | partly | key mint and revoke by zero; hook is own Python code in the proxy |
 | Guardrails, DSGVO | content filter, Presidio | partly | pattern data yes; free text needs Presidio; forge traffic does not pass LiteLLM |
 | Audit per call | spend logs, callbacks | partly | database; change audit is Enterprise |
@@ -164,7 +164,7 @@ The sandbox, its egress rules, the push gate, the forge token and its permission
 ## Probes worth running
 
 1. Sandbox without its own Copilot login; model egress only to the proxy (not shown in PoC 18).
-2. LiteLLM key held outside the sandbox as an OpenShell placeholder.
+2. LiteLLM key held outside the sandbox as an OpenShell placeholder. Done: works (PoC 20, #170).
 3. Copilot connected by a LiteLLM user who is not admin; or service account keys; does the fail-open for tool lists go away.
 4. `custom_auth` hook that accepts the sandbox identity (JWT-SVID) in place of a stored key; works without database?
 5. Skills: one skill, two keys, archive fetched into a sandbox, picked up by opencode.

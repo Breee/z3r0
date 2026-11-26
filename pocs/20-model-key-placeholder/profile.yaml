@@ -1,0 +1,13 @@
+# Provider profile for the model proxy key of a sandbox (PoC 20, #170).
+# No endpoint: where the key may go is in the sandbox's policy (rule "models").
+id: poc20-model-key
+display_name: PoC 20 model proxy key
+description: LiteLLM key of one sandbox, held outside the sandbox
+category: inference
+credentials:
+  - name: key
+    description: LiteLLM key minted for the sandbox
+    env_vars: [POC20_MODEL_KEY]
+    required: true
+    auth_style: bearer
+    header_name: authorization

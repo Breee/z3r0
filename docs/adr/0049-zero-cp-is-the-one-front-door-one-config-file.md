@@ -30,6 +30,6 @@ zero today isolates an agent and gates its pushes. The goal is wider: people def
 - A compromised model proxy holds the provider logins and sees every prompt and answer. A compromised tool gateway sees every tool call, and whoever holds its key can ask zero-cp for a workspace's token (PoC 15). A compromised secret store holds everything stored in it. None of them can reach into a sandbox or past the push gate.
 - Packaging: one compose file with a profile per part, images by digest, ports on 127.0.0.1 (`docs/spec/agents-and-workspaces.md`). Shown with Docker only so far (C57).
 - The API and UI get a listener of their own; the gate port is reachable from sandboxes.
-- LiteLLM needs Postgres for keys and its UI, and a LiteLLM key is readable in the sandbox until a placeholder is shown to work (PoC 18).
+- LiteLLM needs Postgres for keys and its UI, and its key is readable in the sandbox as built today. A placeholder works (PoC 20, #170: provider per sandbox, bound to the proxy endpoint); building it in is part of #162.
 - Open: whether agents with different rights share one sandbox (they would share files, network and token); tool lists per workspace through agentgateway or LiteLLM; shared definitions from a pinned git repository; operator limits file.
 - Running agents on Kubernetes is out of scope here; the local version comes first.

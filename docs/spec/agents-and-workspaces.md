@@ -67,7 +67,7 @@ Short forms stay valid: a workspace with only `folders` (and today's `tools`, `i
 | `mcp` | agentgateway targets; tool list per sandbox identity from zero-cp per request | tool gateway | PoC 15 |
 | `secret://NAME` | lookup at the part that needs it | secret store | PoC 10, 12 (OpenBao) |
 
-The model path does not meet "no provider login in the sandbox" yet: in PoC 18 the sandbox kept its own Copilot login, the proxy key was readable in the sandbox, and keys of the proxy's admin user saw every tool. #162 has to show these closed before the path counts as built.
+The model path does not meet "no provider login in the sandbox" yet: in PoC 18 the sandbox kept its own Copilot login, the proxy key was readable in the sandbox, and keys of the proxy's admin user saw every tool. #162 has to show these closed before the path counts as built. Shown since: a key minted with `no-mcp-servers` sees no tool; the key can be a placeholder (PoC 20); the Copilot CLI needs no GitHub login behind the proxy (PoC 23).
 
 zero-cp decides and hands out; the traffic itself goes from the sandbox to the part (model proxy, tool gateway) under an egress rule, as in PoC 15 and 18, not through zero-cp.
 
@@ -77,7 +77,7 @@ Rules: layers only narrow (operator limits, shared definitions, repository `.zer
 
 | Job | Choice | Reason |
 |---|---|---|
-| Models, guardrails | LiteLLM, opt-in | discovery, per-key model list, mask and block shown (PoC 18). Cost: Postgres, key readable in the sandbox until a placeholder is shown |
+| Models, guardrails | LiteLLM, opt-in | discovery, per-key model list, mask and block shown (PoC 18). Cost: Postgres. The key can stay outside the sandbox as a placeholder (PoC 20); zero does not do that yet (#162) |
 | Tool list per workspace | agentgateway | no database, identity of the sandbox instead of a key, list asked from zero-cp per request (PoC 15). LiteLLM can do it, but keys of the admin user see every tool (PoC 18) |
 | Skills, instructions | plain files, read-only folder | no part needed; LiteLLM keeps skills only in its database and has nothing for instructions |
 | Secrets | host keyring; OpenBao opt-in | as today |
