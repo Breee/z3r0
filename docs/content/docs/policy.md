@@ -96,6 +96,35 @@ workspaces:
 In this version the list decides the token's permissions only. The sandbox cannot reach GitLab's MCP endpoint, so the agent has no GitLab MCP tools until the MCP gateway is built in.
 {{< /callout >}}
 
+## Instructions and skills
+
+Instructions (text files the agent always reads) and skills (folders with a `SKILL.md`) of a workspace are set in the same file:
+
+```yaml {filename="~/.config/zero/config.yaml"}
+workspaces:
+  team:
+    folders: [...]
+    instructions: [~/zero/instructions/review.md]
+    skills: [~/zero/skills/go-review]
+```
+
+`zero up` copies them into the sandbox and tells opencode about them:
+
+```text
+instructions: review.md, read-only
+skills: go-review, read-only
+```
+
+The agent can read them and cannot change them. A changed or removed entry takes effect at the next `zero up`; `zero status` shows both lists. A path that does not exist, a skill folder without `SKILL.md` or two entries with the same name stop every zero command until corrected.
+
+Limits:
+
+- Only opencode is told about them. Other tools in the sandbox find the files under `/tmp/zero-input/.zero/` and nothing more.
+- A skill is offered to the model only if its `SKILL.md` has a `description`.
+- They count into the size limit of input folders (`zero up --max-input`), need the folder `zero install` creates, and do not work with `--vm`.
+- What a repository sets in its own `opencode.json` is added to them, not replaced.
+- If the sandbox already has an opencode user config that zero did not write, zero leaves it alone and says so.
+
 ## Background
 
 - [Policy source and lifecycle](https://github.com/Breee/z3r0/blob/main/docs/architecture/07a-policy-sources-and-lifecycle.md)

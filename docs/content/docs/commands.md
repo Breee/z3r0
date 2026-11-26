@@ -31,7 +31,7 @@ workspace: developer (cwd)
 |---|---|
 | `zero up` | creates the sandbox or reuses it, clones the repositories the first time, starts opencode inside |
 | `zero up --approve` | accepts a wider `.zero/policy.yaml` without the question |
-| `zero up --max-input MiB` | size limit for input folders (default 100) |
+| `zero up --max-input MiB` | size limit for input folders, instructions and skills (default 100) |
 | `zero up --vm` | new sandbox as a MicroVM instead of a container |
 | `zero status` | state of the sandbox, token, push gate |
 | `zero stop` | ends the port forward; the sandbox keeps running |
@@ -138,7 +138,7 @@ A folder whose name starts with `-` is written as `./-name`.
 
 | Path | Content |
 |---|---|
-| `~/.config/zero/config.yaml` | workspaces, their folders and tools, the current workspace |
+| `~/.config/zero/config.yaml` | workspaces, their folders, tools, instructions and skills, the current workspace |
 | `~/.local/state/zero/zero-<name>/` | state of one sandbox (token id, capabilities, push gate log `gate.log`) |
 | `.zero/policy.yaml` in a repository | [policy](../policy) of the project |
 

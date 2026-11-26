@@ -1432,3 +1432,83 @@ func TestHasSession(t *testing.T) {
 		}
 	}
 }
+
+func TestGuidance(t *testing.T) {
+	d := t.TempDir()
+	os.WriteFile(filepath.Join(d, "review.md"), []byte("be brief"), 0o644)
+	os.MkdirAll(filepath.Join(d, "go-review"), 0o755)
+	os.WriteFile(filepath.Join(d, "go-review", "SKILL.md"), []byte("---\ndescription: x\n---\n"), 0o644)
+	os.MkdirAll(filepath.Join(d, "empty"), 0o755)
+	os.MkdirAll(filepath.Join(d, "other"), 0o755)
+	os.WriteFile(filepath.Join(d, "other", "review.md"), []byte("x"), 0o644)
+	p := func(n string) string { return filepath.Join(d, n) }
+
+	instr, skills, err := guidance(&Workspace{Instructions: []string{p("review.md")}, Skills: []string{p("go-review")}})
+	if err != nil || len(instr) != 1 || len(skills) != 1 {
+		t.Fatalf("guidance = %v %v %v", instr, skills, err)
+	}
+	for _, c := range []struct {
+		w    Workspace
+		want string
+	}{
+		{Workspace{Instructions: []string{p("gone.md")}}, "not found"},
+		{Workspace{Instructions: []string{p("go-review")}}, "not a file"},
+		{Workspace{Instructions: []string{p("review.md"), p("other/review.md")}}, "listed twice"},
+		{Workspace{Skills: []string{p("empty")}}, "SKILL.md"},
+		{Workspace{Skills: []string{p("review.md")}}, "SKILL.md"},
+	} {
+		if _, _, err := guidance(&c.w); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("guidance(%v) = %v, want %q", c.w, err, c.want)
+		}
+	}
+
+	if got := guidanceConfig(nil, nil); got != "" {
+		t.Errorf("no guidance: config %q", got)
+	}
+	got := guidanceConfig(instr, skills)
+	for _, want := range []string{`"/tmp/zero-input/.zero/instructions/review.md"`, `"/tmp/zero-input/.zero/skills"`, `"$schema"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("config lacks %s:\n%s", want, got)
+		}
+	}
+	if strings.Contains(guidanceConfig(instr, nil), "skills") {
+		t.Error("config names skills without a skill")
+	}
+
+	// Staging: copied, then dropped when the entries leave the workspace.
+	old := inputRoot
+	inputRoot = t.TempDir()
+	defer func() { inputRoot = old }()
+	oldRT := rt
+	rt = noSandbox{rt}
+	defer func() { rt = oldRT }()
+	s := &Sandbox{Name: "zero-g", State: t.TempDir(), Instructions: instr, Skills: skills}
+	var out bytes.Buffer
+	if err := s.syncInputs(&out); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{".zero/instructions/review.md", ".zero/skills/go-review/SKILL.md"} {
+		if !fileExists(filepath.Join(s.stage(), f)) {
+			t.Errorf("%s not staged", f)
+		}
+	}
+	if !strings.Contains(out.String(), "instructions: review.md, read-only") || !strings.Contains(out.String(), "skills: go-review, read-only") {
+		t.Errorf("output: %s", out.String())
+	}
+	s.Instructions, s.Skills = nil, nil
+	if err := s.syncInputs(&out); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(filepath.Join(s.stage(), ".zero")) {
+		t.Error(".zero kept after the entries left")
+	}
+	s.Instructions, s.MaxInput = instr, 1
+	if err := s.syncInputs(&out); err == nil || !strings.Contains(err.Error(), "limit") {
+		t.Errorf("limit: %v", err)
+	}
+}
+
+// noSandbox is a runtime in which no sandbox exists.
+type noSandbox struct{ Runtime }
+
+func (noSandbox) Exists(string) bool { return false }

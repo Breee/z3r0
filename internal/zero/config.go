@@ -22,6 +22,10 @@ type Workspace struct {
 	// Tools are the forge MCP tools of the workspace: "default" or tool
 	// names. Empty means none (ADR 0043).
 	Tools []string `yaml:"tools,omitempty"`
+	// Instructions are files and Skills are folders holding a SKILL.md; both
+	// are copied read-only into the sandbox (ADR 0049).
+	Instructions []string `yaml:"instructions,omitempty"`
+	Skills       []string `yaml:"skills,omitempty"`
 }
 
 type Config struct {
@@ -60,6 +64,9 @@ func loadConfig() (*Config, error) {
 			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one folder", configPath(), name)
 		}
 		if _, err := mcpTools(w.Tools); err != nil {
+			return nil, fmt.Errorf("%s: workspace %q: %w", configPath(), name, err)
+		}
+		if _, _, err := guidance(w); err != nil {
 			return nil, fmt.Errorf("%s: workspace %q: %w", configPath(), name, err)
 		}
 	}
@@ -241,15 +248,18 @@ func (c *Config) sandbox(name string) *Sandbox {
 		}
 	}
 	tools, _ := mcpTools(c.Workspaces[name].Tools) // checked by loadConfig
+	instr, skills, _ := guidance(c.Workspaces[name])
 	s := &Sandbox{
-		Name:    "zero-" + name,
-		Folders: c.Workspaces[name].Folders,
-		Tools:   tools,
-		Repo:    repo,
-		Top:     top,
-		Dir:     dir,
-		State:   filepath.Join(stateRoot(), "zero-"+name),
-		Host:    rt.HostAlias("zero-" + name),
+		Name:         "zero-" + name,
+		Folders:      c.Workspaces[name].Folders,
+		Tools:        tools,
+		Instructions: instr,
+		Skills:       skills,
+		Repo:         repo,
+		Top:          top,
+		Dir:          dir,
+		State:        filepath.Join(stateRoot(), "zero-"+name),
+		Host:         rt.HostAlias("zero-" + name),
 	}
 	s.setGateway(s.read("gateway"))
 	return s

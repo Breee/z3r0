@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 )
@@ -220,20 +221,27 @@ func kib(n int64) string {
 	return fmt.Sprintf("%d KiB", (n+1023)/1024)
 }
 
-// syncInputs refreshes the host copy of every input folder and drops copies
-// of folders that left the workspace. The size limit holds for all input
-// folders together and is checked before anything is copied.
+// syncInputs refreshes the host copy of every input folder and of the
+// workspace's instructions and skills, and drops copies of what left the
+// workspace. The size limit holds for all of them together and is checked
+// before anything is copied.
 func (s *Sandbox) syncInputs(out io.Writer) error {
 	inputs := s.inputs()
+	what := ""
+	if len(inputs) > 0 {
+		what = inputs[0] + " is an input folder (no git repo); input folders"
+	} else if len(s.Instructions)+len(s.Skills) > 0 {
+		what = "the workspace has instructions or skills; they"
+	}
 	if !fileExists(inputRoot) {
-		if len(inputs) > 0 {
-			return fmt.Errorf("%s is an input folder (no git repo); input folders need %s: sudo zero install", inputs[0], inputRoot)
+		if what != "" {
+			return fmt.Errorf("%s need %s: sudo zero install", what, inputRoot)
 		}
 		return nil
 	}
-	if len(inputs) > 0 {
+	if what != "" {
 		if s.gw != "" {
-			return fmt.Errorf("%s is an input folder (no git repo); input folders are not supported on the %s gateway; use zero up without --vm", inputs[0], s.gw)
+			return fmt.Errorf("%s are not supported on the %s gateway; use zero up without --vm", what, s.gw)
 		}
 		if s.exists() && s.read("input.mount") == "" {
 			return fmt.Errorf("%s was created without the input mount; recreate: zero rm && zero up", s.Name)
@@ -249,9 +257,9 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 		skip  []skipped
 		size  int64
 	}
-	var scans []scan
+	var scans, skills []scan
 	var total int64
-	for _, top := range inputs {
+	for i, top := range append(slices.Clone(inputs), s.Skills...) {
 		files, skip, err := scanInput(top)
 		if err != nil {
 			return fmt.Errorf("input %s: %w", top, err)
@@ -261,10 +269,23 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 			sc.size += f.size
 		}
 		total += sc.size
-		scans = append(scans, sc)
+		if i < len(inputs) {
+			scans = append(scans, sc)
+		} else {
+			skills = append(skills, sc)
+		}
+	}
+	var instr []inputFile
+	for _, f := range s.Instructions {
+		st, err := os.Stat(f)
+		if err != nil {
+			return err
+		}
+		instr = append(instr, inputFile{rel: f, size: st.Size(), mode: 0o644})
+		total += st.Size()
 	}
 	if total > limit {
-		return fmt.Errorf("input folders have %s, limit is %s; raise it: zero up --max-input <MiB>", kib(total), kib(limit))
+		return fmt.Errorf("input folders, instructions and skills have %s, limit is %s; raise it: zero up --max-input <MiB>", kib(total), kib(limit))
 	}
 	stage := s.stage()
 	if err := os.MkdirAll(stage, 0o755); err != nil {
@@ -274,23 +295,30 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 		return err
 	}
 	keep := map[string]bool{}
-	for _, sc := range scans {
-		base := filepath.Base(sc.top)
-		keep[base] = true
-		dst, tmp, old := filepath.Join(stage, base), filepath.Join(stage, "."+base+".new"), filepath.Join(stage, "."+base+".old")
-		os.RemoveAll(tmp)
+	// swap puts the finished copy tmp in place of stage/base.
+	swap := func(base, tmp string) error {
+		dst, old := filepath.Join(stage, base), filepath.Join(stage, "."+base+".old")
 		os.RemoveAll(old)
-		if err := copyInput(sc.top, tmp, sc.files); err != nil {
-			os.RemoveAll(tmp)
-			return fmt.Errorf("copy input %s: %w", sc.top, err)
-		}
 		if err := os.Rename(dst, old); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		if err := os.Rename(tmp, dst); err != nil {
 			return err
 		}
-		os.RemoveAll(old)
+		return os.RemoveAll(old)
+	}
+	for _, sc := range scans {
+		base := filepath.Base(sc.top)
+		keep[base] = true
+		tmp := filepath.Join(stage, "."+base+".new")
+		os.RemoveAll(tmp)
+		if err := copyInput(sc.top, tmp, sc.files); err != nil {
+			os.RemoveAll(tmp)
+			return fmt.Errorf("copy input %s: %w", sc.top, err)
+		}
+		if err := swap(base, tmp); err != nil {
+			return err
+		}
 		fmt.Fprintf(out, "input %s: %d files, %s, read-only\n", base, len(sc.files), kib(sc.size))
 		for i, k := range sc.skip {
 			if i == 10 {
@@ -298,6 +326,43 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 				break
 			}
 			fmt.Fprintf(out, "  excluded: %s (%s)\n", k.rel, k.why)
+		}
+	}
+	if len(instr)+len(skills) > 0 {
+		keep[guidanceDir] = true
+		tmp := filepath.Join(stage, "."+guidanceDir+".new")
+		os.RemoveAll(tmp)
+		fail := func(err error) error {
+			os.RemoveAll(tmp)
+			return fmt.Errorf("copy instructions and skills: %w", err)
+		}
+		for _, d := range []string{"instructions", "skills"} {
+			if err := os.MkdirAll(filepath.Join(tmp, d), 0o755); err != nil {
+				return fail(err)
+			}
+		}
+		var names []string
+		for _, f := range instr {
+			if err := copyFile(f.rel, filepath.Join(tmp, "instructions", filepath.Base(f.rel)), f.mode, f.size); err != nil {
+				return fail(err)
+			}
+			names = append(names, filepath.Base(f.rel))
+		}
+		if len(names) > 0 {
+			fmt.Fprintf(out, "instructions: %s, read-only\n", strings.Join(names, ", "))
+		}
+		names = nil
+		for _, sc := range skills {
+			if err := copyInput(sc.top, filepath.Join(tmp, "skills", filepath.Base(sc.top)), sc.files); err != nil {
+				return fail(err)
+			}
+			names = append(names, filepath.Base(sc.top))
+		}
+		if len(names) > 0 {
+			fmt.Fprintf(out, "skills: %s, read-only\n", strings.Join(names, ", "))
+		}
+		if err := swap(guidanceDir, tmp); err != nil {
+			return err
 		}
 	}
 	entries, err := os.ReadDir(stage)

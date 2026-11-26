@@ -45,6 +45,17 @@ Runtime state stays per workspace: `~/.local/state/zero/zero-<name>/` (port, for
 
 Without `tools` nothing changes for the workspace. A name without an entry in zero's tool table (`gitlabTools` in `internal/zero/gitlab.go`) fails when the config is read. The token gets the permissions of the policy capabilities plus those of the listed tools; a changed list re-mints the token at the next `zero up`. `zero status` shows the list the token was minted for. A wrong name stops every zero command until the file is fixed, like a wrong workspace name. Changing the order of the list also re-mints. The setting is edited in the file, there is no command for it. Limit: the sandbox cannot reach the MCP endpoint (ADR 0046), so until the MCP gateway is built into zero the list decides the token's permissions only.
 
+`instructions` and `skills` (optional, built in #161, ADR 0049) list files and folders with a `SKILL.md`:
+
+```yaml
+  team:
+    folders: [...]
+    instructions: [~/zero/instructions/review.md]
+    skills: [~/zero/skills/go-review]
+```
+
+`zero up` copies them next to the input folders (`/tmp/zero-input/.zero/instructions/<file>`, `/tmp/zero-input/.zero/skills/<name>/`, read-only mount, same size limit, same conditions: input root from `zero install`, not with `--vm`) and writes the sandbox's opencode user config (`~/.config/opencode/opencode.json`, fields `instructions` and `skills`). zero records the checksum of what it wrote; a file there that zero did not write is left alone with a note. A missing path, a skill folder without `SKILL.md` or two entries with the same base name fail when the config is read. Removed entries are removed from the sandbox at the next `zero up`. Limit: only opencode is told.
+
 Names: `[a-z0-9-]{1,40}`, unique. Folder paths stored as resolved absolute paths (symlinks resolved).
 
 ## 3. Context resolution

@@ -138,6 +138,9 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err := s.ensureCheckout(out); err != nil {
 		return 0, err
 	}
+	if err := s.syncGuidance(out); err != nil {
+		return 0, err
+	}
 	if s.read("copilot") != "" && !fileExists(s.path("copilot-auth.done")) {
 		if err := s.importCopilotAuth(); err != nil {
 			return 0, err
@@ -534,6 +537,12 @@ func (s *Sandbox) Status(out io.Writer) error {
 		fmt.Fprintf(out, "%s token: none; zero up makes a new one\n", f.Name())
 	} else {
 		fmt.Fprintln(out, noForge)
+	}
+	if len(s.Instructions) > 0 {
+		fmt.Fprintf(out, "instructions: %s\n", baseNames(s.Instructions))
+	}
+	if len(s.Skills) > 0 {
+		fmt.Fprintf(out, "skills: %s\n", baseNames(s.Skills))
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {
