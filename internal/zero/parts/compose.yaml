@@ -1,0 +1,36 @@
+# Opt-in parts next to the sandbox (ADR 0049). zero writes this file into its
+# state directory and starts the profiles named under `parts` in its config.
+services:
+  models-db:
+    profiles: [models]
+    # 17-alpine
+    image: docker.io/library/postgres@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_DB: litellm
+      POSTGRES_PASSWORD: ${ZERO_MODELS_DB_PASSWORD:?set by zero}
+    volumes:
+      - models-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litellm"]
+      interval: 2s
+      retries: 30
+
+  models:
+    profiles: [models]
+    # v1.110.3
+    image: ghcr.io/berriai/litellm@sha256:1050d2c9ca58399de9cd51df6eb503812af697717f54d2f08c1c30589c75e1f7
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${ZERO_MODELS_KEY:?set by zero}
+      DATABASE_URL: postgresql://litellm:${ZERO_MODELS_DB_PASSWORD:?set by zero}@models-db:5432/litellm
+    volumes:
+      - ./litellm.yaml:/app/config.yaml:ro
+    ports:
+      - "127.0.0.1:18096:4000"
+    depends_on:
+      models-db:
+        condition: service_healthy
+
+volumes:
+  models-db:

@@ -139,7 +139,11 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err := s.ensureCheckout(out); err != nil {
 		return 0, err
 	}
-	if err := s.syncGuidance(out); err != nil {
+	models, err := s.syncModels(out, s.Providers)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.syncGuidance(out, models); err != nil {
 		return 0, err
 	}
 	if s.read("copilot") != "" && !fileExists(s.path("copilot-auth.done")) {
@@ -152,7 +156,6 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	}
 	os.Remove(s.path("password")) // left by versions that ran serve with a password
 	var port int
-	var err error
 	if f := s.currentForward(); f != nil {
 		port = f.port
 	} else {
@@ -178,8 +181,11 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if s.forge() == nil {
 		fmt.Fprintln(out, noForge)
 	}
-	if s.read("copilot") == "" {
+	if s.read("copilot") == "" && len(s.Models) == 0 {
 		fmt.Fprintln(out, noModel)
+	}
+	if s.read("copilot") != "" && len(s.Models) > 0 {
+		fmt.Fprintln(out, "models: this sandbox still holds its own Copilot login from before; to drop it: zero rm && zero up")
 	}
 	return port, nil
 }
@@ -233,9 +239,14 @@ func (s *Sandbox) create() error {
 			return err
 		}
 	}
-	cp, err := s.setupCopilot()
-	if err != nil {
-		return err
+	// With the model proxy the sandbox gets no provider login of its own.
+	cp := ""
+	if len(s.Models) == 0 {
+		c, err := s.setupCopilot()
+		if err != nil {
+			return err
+		}
+		cp = c
 	}
 	if cp != "" {
 		creds = append(creds, cp)
@@ -666,6 +677,9 @@ func (s *Sandbox) Pause(out io.Writer) error {
 	if err := s.pauseForge(); err != nil {
 		return err
 	}
+	if err := s.revokeModelKey(); err != nil {
+		return err
+	}
 	fmt.Fprintf(out, "paused %s\n", s.Name)
 	return nil
 }
@@ -694,6 +708,9 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 		}
 	}
 	if err := s.revokeForge(); err != nil {
+		return fmt.Errorf("%w (state kept for retry)", err)
+	}
+	if err := s.revokeModelKey(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	rt.UnbindCredential(s.copilotProvider())

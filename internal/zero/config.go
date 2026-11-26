@@ -275,6 +275,7 @@ func (c *Config) sandbox(name string) *Sandbox {
 		Instructions: instr,
 		Skills:       skills,
 		Models:       c.Workspaces[name].Models,
+		Providers:    c.Providers,
 		Repo:         repo,
 		Top:          top,
 		Dir:          dir,

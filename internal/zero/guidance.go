@@ -74,8 +74,8 @@ func guidance(w *Workspace) (instr, skills []string, err error) {
 
 // guidanceConfig is the opencode config that names the copied instructions
 // and skills; empty when the workspace has none.
-func guidanceConfig(instr, skills []string) string {
-	if len(instr)+len(skills) == 0 {
+func guidanceConfig(instr, skills, models []string) string {
+	if len(instr)+len(skills)+len(models) == 0 {
 		return ""
 	}
 	root := inputMount + "/" + guidanceDir
@@ -90,14 +90,17 @@ func guidanceConfig(instr, skills []string) string {
 	if len(skills) > 0 {
 		c["skills"] = []string{root + "/skills"}
 	}
+	if len(models) > 0 {
+		c["providers"] = map[string]any{"litellm": modelProvider(models)}
+	}
 	b, _ := json.MarshalIndent(c, "", "  ")
 	return string(b) + "\n"
 }
 
 // syncGuidance writes, replaces or removes the opencode user config in the
 // sandbox. It only touches a file zero wrote itself (state opencode.sha).
-func (s *Sandbox) syncGuidance(out io.Writer) error {
-	want := guidanceConfig(s.Instructions, s.Skills)
+func (s *Sandbox) syncGuidance(out io.Writer, models []string) error {
+	want := guidanceConfig(s.Instructions, s.Skills, models)
 	mine := s.read("opencode.sha")
 	if want == "" && mine == "" {
 		return nil
@@ -109,7 +112,7 @@ func (s *Sandbox) syncGuidance(out io.Writer) error {
 	cur = strings.TrimSpace(cur)
 	if cur != "" && cur != mine {
 		if want != "" {
-			fmt.Fprintf(out, "instructions and skills: not announced to opencode, the sandbox has an opencode config zero did not write (~/.config/opencode/opencode.json); remove it there and run zero up\n")
+			fmt.Fprintf(out, "instructions, skills and models: not announced to opencode, the sandbox has an opencode config zero did not write (~/.config/opencode/opencode.json); remove it there and run zero up\n")
 			return nil
 		}
 		fmt.Fprintf(out, "opencode config in the sandbox was changed there (~/.config/opencode/opencode.json); zero leaves it\n")

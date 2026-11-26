@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"go.yaml.in/yaml/v3"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1462,16 +1464,16 @@ func TestGuidance(t *testing.T) {
 		}
 	}
 
-	if got := guidanceConfig(nil, nil); got != "" {
+	if got := guidanceConfig(nil, nil, nil); got != "" {
 		t.Errorf("no guidance: config %q", got)
 	}
-	got := guidanceConfig(instr, skills)
+	got := guidanceConfig(instr, skills, nil)
 	for _, want := range []string{`"/tmp/zero-input/.zero/instructions/review.md"`, `"/tmp/zero-input/.zero/skills"`, `"$schema"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("config lacks %s:\n%s", want, got)
 		}
 	}
-	if strings.Contains(guidanceConfig(instr, nil), "skills") {
+	if strings.Contains(guidanceConfig(instr, nil, nil), "skills") {
 		t.Error("config names skills without a skill")
 	}
 
@@ -1549,5 +1551,50 @@ func TestCheckModels(t *testing.T) {
 		if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: got %v", want, err)
 		}
+	}
+}
+
+func TestModelProxyParts(t *testing.T) {
+	cfg := modelConfig([]string{"github_copilot"})
+	for _, want := range []string{`model_name: "github_copilot/*"`, "per_user_oauth", "credential_name: github-copilot", "require_key_mcp_access_defined: true", "master_key: os.environ/LITELLM_MASTER_KEY"} {
+		if !strings.Contains(cfg, want) {
+			t.Errorf("config lacks %q", want)
+		}
+	}
+	var c map[string]any
+	if err := yaml.Unmarshal([]byte(cfg), &c); err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(partsCompose, &c); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(partsCompose), `"127.0.0.1:18096:4000"`) || strings.Count(string(partsCompose), "@sha256:") != 2 {
+		t.Error("compose: loopback port and two images by digest wanted")
+	}
+	req := keyRequest("zero-a@h", []string{"github_copilot/*"})
+	b, _ := json.Marshal(req)
+	for _, want := range []string{`"no-mcp-servers"`, `"user_id":"default_user_id"`, `"models":["github_copilot/*"]`, `"key_alias":"zero-a@h"`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("key request lacks %s: %s", want, b)
+		}
+	}
+	ids, err := modelIDs([]byte(`{"data":[{"id":"github_copilot/*"},{"id":"github_copilot/gpt-5"},{"id":"github_copilot/claude-haiku-4.5"}]}`))
+	if err != nil || len(ids) != 2 || ids[0] != "github_copilot/claude-haiku-4.5" {
+		t.Errorf("ids: %v %v", ids, err)
+	}
+	if _, err := modelIDs([]byte("nope")); err == nil {
+		t.Error("unreadable list accepted")
+	}
+	got := guidanceConfig(nil, nil, ids)
+	for _, want := range []string{`"litellm"`, `"baseURL": "http://host.openshell.internal:18096/v1"`, `"apiKey": "{env:LITELLM_API_KEY}"`, `"cacheFormat": "anthropic"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("opencode config lacks %s", want)
+		}
+	}
+	if n := notConnected([]byte(`{"connections":[{"credential_name":"github-copilot","connected":false},{"credential_name":"x","connected":true}]}`)); len(n) != 1 || n[0] != "github-copilot" {
+		t.Errorf("not connected: %v", n)
+	}
+	if strings.Contains(got, "sk-") {
+		t.Error("key in the opencode config")
 	}
 }
