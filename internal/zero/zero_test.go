@@ -1520,3 +1520,34 @@ func TestCopilotScript(t *testing.T) {
 		t.Fatalf("got  %s\nwant %s", got, want)
 	}
 }
+
+func TestCheckModels(t *testing.T) {
+	ws := func(m ...string) map[string]*Workspace {
+		return map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: m}}
+	}
+	ok := []Config{
+		{Workspaces: ws()},
+		{Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws()},
+		{Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/*", "github_copilot/claude-haiku-4.5")},
+	}
+	for i, c := range ok {
+		if err := c.checkModels(); err != nil {
+			t.Errorf("ok %d: %v", i, err)
+		}
+	}
+	bad := map[string]Config{
+		"unknown value":    {Parts: Parts{Models: "other"}},
+		"unknown provider": {Parts: Parts{Models: "litellm"}, Providers: []string{"nope"}},
+		"needs parts":      {Providers: []string{"github_copilot"}},
+		"needs providers":  {Parts: Parts{Models: "litellm"}},
+		"models needs":     {Workspaces: ws("github_copilot/*")},
+		"want PROVIDER":    {Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("openai/gpt")},
+		"not usable":       {Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/a b")},
+		"listed twice":     {Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/*", "github_copilot/*")},
+	}
+	for want, c := range bad {
+		if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: got %v", want, err)
+		}
+	}
+}

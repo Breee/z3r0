@@ -26,10 +26,21 @@ type Workspace struct {
 	// are copied read-only into the sandbox (ADR 0049).
 	Instructions []string `yaml:"instructions,omitempty"`
 	Skills       []string `yaml:"skills,omitempty"`
+	// Models are the models the workspace's agents may use through the
+	// model proxy: "provider/model" or "provider/*" (ADR 0049).
+	Models []string `yaml:"models,omitempty"`
+}
+
+// Parts are the opt-in services next to the sandbox (ADR 0049).
+type Parts struct {
+	Models string `yaml:"models,omitempty"`
 }
 
 type Config struct {
-	Current    string                `yaml:"current,omitempty"`
+	Current string `yaml:"current,omitempty"`
+	Parts   Parts  `yaml:"parts,omitempty"`
+	// Providers are the model providers behind the model proxy.
+	Providers  []string              `yaml:"providers,omitempty"`
 	Workspaces map[string]*Workspace `yaml:"workspaces"`
 }
 
@@ -58,6 +69,9 @@ func loadConfig() (*Config, error) {
 	}
 	if c.Workspaces == nil {
 		c.Workspaces = map[string]*Workspace{}
+	}
+	if err := c.checkModels(); err != nil {
+		return nil, fmt.Errorf("%s: %w", configPath(), err)
 	}
 	for name, w := range c.Workspaces {
 		if !wsNameRe.MatchString(name) || w == nil || len(w.Folders) == 0 {
@@ -260,6 +274,7 @@ func (c *Config) sandbox(name string) *Sandbox {
 		Tools:        tools,
 		Instructions: instr,
 		Skills:       skills,
+		Models:       c.Workspaces[name].Models,
 		Repo:         repo,
 		Top:          top,
 		Dir:          dir,

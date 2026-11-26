@@ -34,12 +34,14 @@ type Sandbox struct {
 	Tools        []string // forge MCP tools of the workspace, "default" expanded
 	Instructions []string // instruction files on the host, absolute
 	Skills       []string // skill folders on the host, absolute
-	Repo         string   // basename of the first folder
-	Top          string   // first folder on the host
-	Dir          string   // checkout path of the first folder inside the sandbox
-	State        string   // local state dir (0700)
-	Host         string   // ssh host alias from `openshell sandbox ssh-config`
-	gw           string   // OpenShell gateway; empty = active gateway (podman, E1)
+	// Models the agents may use through the model proxy; empty: no proxy.
+	Models []string
+	Repo   string // basename of the first folder
+	Top    string // first folder on the host
+	Dir    string // checkout path of the first folder inside the sandbox
+	State  string // local state dir (0700)
+	Host   string // ssh host alias from `openshell sandbox ssh-config`
+	gw     string // OpenShell gateway; empty = active gateway (podman, E1)
 
 	Approve bool
 	// MaxInput is the size limit for input folders in bytes; 0 means the default.
