@@ -4,7 +4,7 @@ Status: design (#157, ADR 0049). Built: `folders`, `tools` (#132), `instructions
 
 ## 1. The file
 
-`~/.config/zero/config.yaml`. No credential is ever written here.
+`~/.config/zero/config.yaml`. No credential is ever written here. The example is the target shape: today's zero reads only `current`, `folders`, `tools`, `instructions` and `skills` (the last two per workspace, where they stay valid) and refuses the other fields.
 
 ```yaml
 current: payments
@@ -67,6 +67,10 @@ Short forms stay valid: a workspace with only `folders` (and today's `tools`, `i
 | `mcp` | agentgateway targets; tool list per sandbox identity from zero-cp per request | tool gateway | PoC 15 |
 | `secret://NAME` | lookup at the part that needs it | secret store | PoC 10, 12 (OpenBao) |
 
+The model path does not meet "no provider login in the sandbox" yet: in PoC 18 the sandbox kept its own Copilot login, the proxy key was readable in the sandbox, and keys of the proxy's admin user saw every tool. #162 has to show these closed before the path counts as built.
+
+zero-cp decides and hands out; the traffic itself goes from the sandbox to the part (model proxy, tool gateway) under an egress rule, as in PoC 15 and 18, not through zero-cp.
+
 Rules: layers only narrow (operator limits, shared definitions, repository `.zero/policy.yaml`, this file); a wider setting asks for approval as today. `zero up` prints what each agent gets.
 
 ## 3. One choice per job
@@ -84,11 +88,11 @@ Sources: `ai-docs/tool-eval-litellm.md`, `pocs/15-gitlab-mcp`, `pocs/17-litellm`
 
 One compose file shipped with zero, one profile per part (`models`, `tools`, `secrets`); images pinned by digest; every port bound to 127.0.0.1. `zero up` starts the profiles named under `parts` with the compose command of the installed runtime and renders their config from this file into zero's state directory. zero-cp itself stays the user unit it is today.
 
-Known limit: `podman compose down` fails on Ubuntu 26.04 (C57); the PoCs ran with Docker. The runtime question (podman, Docker, rootless) is its own issue.
+Not settled: the runtime. `podman compose down` fails on Ubuntu 26.04 (C57), so the PoCs ran with Docker only; zero's sandboxes run on rootless podman. The parts are therefore shown with Docker only until C57 is fixed or the runtime issue decides.
 
 ## 5. First UI (read-only)
 
-Served by zero-cp on 127.0.0.1, same port as the gate, under `/ui/`; data from `/api/` (JSON), which the CLI and a terminal UI use too.
+Served by zero-cp under `/ui/`, data from `/api/` (JSON), which the CLI and a terminal UI use too. It gets its own listener on 127.0.0.1 with a port of its own: the gate port is reachable from every sandbox (`host.openshell.internal:18095`), so nothing but the gate may answer there, and no sandbox policy names the UI port.
 
 | Page | Shows | Read from |
 |---|---|---|
@@ -97,7 +101,7 @@ Served by zero-cp on 127.0.0.1, same port as the gate, under `/ui/`; data from `
 | Decisions | pushes allowed, denied, refused requests | `gate.log` |
 | Parts | which are on, health | compose state |
 
-Protection: loopback only; a session started with a one-time link printed by `zero ui` (as `zero web` does for opencode); `Host` and `Origin` checked on every request; no call that changes anything; no credential in any answer. The gate's paths (`/s/<key>/`) stay separate from `/api/` and `/ui/`.
+Protection: the threat is the agent in a sandbox and a web page in the user's browser. Own loopback listener (above); every call needs a session started with a one-time link printed by `zero ui` (as `zero web` does for opencode); `Host` and `Origin` checked against rebinding and forged requests; no call that changes anything. Answers carry no token, key or gate key: token ID and expiry only, and decision lines as the gate writes them (it logs no credential).
 
 ## 6. Open
 
