@@ -527,14 +527,26 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	if err := CopilotNeedsTerminal(args); err != nil {
 		return err
 	}
+	proxy := len(s.Models) > 0
+	if proxy && !hasModelArg(args) {
+		return fmt.Errorf("zero copilot in this workspace needs a model: zero copilot --model PROVIDER/MODEL ... (models of the workspace: %s)", strings.Join(s.Models, ", "))
+	}
 	if _, err := s.Up(out); err != nil {
 		return err
 	}
-	if s.read("copilot") == "" {
+	if !proxy && s.read("copilot") == "" {
 		return fmt.Errorf("%s", noModel)
 	}
 	if _, err := s.ssh("test -x " + copilotBin); err != nil {
 		return fmt.Errorf("the image of %s has no Copilot CLI; recreate it: zero rm && zero up", s.Name)
+	}
+	if proxy {
+		// The models rule of the sandbox names the binary (PoC 23).
+		ssh := []string{"-F", s.path("ssh.conf"), s.Host, copilotProxyScript(s.Dir, args)}
+		if tty {
+			ssh = append([]string{"-t"}, ssh...)
+		}
+		return passthrough("ssh", ssh...)
 	}
 	if !fileExists(s.path("copilot-cli.rule")) {
 		if err := rt.AllowEgress(s.Name, copilotRule, copilotBin, "read-write", []string{copilotHost}); err != nil {
@@ -550,6 +562,30 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 		ssh = append([]string{"-t"}, ssh...)
 	}
 	return passthrough("ssh", ssh...)
+}
+
+// hasModelArg reports whether the arguments for the Copilot CLI name a model.
+func hasModelArg(args []string) bool {
+	for i, a := range args {
+		if a == "--model" && i+1 < len(args) || strings.HasPrefix(a, "--model=") && a != "--model=" {
+			return true
+		}
+	}
+	return false
+}
+
+// copilotProxyScript is the command run in a sandbox whose workspace uses the
+// model proxy (PoC 23): the CLI talks to the proxy with the sandbox's key and
+// asks GitHub for nothing. The key is read inside the sandbox from the
+// opencode service settings, where zero put it.
+func copilotProxyScript(dir string, args []string) string {
+	key := `python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.config/opencode/service.json")))["env"]["` + modelKeyEnv + `"])'`
+	script := "cd " + shellQuote(dir) + " && KEY=$(" + key + ") && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=" +
+		fmt.Sprintf("http://%s:%d/v1", gateHost, modelPort) + " COPILOT_PROVIDER_API_KEY=\"$KEY\" exec " + copilotBin + " --no-auto-update"
+	for _, a := range args {
+		script += " " + shellQuote(a)
+	}
+	return script
 }
 
 // copilotScript is the command run in the sandbox. The CLI does not update
@@ -617,7 +653,9 @@ func (s *Sandbox) Status(out io.Writer) error {
 	if len(s.Skills) > 0 {
 		fmt.Fprintf(out, "skills: %s\n", baseNames(s.Skills))
 	}
-	if fileExists(s.path("copilot-cli.rule")) {
+	if len(s.Models) > 0 {
+		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL)\n", copilotBin)
+	} else if fileExists(s.path("copilot-cli.rule")) {
 		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
 	}
 	if s.read("gate.key") != "" {

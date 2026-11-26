@@ -1523,6 +1523,30 @@ func TestCopilotScript(t *testing.T) {
 	}
 }
 
+func TestCopilotProxyScript(t *testing.T) {
+	got := copilotProxyScript("/tmp/zero/a", []string{"--model", "github_copilot/x", "-p", "it's"})
+	for _, w := range []string{
+		"cd '/tmp/zero/a' && KEY=$(python3 -c ",
+		`["env"]["LITELLM_API_KEY"]`,
+		"COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=http://host.openshell.internal:18096/v1 COPILOT_PROVIDER_API_KEY=\"$KEY\" exec /usr/local/bin/copilot --no-auto-update '--model' 'github_copilot/x' '-p' 'it'\\''s'",
+	} {
+		if !strings.Contains(got, w) {
+			t.Errorf("script lacks %q:\n%s", w, got)
+		}
+	}
+	if strings.Contains(got, "COPILOT_GITHUB_TOKEN") {
+		t.Errorf("script passes a GitHub login: %s", got)
+	}
+	for args, want := range map[string]bool{"--model x": true, "--model=x": true, "-p hi": false, "--model": false, "--model=": false} {
+		if got := hasModelArg(strings.Fields(args)); got != want {
+			t.Errorf("hasModelArg(%q) = %v", args, got)
+		}
+	}
+	if !strings.Contains(fmt.Sprint(modelPolicy()), copilotBin) {
+		t.Error("models rule does not name the Copilot CLI")
+	}
+}
+
 func TestCheckModels(t *testing.T) {
 	ws := func(m ...string) map[string]*Workspace {
 		return map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: m}}

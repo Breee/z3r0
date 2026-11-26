@@ -247,7 +247,7 @@ func modelPolicy() map[string]any {
 		"endpoints": []map[string]any{{
 			"host": gateHost, "port": modelPort, "protocol": "rest", "enforcement": "enforce", "access": "read-write",
 		}},
-		"binaries": []map[string]any{{"path": opencodeBin}, {"path": "/usr/bin/curl"}},
+		"binaries": []map[string]any{{"path": opencodeBin}, {"path": copilotBin}, {"path": "/usr/bin/curl"}},
 	}
 }
 
