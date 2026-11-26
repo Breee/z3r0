@@ -143,6 +143,11 @@ func main() {
 			fatal(err)
 		}
 	}
+	if cmd == "copilot" {
+		if err := zero.CopilotNeedsTerminal(args); err != nil {
+			fatal(err)
+		}
+	}
 	z, err := zero.Open(ctx, create)
 	if err != nil {
 		fatal(err)

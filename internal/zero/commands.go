@@ -498,14 +498,23 @@ const (
 	copilotHost = "api.githubcopilot.com"
 )
 
+// CopilotNeedsTerminal is the check of `zero copilot` without arguments, for
+// main to refuse before a workspace is made.
+func CopilotNeedsTerminal(args []string) error {
+	if len(args) == 0 && (!isTerminal(os.Stdin) || !isTerminal(os.Stdout)) {
+		return fmt.Errorf("zero copilot needs a terminal; without one: zero copilot -p PROMPT")
+	}
+	return nil
+}
+
 // Copilot is up + the GitHub Copilot CLI inside the sandbox over ssh
 // (ADR 0050). It uses the Copilot login zero brought in at create: the
 // sandbox holds a placeholder, the token is put in outside of it. Arguments
 // go to the tool; without arguments it needs a terminal.
 func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	tty := isTerminal(os.Stdin) && isTerminal(os.Stdout)
-	if !tty && len(args) == 0 {
-		return fmt.Errorf("zero copilot needs a terminal; without one: zero copilot -p PROMPT")
+	if err := CopilotNeedsTerminal(args); err != nil {
+		return err
 	}
 	if _, err := s.Up(out); err != nil {
 		return err
@@ -518,7 +527,7 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	}
 	if !fileExists(s.path("copilot-cli.rule")) {
 		if err := rt.AllowEgress(s.Name, copilotRule, copilotBin, "read-write", []string{copilotHost}); err != nil {
-			return err
+			return fmt.Errorf("%w; check: zero doctor, then run zero copilot again", err)
 		}
 		if err := s.write("copilot-cli.rule", copilotHost, 0o600); err != nil {
 			return err

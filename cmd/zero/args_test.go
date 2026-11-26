@@ -92,6 +92,10 @@ func TestContextFlag(t *testing.T) {
 	if err != nil || ctx != "api" || strings.Join(rest, " ") != "run -c x" {
 		t.Errorf("got %q %v %v", ctx, rest, err)
 	}
+	ctx, rest, err = contextFlag([]string{"-c", "api", "copilot", "-c", "x"})
+	if err != nil || ctx != "api" || strings.Join(rest, " ") != "copilot -c x" {
+		t.Errorf("got %q %v %v", ctx, rest, err)
+	}
 	ctx, rest, err = contextFlag([]string{"up", "--context=api", "--vm"})
 	if err != nil || ctx != "api" || strings.Join(rest, " ") != "up --vm" {
 		t.Errorf("got %q %v %v", ctx, rest, err)
