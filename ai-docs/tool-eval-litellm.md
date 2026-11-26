@@ -38,11 +38,12 @@ LiteLLM can enforce **models, tools and guardrails**. It does not replace anythi
 
 | Feature | Where | DB | Ent. | Seen | Source |
 |---|---|---|---|---|---|
-| Virtual key with `models`, `duration`, `metadata`; delete | API/UI | yes | no | run | /docs/proxy/virtual_keys |
+| Virtual key with `models`, `duration`; delete (`metadata`: read, not run) | API/UI | yes | no | run | /docs/proxy/virtual_keys |
 | Limits for new keys (`upperbound_key_generate_params`, `default_key_generate_params`, `key_alias_pattern`) | config | yes | no | read | /docs/proxy/virtual_keys |
 | Key regenerate (`/key/{key}/regenerate`) | API | yes | no | read | /docs/proxy/virtual_keys |
 | Service account keys (team, no user) | API | yes | no | read | /docs/proxy/service_accounts |
-| Automatic key rotation | config | yes | yes | read | /docs/proxy/virtual_keys |
+| Master key rotation | API | yes | no | read | /docs/proxy/master_key_rotations |
+| Automatic rotation of virtual keys | - | - | - | not found on the key page | /docs/proxy/virtual_keys |
 | Budgets, rate limits per key, team, user | API/UI | yes | no | read | /docs/proxy/users |
 | Without database: master key only, no virtual keys, budgets silently not enforced | - | - | - | run (no keys) | /docs/proxy/docker_quick_start |
 
@@ -55,12 +56,13 @@ LiteLLM can enforce **models, tools and guardrails**. It does not replace anythi
 | OAuth upstream: per user, client credentials, pass-through, token exchange (RFC 8693) | config | yes for tokens | no | read | /docs/mcp_oauth, /docs/mcp_oauth_passthrough, /docs/mcp_obo_auth |
 | Signed JWT per tool call for the upstream (`mcp_jwt_signer`) | config | no | not stated | read | /docs/mcp_zero_trust |
 | Tool and parameter filter per server (`allowed_tools`, `disallowed_tools`, `allowed_params`) | config | no | no | read | /docs/mcp_control |
-| Tool list per key, team, agent (`object_permission.mcp_tool_permissions`), intersected | API/UI | yes | no | run | /docs/mcp_grant_access |
-| No list means no server (`require_key_mcp_access_defined`) | config | yes | no | run: holds for keys without user and normal users, **not for admin-user keys** | /docs/mcp_control |
+| Tool list per key, team, agent (`object_permission.mcp_tool_permissions`), intersected | API/UI | yes | no | run (per key); read (team and agent intersection) | /docs/mcp_grant_access, /docs/mcp_control |
+| With `require_key_mcp_access_defined` a key without a list gets no server (an empty team list still does not restrict; access groups can grant) | config | yes | no | run: holds for keys without user and normal users, **not for admin-user keys** | /docs/mcp_control |
 | Access groups | config + API | yes | no | read | /docs/mcp_control |
 | Toolsets | API/UI | yes | no | read | /docs/mcp_toolsets |
 | Tool list pinning (freeze names, descriptions, schemas) | API | yes | no | read | /docs/mcp_control |
-| Guardrails on tool calls and on tool descriptions | config | no | no | run (block) | /docs/mcp_guardrail |
+| Guardrails on tool calls and results | config | no | no | run (block on a call) | /docs/mcp_guardrail |
+| Tool list pinning (tools, descriptions, schemas frozen) | API | yes | not stated | read | /docs/mcp_control |
 | Cost and rate limit per server | config/API | partly | no | read | /docs/mcp_cost |
 | Tool search (few virtual tools instead of the full list) | config + API | yes | no | read | /docs/mcp_tool_search |
 | OpenAPI file turned into an MCP server | API/UI | yes | no | read | /docs/mcp_openapi |
@@ -69,15 +71,15 @@ LiteLLM can enforce **models, tools and guardrails**. It does not replace anythi
 
 | Feature | Where | DB | Ent. | Seen | Source |
 |---|---|---|---|---|---|
-| Skills Hub: upload or import (GitHub, URL, archive with sha256), versions, review | API/UI | yes | not stated | read | /docs/skills_gateway |
+| Skills Hub: ZIP upload, import from GitHub or by URL, versions, review | API/UI | yes | not stated | read | /docs/skills_gateway |
 | Skills per key or team (`object_permission.skills`) | API/UI | yes | not stated | read | /docs/skills_gateway |
-| Delivery: Claude Code plugin marketplace, Codex index, archive download API | - | yes | not stated | read | /docs/tutorials/claude_code_plugin_marketplace |
+| Delivery: Claude Code plugin marketplace, Codex index, archive download API | - | yes | not stated | read | /docs/tutorials/claude_code_plugin_marketplace, /docs/skills_gateway |
 | Skill scan before publishing (`skill_scanner`) | config | yes | not stated | read | /docs/skills_gateway |
-| Skills declared in `config.yaml` | - | - | - | not found | - |
+| Skills declared in `config.yaml` | - | - | - | not found (page read: no config form) | /docs/skills_gateway |
 | Skills for opencode | - | - | - | not found | /docs/tutorials/opencode_integration |
 | Prompts (`prompts:`, dotprompt files, GitLab as source); client must name `prompt_id` | config | no | no | read | /docs/proxy/prompt_management |
-| System prompt forced per key or team | - | - | - | not found | - |
-| Instruction files delivered to an agent | - | - | - | not found | - |
+| System prompt forced per key or team | - | - | - | not found (page read) | /docs/proxy/prompt_management |
+| Instruction files delivered to an agent | - | - | - | not found (page read) | /docs/agent_resources |
 | Agents (`agents:`, A2A route), key bound to an agent gets the intersection of tool lists | config (or API/UI) | yes for keys | not stated | read | /docs/a2a, /docs/a2a_agent_permissions |
 | Iteration and session budgets, kill switch for agents | API | yes | not stated | read | /docs/a2a_iteration_budgets |
 
@@ -105,8 +107,8 @@ LiteLLM's "agent" is a remote agent service reached through the proxy, not a cod
 | Message logging off, redaction headers, retention period | config | yes | no | read | /docs/proxy/spend_logs_deletion |
 | Callbacks (OpenTelemetry, Prometheus, Langfuse, S3 ...) | config | no | no | read | /docs/proxy/logging |
 | Audit log of changes to keys, teams, models, guardrails | config | yes | yes | read | /docs/proxy/audit_logs |
-| No calls to hosts that are not configured (`LITELLM_OFFLINE_MODE`) | env | no | no | read | /docs/proxy/outbound_requests |
-| Delete everything of one person | - | - | - | not found | - |
+| Offline mode: stops the outbound requests listed on that page, each with its own switch (`LITELLM_OFFLINE_MODE`) | env | no | no | read | /docs/proxy/outbound_requests |
+| Delete everything of one person | - | - | - | not found (pages read) | /docs/proxy/spend_logs_deletion, /docs/proxy/ui_logs |
 
 ### Identity, UI, deployment, licence
 
@@ -114,15 +116,17 @@ LiteLLM's "agent" is a remote agent service reached through the proxy, not a cod
 |---|---|---|---|---|---|
 | Own check of the caller in Python (`custom_auth`) | config | no | no | read | /docs/proxy/custom_auth |
 | JWT auth (issuer, claims to team and user) | config | yes | yes | read | /docs/proxy/jwt_user_team_auth |
-| Sign-in to the UI with OIDC (free up to 5 users); SAML, SCIM | config | yes | above 5: yes | read | /docs/proxy/authentication |
+| Sign-in to the UI with OIDC (free up to 5 users) | config | yes | above 5: yes | read | /docs/proxy/admin_ui_sso |
+| SAML | config | yes | yes | read | /docs/proxy/authentication |
+| SCIM | config | yes | yes | read | /docs/tutorials/scim_litellm |
 | Client certificate checked in front of the proxy, name passed in a header | ingress | no | no | read | /docs/proxy/deploy/mtls |
 | Web UI (all pages) | - | yes | no | run (login, credentials) | /docs/proxy/ui |
 | Pass-through endpoints; allow or deny per key | config / API | yes | per key: yes | read | /docs/proxy/pass_through |
 | One image, 1.36 GB, about 620 MiB idle, 780 MiB with Postgres, 17 to 36 s start | - | - | - | run | pocs/17-litellm |
 | Helm chart; several replicas need Postgres and Redis | - | yes | no | read | /docs/proxy/prod |
-| Images signed with cosign from v1.111.0-dev.3 on; SBOM not found | - | - | - | read | /docs/proxy/docker_image_security |
-| Two compromised releases in 2026 (1.82.7/1.82.8, v1.107.0) | - | - | - | read | /blog/security-incident-oct-21-2026 |
-| Open source MIT; Enterprise is a licence key on the same image | - | - | - | read | /docs/enterprise |
+| Images signed with cosign: with a key since v1.83.0, keyless since v1.111.0-dev.3; SBOM not found | - | - | - | read | /docs/proxy/docker_image_security |
+| Compromised releases in 2026: v1.107.0 (October); 1.82.7/1.82.8 (March) | - | - | - | read | /blog/security-incident-oct-21-2026, /blog/security-update-march-2026 |
+| Open source (MIT, per the licence file of the repository); Enterprise is a licence key on the same image | - | - | - | read | /docs/enterprise, https://github.com/BerriAI/litellm/blob/main/LICENSE |
 
 ## zero's needs
 
