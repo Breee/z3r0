@@ -16,8 +16,8 @@ Claude Code is the third agent tool asked for next to opencode and the Copilot C
 1. `zero claude [ARG...]` is `up`, then Claude Code inside the sandbox over ssh, in the first repository. Arguments go to the tool; without arguments it needs a terminal.
 2. It works only in a workspace that uses the model proxy (`parts.models`, `models`). Without it zero refuses and says so. No Anthropic key or subscription login is taken into a sandbox.
 3. Claude Code gets the proxy address (`ANTHROPIC_BASE_URL`, without `/v1`) and the sandbox's placeholder as `ANTHROPIC_AUTH_TOKEN` (the form sent as `Authorization: Bearer`; the `x-api-key` form is refused, PoC 20). The real key stays outside (ADR 0049).
-4. A model is named on every run (`--model PROVIDER/MODEL`), as for `zero copilot` in such a workspace.
-5. The program is part of the `models` rule of the sandbox: it reaches the model routes of the proxy and nothing else. Its own update, telemetry and error reports are switched off; the image pins its version by digest.
+4. A model is named on every run (`--model PROVIDER/MODEL`), as for `zero copilot` in such a workspace. zero also sets it as `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_HAIKU_MODEL`, so calls Claude Code makes in the background use the same model.
+5. The program is part of the `models` rule of the sandbox: it reaches the model routes of the proxy and nothing else. The rule is set at every `zero up` of such a workspace, not at the first `zero claude`. Its own updates (`DISABLE_UPDATES`, `DISABLE_AUTOUPDATER`), the plugin marketplace registration, telemetry and error reports are switched off; the image pins its version by digest.
 
 ## Consequences
 

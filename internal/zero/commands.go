@@ -621,26 +621,37 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 
 // claudeScript is the command run in the sandbox (PoC 24): Claude Code talks
 // to the model proxy with the placeholder of the sandbox's environment as
-// its key and asks Anthropic for nothing; the image pins its version.
+// its key and asks Anthropic for nothing; the image pins its version. The
+// model of --model is also the one for its background calls.
 func claudeScript(dir string, args []string) string {
 	script := "cd " + shellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
-		fmt.Sprintf("http://%s:%d", gateHost, modelPort) + ` ANTHROPIC_AUTH_TOKEN="$` + modelKeyEnv + `" CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + claudeBin
+		fmt.Sprintf("http://%s:%d", gateHost, modelPort) + ` ANTHROPIC_AUTH_TOKEN="$` + modelKeyEnv + `" ANTHROPIC_MODEL=` + shellQuote(modelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + shellQuote(modelArg(args)) +
+		` CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1 DISABLE_UPDATES=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + claudeBin
 	for _, a := range args {
 		script += " " + shellQuote(a)
 	}
 	return script
 }
 
-// hasModelArg reports whether the arguments for the Copilot CLI or Claude
-// Code name a model.
-func hasModelArg(args []string) bool {
+// modelArg is the model the arguments for the Copilot CLI or Claude Code
+// name with --model, or "". A value that starts with - is the next option,
+// not a model.
+func modelArg(args []string) string {
 	for i, a := range args {
-		if a == "--model" && i+1 < len(args) && args[i+1] != "" || strings.HasPrefix(a, "--model=") && a != "--model=" {
-			return true
+		v := ""
+		if a == "--model" && i+1 < len(args) {
+			v = args[i+1]
+		} else if strings.HasPrefix(a, "--model=") {
+			v = strings.TrimPrefix(a, "--model=")
+		}
+		if v != "" && !strings.HasPrefix(v, "-") {
+			return v
 		}
 	}
-	return false
+	return ""
 }
+
+func hasModelArg(args []string) bool { return modelArg(args) != "" }
 
 // copilotProxyScript is the command run in a sandbox whose workspace uses the
 // model proxy (PoC 23): the CLI talks to the proxy and asks GitHub for
@@ -721,7 +732,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 	}
 	if len(s.Models) > 0 {
 		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL)\n", copilotBin)
-		fmt.Fprintf(out, "claude: Claude Code may reach the model proxy only (zero claude --model PROVIDER/MODEL)\n")
+		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL)\n", claudeBin)
 	} else if fileExists(s.path("copilot-cli.rule")) {
 		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
 	}

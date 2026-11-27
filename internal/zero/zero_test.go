@@ -1682,3 +1682,31 @@ func TestClaudeScript(t *testing.T) {
 		t.Error("models rule does not name Claude Code")
 	}
 }
+
+func TestModelArg(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--model", "a/b", "-p", "x"}, "a/b"},
+		{[]string{"-p", "x", "--model=a/b"}, "a/b"},
+		{[]string{"--model", "-p", "x"}, ""},
+		{[]string{"--model", ""}, ""},
+		{[]string{"--model="}, ""},
+		{[]string{"--model"}, ""},
+		{[]string{"-p", "x"}, ""},
+	} {
+		if got := modelArg(c.args); got != c.want {
+			t.Errorf("modelArg(%q) = %q, want %q", c.args, got, c.want)
+		}
+	}
+	s := claudeScript("/tmp/zero/a", []string{"--model", "a/b", "-p", "x"})
+	for _, w := range []string{"ANTHROPIC_MODEL='a/b'", "ANTHROPIC_DEFAULT_HAIKU_MODEL='a/b'", "DISABLE_UPDATES=1", "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1"} {
+		if !strings.Contains(s, w) {
+			t.Errorf("claude script lacks %s: %s", w, s)
+		}
+	}
+	if err := ClaudeNeedsTerminal(nil); err == nil {
+		t.Error("zero claude without arguments and without a terminal is not refused")
+	}
+}

@@ -37,6 +37,7 @@ Claude Code (sandbox; `ANTHROPIC_BASE_URL` = proxy, `ANTHROPIC_AUTH_TOKEN` = pla
 
 ## Limits
 
+- The run starts Claude Code the way zero does: `--model`, the same model as `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_HAIKU_MODEL`, updates and marketplace registration off.
 - Only `-p` runs; the interactive screen was not started.
 - One model, a Claude model served by Copilot. A non-Claude model was not tried; Anthropic says it does not support that behind a gateway.
 - The WebFetch tool's check against api.anthropic.com was not tried (the host is not reachable).

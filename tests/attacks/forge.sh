@@ -107,4 +107,14 @@ case $O in *rc=0*) echo "PASS control: git fetch of the own project works";; *) 
 want "control: own project by path"        "$(out "$T $GL/api/v4/projects/$(printf %s "$P" | sed 's#/#%2F#g')")" 200
 want "control: read MRs works"     "$(code GET /merge_requests)" 200
 glab api "projects/$ID/repository/branches" | jq -r '.[].name' | grep -q zero-attack && { echo "FAIL branch zero-attack exists on forge"; FAILS=$((FAILS+1)); }
+# Model proxy (sandbox of a workspace with models): only model routes, no other model host.
+if [ "$(sbx 'test -n "$LITELLM_API_KEY" && echo yes' | tail -n 1)" = yes ]; then
+	MP='curl -s -o /dev/null -m 10 -w %{http_code} -H "Authorization: Bearer $LITELLM_API_KEY" http://host.openshell.internal:18096'
+	want "model proxy: key list refused"      "$(sbx "$MP/key/list" | tail -n 1)" 403
+	want "model proxy: new key refused"       "$(sbx "$MP/key/generate -X POST -H 'content-type: application/json' -d '{}'" | tail -n 1)" 403
+	want "control: model list of the proxy"   "$(sbx "$MP/v1/models" | tail -n 1)" 200
+	for h in api.githubcopilot.com api.anthropic.com opencode.ai; do
+		want "model host $h not reachable" "$(sbx "curl -s -o /dev/null -m 10 -w %{http_code} https://$h/" | tail -n 1)" 000
+	done
+fi
 echo "fails: $FAILS"; [ "$FAILS" = 0 ]

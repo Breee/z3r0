@@ -43,9 +43,9 @@ ssh -F "$CONF" "openshell-$SANDBOX.default" 'mkdir -p /tmp/poc24/home /tmp/poc24
 sbx 'echo MARKER-24-OK > /tmp/poc24/work/note.txt' >/dev/null
 echo "claude: $(sbx '/tmp/poc24/claude --version')"
 
-# One Claude Code run in the sandbox; $1 = arguments as shell text.
+# One Claude Code run in the sandbox, started the way zero claude starts it; $1 = arguments as shell text.
 cc() {
-	sbx "cd /tmp/poc24/work && HOME=/tmp/poc24/home ANTHROPIC_BASE_URL=http://host.openshell.internal:18096 ANTHROPIC_AUTH_TOKEN=\"\$LITELLM_API_KEY\" ANTHROPIC_MODEL=$MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL=$MODEL CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 timeout 120 /tmp/poc24/claude $1"
+	sbx "cd /tmp/poc24/work && HOME=/tmp/poc24/home ANTHROPIC_BASE_URL=http://host.openshell.internal:18096 ANTHROPIC_AUTH_TOKEN=\"\$LITELLM_API_KEY\" ANTHROPIC_MODEL=$MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL=$MODEL CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1 DISABLE_AUTOUPDATER=1 DISABLE_UPDATES=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 timeout 120 /tmp/poc24/claude --model $MODEL $1"
 }
 ASK="-p 'what is 17 plus 25? answer with the number only'"
 
@@ -61,13 +61,14 @@ touch "$W/keep"; changed=1
 "$O" policy set "$SANDBOX" --policy "$W/poc.yaml" --wait >/dev/null
 is "prompt answered through the proxy" "$(cc "$ASK" | tail -n 1)" 42
 has "tool use: reads a file" "$(cc "--allowedTools Read -p 'read the file note.txt and print its content exactly'")" MARKER-24-OK
-has "tool use: runs a shell command" "$(cc "--permission-mode bypassPermissions -p 'run the shell command: echo SHELL-24-OK, and print its output'")" SHELL-24-OK
+sbx 'echo "echo SHELL-\$((20+4))-RAN" > /tmp/poc24/work/tok.sh' >/dev/null
+has "tool use: runs a shell command" "$(cc "--permission-mode bypassPermissions -p 'run the shell command: sh tok.sh, and print its output'")" SHELL-24-RAN
 
 echo "== what the sandbox holds and reaches"
 has "the proxy key in the sandbox is a placeholder" "$(sbx 'printf %s "$LITELLM_API_KEY" | cut -c1-17')" '^openshell:resolve'
 is "no key in what Claude Code wrote" "$(sbx 'grep -rlE "(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{16,}" /tmp/poc24/home 2>/dev/null | wc -l')" 0
 is "api.anthropic.com not reachable" "$(sbx 'curl -s -o /dev/null -m 10 -w "%{http_code}" https://api.anthropic.com/' | tail -n 1)" 000
-is "no Anthropic login in the sandbox" "$(sbx 'env | grep -c "^ANTHROPIC_" ; true' | tail -n 1)" 0
+is "no Anthropic login in the sandbox" "$(sbx 'echo "n=$(env | grep -c "^ANTHROPIC_")"' | tail -n 1)" n=0
 
 "$O" policy set "$SANDBOX" --policy "$W/base.yaml" --wait >/dev/null && { changed=0; rm -f "$W/keep"; }
 echo "fails: $fails"

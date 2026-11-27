@@ -429,6 +429,20 @@ func (s *Sandbox) dropModelProvider() error {
 	return os.Remove(s.path("models.provider"))
 }
 
+// proxyLogin is the doctor check of a setup with the model proxy: the
+// provider logins live in the proxy, not in the host's opencode.
+func proxyLogin() string {
+	ui := fmt.Sprintf("http://127.0.0.1:%d/ui/", modelPort)
+	b, err := modelAPI("", "GET", "/credentials/user_connections", nil)
+	if err != nil {
+		return "the model proxy does not answer; zero up in a workspace with models starts it"
+	}
+	if n := notConnected(b); len(n) > 0 {
+		return strings.Join(n, ", ") + " not connected; connect it in the proxy's UI: " + ui + " (Models + Endpoints, LLM Credentials, Connect)"
+	}
+	return ""
+}
+
 func conns() []byte {
 	b, _ := modelAPI("", "GET", "/credentials/user_connections", nil)
 	return b
