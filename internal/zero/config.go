@@ -29,6 +29,8 @@ type Workspace struct {
 	// Models are the models the workspace's agents may use through the
 	// model proxy: "provider/model" or "provider/*" (ADR 0049).
 	Models []string `yaml:"models,omitempty"`
+	// Model is the default model of the workspace: one of Models (ADR 0054).
+	Model string `yaml:"model,omitempty"`
 }
 
 // Parts are the opt-in services next to the sandbox (ADR 0049).
@@ -275,6 +277,7 @@ func (c *Config) sandbox(name string) *Sandbox {
 		Instructions: instr,
 		Skills:       skills,
 		Models:       c.Workspaces[name].Models,
+		Model:        c.Workspaces[name].Model,
 		Providers:    c.Providers,
 		Repo:         repo,
 		Top:          top,

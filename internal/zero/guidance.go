@@ -74,7 +74,7 @@ func guidance(w *Workspace) (instr, skills []string, err error) {
 
 // guidanceConfig is the opencode config that names the copied instructions
 // and skills; empty when the workspace has none.
-func guidanceConfig(instr, skills []string, models []proxyModel) string {
+func guidanceConfig(instr, skills []string, models []proxyModel, model string) string {
 	if len(instr)+len(skills)+len(models) == 0 {
 		return ""
 	}
@@ -92,6 +92,9 @@ func guidanceConfig(instr, skills []string, models []proxyModel) string {
 	}
 	if len(models) > 0 {
 		c["providers"] = map[string]any{"litellm": modelProvider(models)}
+		if model != "" {
+			c["model"] = "litellm/" + model
+		}
 	}
 	b, _ := json.MarshalIndent(c, "", "  ")
 	return string(b) + "\n"
@@ -100,7 +103,7 @@ func guidanceConfig(instr, skills []string, models []proxyModel) string {
 // syncGuidance writes, replaces or removes the opencode user config in the
 // sandbox. It only touches a file zero wrote itself (state opencode.sha).
 func (s *Sandbox) syncGuidance(out io.Writer, models []proxyModel) error {
-	want := guidanceConfig(s.Instructions, s.Skills, models)
+	want := guidanceConfig(s.Instructions, s.Skills, models, s.Model)
 	mine := s.read("opencode.sha")
 	if want == "" && mine == "" {
 		return nil

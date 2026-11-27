@@ -55,6 +55,19 @@ func (c *Config) checkModels() error {
 			}
 			seen[m] = true
 		}
+		if w.Model != "" && !modelListed(w.Model, w.Models) {
+			return fmt.Errorf("workspace %q: model %q is not one of its models (%s)", name, w.Model, strings.Join(w.Models, ", "))
+		}
 	}
 	return nil
+}
+
+// modelListed reports whether the default model m is a full name that the
+// list names itself or covers with PROVIDER/*.
+func modelListed(m string, list []string) bool {
+	prov, model, ok := strings.Cut(m, "/")
+	if !ok || model == "*" || !modelNameRe.MatchString(model) {
+		return false
+	}
+	return slices.Contains(list, m) || slices.Contains(list, prov+"/*")
 }

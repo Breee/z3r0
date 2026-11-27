@@ -13,7 +13,7 @@ A tool in the sandbox needs a model. There are two setups. In both, no provider 
 | The sandbox holds | a placeholder for the Copilot token | a placeholder for its own proxy key |
 | Model hosts the sandbox reaches | `api.githubcopilot.com`, `opencode.ai`, `models.opencode.ai` | none; only the proxy on your machine, and of it only the model list and the model calls (chat, responses, messages, token count, embeddings) |
 | `zero opencode`, `zero web` | yes | yes |
-| `zero run` | yes | only with `model: litellm/github_copilot/...` in the repository's `opencode.json`; opencode's own default model is not reachable here ([#176](https://github.com/Breee/z3r0/issues/176)) |
+| `zero run` | yes | with `model:` for the workspace in zero's config, or `model: litellm/github_copilot/...` in the repository's `opencode.json`; opencode's own default model is not reachable here |
 | Copilot inside `zero vscode` | yes | no: it has no login and no way out |
 | `zero copilot` | yes | yes, with `--model` |
 | `zero claude` | no | yes, with `--model` |
@@ -66,7 +66,7 @@ In opencode the models appear as `litellm/github_copilot/...` in `/models`.
 - The proxy runs under Docker, a daemon with root rights, until the podman on the host can run health checks ([ADR 0051](https://github.com/Breee/z3r0/blob/main/docs/adr/0051-opt-in-parts-run-under-docker-until-podman-has-health-checks.md)).
 - Anthropic supports Claude Code behind a gateway with Claude models only. Shown here: a Claude model served by Copilot. Another model was not tried ([ADR 0052](https://github.com/Breee/z3r0/blob/main/docs/adr/0052-claude-code-runs-in-the-sandbox-through-the-model-proxy.md)).
 - Only GitHub Copilot is a provider today ([#177](https://github.com/Breee/z3r0/issues/177)).
-- No default model per workspace: `--model` each time for `zero copilot` and `zero claude` with the proxy ([#176](https://github.com/Breee/z3r0/issues/176)).
+- zero checks a workspace's `model:` against its list, not whether the provider serves it; a model the provider refuses shows as the provider's error (ADR 0054).
 - Run for this page: the three quoted commands, `zero up`, `zero doctor`, and opencode with a `litellm/` model inside the sandbox. Not run: the screens of `zero copilot` and `zero claude` in a terminal, `zero run` with a model set in the repository, VS Code with the proxy.
 - Instructions and skills of a workspace are told to opencode only.
 - The personal opencode configuration of the host (plugins, MCP servers, other providers) is not carried into the sandbox ([#153](https://github.com/Breee/z3r0/issues/153)).

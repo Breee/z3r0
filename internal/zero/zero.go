@@ -36,6 +36,7 @@ type Sandbox struct {
 	Skills       []string // skill folders on the host, absolute
 	// Models the agents may use through the model proxy; empty: no proxy.
 	Models    []string
+	Model     string
 	Providers []string
 	Repo      string // basename of the first folder
 	Top       string // first folder on the host

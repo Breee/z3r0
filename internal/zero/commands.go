@@ -544,8 +544,11 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 		return err
 	}
 	proxy := len(s.Models) > 0
+	if proxy {
+		args = s.withModel(args)
+	}
 	if proxy && !hasModelArg(args) {
-		return fmt.Errorf("zero copilot in this workspace needs a model: zero copilot --model PROVIDER/MODEL ... (models of the workspace: %s)", strings.Join(s.Models, ", "))
+		return fmt.Errorf("zero copilot in this workspace needs a model: zero copilot --model PROVIDER/MODEL ..., or model: for the workspace in zero's config (models of the workspace: %s)", strings.Join(s.Models, ", "))
 	}
 	if _, err := s.Up(out); err != nil {
 		return err
@@ -593,6 +596,15 @@ func ClaudeNeedsTerminal(args []string) error {
 	return nil
 }
 
+// withModel puts the workspace's default model in front of the arguments
+// when they name none (ADR 0054).
+func (s *Sandbox) withModel(args []string) []string {
+	if s.Model == "" || hasModelArg(args) {
+		return args
+	}
+	return append([]string{"--model", s.Model}, args...)
+}
+
 // Claude is up + Claude Code inside the sandbox over ssh (ADR 0052). It
 // talks to the model proxy only, so the workspace has to use the proxy.
 // Arguments go to the tool; without arguments it needs a terminal.
@@ -603,8 +615,9 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 	if len(s.Models) == 0 {
 		return fmt.Errorf("zero claude needs the model proxy: set parts.models, providers and models for this workspace in zero's config")
 	}
+	args = s.withModel(args)
 	if !hasModelArg(args) {
-		return fmt.Errorf("zero claude needs a model: zero claude --model PROVIDER/MODEL ... (models of the workspace: %s)", strings.Join(s.Models, ", "))
+		return fmt.Errorf("zero claude needs a model: zero claude --model PROVIDER/MODEL ..., or model: for the workspace in zero's config (models of the workspace: %s)", strings.Join(s.Models, ", "))
 	}
 	if _, err := s.Up(out); err != nil {
 		return err
@@ -731,6 +744,9 @@ func (s *Sandbox) Status(out io.Writer) error {
 		fmt.Fprintf(out, "skills: %s\n", baseNames(s.Skills))
 	}
 	if len(s.Models) > 0 {
+		if s.Model != "" {
+			fmt.Fprintf(out, "model: %s (default; a repository's opencode.json and --model win)\n", s.Model)
+		}
 		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL)\n", copilotBin)
 		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL)\n", claudeBin)
 	} else if fileExists(s.path("copilot-cli.rule")) {

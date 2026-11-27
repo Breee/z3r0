@@ -1464,16 +1464,16 @@ func TestGuidance(t *testing.T) {
 		}
 	}
 
-	if got := guidanceConfig(nil, nil, nil); got != "" {
+	if got := guidanceConfig(nil, nil, nil, ""); got != "" {
 		t.Errorf("no guidance: config %q", got)
 	}
-	got := guidanceConfig(instr, skills, nil)
+	got := guidanceConfig(instr, skills, nil, "")
 	for _, want := range []string{`"/tmp/zero-input/.zero/instructions/review.md"`, `"/tmp/zero-input/.zero/skills"`, `"$schema"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("config lacks %s:\n%s", want, got)
 		}
 	}
-	if strings.Contains(guidanceConfig(instr, nil, nil), "skills") {
+	if strings.Contains(guidanceConfig(instr, nil, nil, ""), "skills") {
 		t.Error("config names skills without a skill")
 	}
 
@@ -1629,7 +1629,7 @@ func TestModelProxyParts(t *testing.T) {
 	if _, err := proxyModels([]byte("nope")); err == nil {
 		t.Error("unreadable list accepted")
 	}
-	got := guidanceConfig(nil, nil, ids)
+	got := guidanceConfig(nil, nil, ids, "")
 	if strings.Contains(got, `"context": 1000`) || strings.Contains(got, "emb") || strings.Contains(got, "img") {
 		t.Errorf("opencode config has a half limit or a model that cannot chat: %s", got)
 	}
@@ -1819,5 +1819,50 @@ func TestHostLoginNeeded(t *testing.T) {
 		if got := hostLoginNeeded(tc.c); got != tc.want {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+func TestDefaultModel(t *testing.T) {
+	list := []string{"github_copilot/*", "github_copilot/a"}
+	for m, want := range map[string]bool{
+		"github_copilot/claude-haiku-4.5": true, "github_copilot/a": true,
+		"github_copilot/*": false, "other/x": false, "nomodel": false, "github_copilot/": false,
+	} {
+		if got := modelListed(m, list); got != want {
+			t.Errorf("modelListed(%q) = %v", m, got)
+		}
+	}
+	if modelListed("github_copilot/b", []string{"github_copilot/a"}) {
+		t.Error("a model outside a list without wildcard counts")
+	}
+	c := &Config{Parts: Parts{Models: partLiteLLM}, Providers: []string{"github_copilot"},
+		Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: []string{"github_copilot/a"}, Model: "github_copilot/b"}}}
+	if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), "is not one of its models") {
+		t.Errorf("default model outside the list: %v", err)
+	}
+	c.Workspaces["a"].Model = "github_copilot/a"
+	if err := c.checkModels(); err != nil {
+		t.Errorf("default model in the list: %v", err)
+	}
+	c.Workspaces["a"].Models = nil
+	if err := c.checkModels(); err == nil {
+		t.Error("default model without models accepted")
+	}
+	ms := []proxyModel{{ID: "github_copilot/a"}}
+	if got := guidanceConfig(nil, nil, ms, "github_copilot/a"); !strings.Contains(got, `"model": "litellm/github_copilot/a"`) {
+		t.Errorf("default model not written:\n%s", got)
+	}
+	if got := guidanceConfig(nil, nil, ms, ""); strings.Contains(got, `"model":`) {
+		t.Errorf("model written without a default:\n%s", got)
+	}
+	s := &Sandbox{Model: "github_copilot/a"}
+	if got := strings.Join(s.withModel([]string{"-p", "hi"}), " "); got != "--model github_copilot/a -p hi" {
+		t.Errorf("withModel = %q", got)
+	}
+	if got := strings.Join(s.withModel([]string{"--model", "x/y", "-p", "hi"}), " "); got != "--model x/y -p hi" {
+		t.Errorf("withModel with a model = %q", got)
+	}
+	if got := (&Sandbox{}).withModel([]string{"-p"}); len(got) != 1 {
+		t.Errorf("withModel without default = %q", got)
 	}
 }
