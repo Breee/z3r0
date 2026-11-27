@@ -39,7 +39,7 @@ fail() { echo "FAIL $1: $(printf %s "$2" | cut -c1-300)"; fails=$((fails+1)); }
 is() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "got $2, want $3"; fi; }
 has() { if printf %s "$2" | grep -q -- "$3"; then pass "$1"; else fail "$1" "$2"; fi; }
 # a process of `openshell`, with exactly the groups named
-asou() { g=$1; shift; setpriv --reuid "$OUID" --regid "$OGID" --groups "$g" env -i PATH=/usr/local/bin:/usr/bin:/bin \
+asou() { g=$1; shift; setpriv --reuid "$OUID" --regid "$OGID" --groups "$g" env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
 	HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG_HOME="$D/cfg" XDG_STATE_HOME="$D/state" \
 	XDG_DATA_HOME="$D/share" OPENSHELL_LOCAL_TLS_DIR="$D/tls" OPENSHELL_TELEMETRY_ENABLED=false \
 	OPENSHELL_SERVER_PORT="$PORT" OPENSHELL_GATEWAY_CONFIG="$D/cfg/openshell/gateway.toml" \
