@@ -2017,6 +2017,26 @@ func TestProviderKeys(t *testing.T) {
 	if a == b || a != keysSum(map[string]string{"x": "1"}) || strings.Contains(a, "1=") {
 		t.Errorf("key sums: %s %s", a, b)
 	}
+	// The error names the provider, never the command or what it printed.
+	if _, err := providerKeys(map[string]string{"openrouter": "echo sk-inline"}); err != nil {
+		t.Errorf("inline key: %v", err)
+	}
+	d := t.TempDir()
+	script := filepath.Join(d, "k")
+	os.WriteFile(script, []byte("#!/bin/sh\necho sk-printed\nexit 1\n"), 0o755)
+	if _, err := providerKeys(map[string]string{"openrouter": script}); err == nil || strings.Contains(err.Error(), "sk-printed") || strings.Contains(err.Error(), script) {
+		t.Errorf("failing key command leaks: %v", err)
+	}
+	c.ProviderKeys = map[string]string{"openrouter": "sh -c 'echo k'"}
+	if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), "without a shell") {
+		t.Errorf("command with quotes: %v", err)
+	}
+	// Every key provider's variable is handed to the proxy container.
+	for p, env := range keyProviders {
+		if !strings.Contains(string(partsCompose), env+": ${ZERO_KEY_"+strings.ToUpper(p)+"-}") {
+			t.Errorf("compose file lacks %s for %s", env, p)
+		}
+	}
 	if providerKeysProblem(map[string]string{"x": "false"}) == "" || providerKeysProblem(map[string]string{"x": "echo k"}) != "" {
 		t.Error("doctor check of the key commands")
 	}

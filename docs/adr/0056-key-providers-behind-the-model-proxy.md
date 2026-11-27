@@ -15,8 +15,8 @@ The model proxy (ADR 0049) knew one provider, GitHub Copilot. A second provider 
 
 1. `providers` accepts `openai`, `anthropic` and `openrouter` next to `github_copilot`.
 2. Each of the three needs an entry in `provider_keys`: a command that prints the key, for example `openrouter: pass show OPENROUTER_API_KEY`. A missing entry, or an entry for a provider that is not listed or takes no key, fails when the config is loaded.
-3. zero runs the command without a shell at every `zero up` of a workspace with models. The first printed line is the key.
-4. The key reaches the proxy only through the environment of the compose command. zero writes it to no file. It keeps the key's SHA-256 in `parts/keys.sha` to see a change.
+3. zero runs the command without a shell at every `zero up` of a workspace with models. The first printed line is the key. The command is split at spaces; one with quotes, pipes or variables fails at load. It has 30 seconds. An error names the provider, not the command or what it printed.
+4. The key reaches the proxy only through the environment of the compose command. zero writes it to no file. It keeps the key's SHA-256 in `parts/keys.sha` to see a change; the file is written once the proxy answers with the new key.
 5. The proxy config gets one entry per provider (`P/*`, key from the container's environment). A workspace names the models as before (`openrouter/*` or a full name).
 6. A changed key makes the proxy anew.
 7. `zero doctor` runs the commands and reports `model provider keys`. It shows no value.

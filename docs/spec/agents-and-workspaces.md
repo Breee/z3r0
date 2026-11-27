@@ -1,6 +1,6 @@
 # Spec: agents and workspaces in one config file
 
-Status: design (#157, ADR 0049). Built: `folders`, `tools` (#132), `instructions`, `skills` (#161), `parts.models`, `providers`, `models` per workspace (#162), `model` (#176), `provider_keys` (#177, ADR 0056), tools through the model proxy (#164, ADR 0055). Everything else on this page is not built.
+Status: design (#157, ADR 0049). Built: `folders`, `tools` (#132), `instructions`, `skills` (#161), `parts.models`, `providers`, `models` per workspace (#162), `model` (#176), `provider_keys` (#177, ADR 0056), tools through the model proxy (#164, ADR 0055). Everything else on this page is not built. The built form of the providers differs from the example below: `providers` is a list of names (`[github_copilot, openrouter]`) and a key provider gets `provider_keys: NAME: COMMAND`, a command that prints its key (ADR 0056); `secret://` names are not built.
 
 ## 1. The file
 

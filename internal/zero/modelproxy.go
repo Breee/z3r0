@@ -2,6 +2,7 @@ package zero
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	_ "embed"
@@ -159,9 +160,9 @@ func startModelProxy(out io.Writer, providers []string, keyCmds map[string]strin
 	if err := os.WriteFile(filepath.Join(dir, "mcp.env"), []byte(env), 0o600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "keys.sha"), []byte(sum), 0o600); err != nil {
-		return err
-	}
+	// Written only once the proxy answers with these keys; until then a
+	// failed start is tried again at the next zero up.
+	os.Remove(filepath.Join(dir, "keys.sha"))
 	fmt.Fprintf(out, "model proxy: starting (LiteLLM on 127.0.0.1:%d)\n", modelPort)
 	c := compose()
 	args := append(c[1:], "-p", modelProject, "-f", filepath.Join(dir, "compose.yaml"), "--profile", "models", "up", "-d")
@@ -178,7 +179,7 @@ func startModelProxy(out io.Writer, providers []string, keyCmds map[string]strin
 	}
 	for i := 0; i < 150; i++ {
 		if modelHealthy() {
-			return nil
+			return os.WriteFile(filepath.Join(dir, "keys.sha"), []byte(sum), 0o600)
 		}
 		time.Sleep(2 * time.Second)
 	}
@@ -509,6 +510,9 @@ func notConnected(list []byte) []string {
 // providerKeys runs each provider's key command (no shell) and takes the
 // first line it prints. The key goes to the proxy through the environment of
 // the compose command only; zero writes it to no file (ADR 0056).
+// keyTimeout bounds a key command; it runs under the lock of the parts.
+const keyTimeout = 30 * time.Second
+
 func providerKeys(cmds map[string]string) (map[string]string, error) {
 	keys := map[string]string{}
 	for p, c := range cmds {
@@ -516,10 +520,13 @@ func providerKeys(cmds map[string]string) (map[string]string, error) {
 		if len(f) == 0 {
 			return nil, fmt.Errorf("provider_keys.%s: no command", p)
 		}
-		out, err := exec.Command(f[0], f[1:]...).Output()
+		ctx, cancel := context.WithTimeout(context.Background(), keyTimeout)
+		out, err := exec.CommandContext(ctx, f[0], f[1:]...).Output()
+		cancel()
 		line, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
 		if line = strings.TrimSpace(line); err != nil || line == "" {
-			return nil, fmt.Errorf("provider_keys.%s: `%s` gave no key; run it by hand to see why", p, c)
+			// Neither the command nor what it printed: both can hold the key.
+			return nil, fmt.Errorf("provider_keys.%s: its command gave no key within %s; run it by hand to see why", p, keyTimeout)
 		}
 		keys[p] = line
 	}
