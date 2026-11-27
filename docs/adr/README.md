@@ -58,3 +58,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [54](0054-a-workspace-can-name-its-default-model.md) | 2026-11-27 | A workspace can name its default model (`model:`), only with the model proxy; amends 48 | Z-INV-2 |
 | [55](0055-workspace-tools-go-through-the-model-proxy-when-it-is-on.md) | 2026-11-27 | A workspace's tools go through the model proxy when it is on: one server entry and one tool-scoped token per workspace, list on the sandbox's key | Z-INV-1, Z-INV-2, Z-INV-4, Z-INV-6 |
 | [56](0056-key-providers-behind-the-model-proxy.md) | 2026-11-27 | Providers with an API key behind the model proxy; the key comes from a command | Z-INV-2, Z-INV-4 |
+| [57](0057-docker-as-a-runtime-chosen-by-one-setting.md) | 2026-11-27 | Docker as a runtime next to podman, chosen by one setting at install; rootful Docker offered with a plain danger warning; `openshell` user stays the default | Z-OS-3 |
