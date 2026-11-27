@@ -31,3 +31,4 @@ Prereqs: host setup from `ai-docs/sprints/01-openshell-eval/F01-openshell-baseli
 | 23-copilot-cli-proxy | #173: the Copilot CLI in a sandbox answers and uses tools through the model proxy with the sandbox's key, no GitHub login in the sandbox; the model must be named | `pocs/23-copilot-cli-proxy/run.sh` |
 | 24-claude-code-proxy | #166: Claude Code in a sandbox answers through the model proxy with the placeholder key, no Anthropic login; model name taken as written; 9 PASS | `pocs/24-claude-code-proxy/run.sh` |
 | 25-zero-ui | #163: LiteLLM's web UI loads below a sub-path behind one loopback port a sandbox cannot reach; signing in from that port needs Enterprise (C59) | `pocs/25-zero-ui/run.sh` |
+| 26-default-model | #176: a `model` line in opencode's user config is the default and a repository's config wins; Copilot CLI and Claude Code take a default model too | `pocs/26-default-model/run.sh` |
