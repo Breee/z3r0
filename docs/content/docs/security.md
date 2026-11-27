@@ -8,7 +8,7 @@ zero assumes that the agent can be turned against you: by a prompt hidden in an 
 
 ## What the agent has
 
-- a copy of the repositories and input folders of its workspace
+- a copy of the repositories and input directories of its workspace
 - network access to the workspace's projects on the GitLab host (API and git fetch, nothing else on that host), the model endpoint and the hosts in the [policy](../policy)
 - a GitLab token for exactly the projects of the workspace, with the permissions of the policy, valid for one to two days (it ends at midnight UTC of the day after tomorrow) and renewed while the sandbox runs
 - one way to hand over work: `git push` to `zero/<workspace>`

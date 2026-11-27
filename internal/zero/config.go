@@ -15,14 +15,14 @@ import (
 )
 
 // Workspaces (docs/spec/workspaces.md): a workspace is one sandbox with its
-// folders. The config holds names and folder paths only, never secrets.
+// directories. The config holds names and directory paths only, never secrets.
 
 type Workspace struct {
 	Folders []string `yaml:"folders"`
 	// Tools are the forge MCP tools of the workspace: "default" or tool
 	// names. Empty means none (ADR 0043).
 	Tools []string `yaml:"tools,omitempty"`
-	// Instructions are files and Skills are folders holding a SKILL.md; both
+	// Instructions are files and Skills are directories holding a SKILL.md; both
 	// are copied read-only into the sandbox (ADR 0049).
 	Instructions []string `yaml:"instructions,omitempty"`
 	Skills       []string `yaml:"skills,omitempty"`
@@ -80,11 +80,11 @@ func loadConfig() (*Config, error) {
 	}
 	for name, w := range c.Workspaces {
 		if !wsNameRe.MatchString(name) || w == nil || len(w.Folders) == 0 {
-			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one folder", configPath(), name)
+			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one directory", configPath(), name)
 		}
 		for _, f := range w.Folders {
 			if filepath.Base(f) == guidanceDir {
-				return nil, fmt.Errorf("%s: workspace %q: a folder cannot be named %s", configPath(), name, guidanceDir)
+				return nil, fmt.Errorf("%s: workspace %q: a directory cannot be named %s", configPath(), name, guidanceDir)
 			}
 		}
 		if _, err := mcpTools(w.Tools); err != nil {
@@ -122,7 +122,7 @@ func realPath(p string) (string, error) {
 	return filepath.EvalSymlinks(abs)
 }
 
-// wsName turns a folder name into a workspace name.
+// wsName turns a directory name into a workspace name.
 func wsName(base string) string {
 	n := strings.Trim(strings.TrimPrefix(SandboxName(base), "zero-"), "-")
 	if len(n) > 40 {
@@ -131,7 +131,7 @@ func wsName(base string) string {
 	return n
 }
 
-// at lists the workspaces that have a folder containing dir.
+// at lists the workspaces that have a directory containing dir.
 func (c *Config) at(dir string) []string {
 	var names []string
 	for name, w := range c.Workspaces {
@@ -234,7 +234,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 			return nil, fmt.Errorf("cannot derive a workspace name from %s; use zero ctx new NAME", top)
 		}
 		if c.Workspaces[name] != nil {
-			return nil, fmt.Errorf("workspace %s exists with other folders; use zero ctx new NAME here", name)
+			return nil, fmt.Errorf("workspace %s exists with other directories; use zero ctx new NAME here", name)
 		}
 		c.Workspaces[name] = &Workspace{Folders: []string{top}}
 		c.Current, source, changed = name, "new", true
@@ -249,10 +249,10 @@ func Open(flag string, create bool) (*Sandbox, error) {
 	seen := map[string]string{}
 	for _, f := range s.Folders {
 		if _, err := os.Stat(f); err != nil {
-			return nil, fmt.Errorf("folder %s is missing; restore it, or take it out of the workspace: zero -c %s ctx remove %s", f, name, f)
+			return nil, fmt.Errorf("directory %s is missing; restore it, or take it out of the workspace: zero -c %s ctx remove %s", f, name, f)
 		}
 		if other, ok := seen[filepath.Base(f)]; ok {
-			return nil, fmt.Errorf("folders %s and %s have the same name; a workspace needs distinct folder names: rename one or put it in its own workspace (zero ctx new NAME PATH)", other, f)
+			return nil, fmt.Errorf("directories %s and %s have the same name; a workspace needs distinct directory names: rename one or put it in its own workspace (zero ctx new NAME PATH)", other, f)
 		}
 		seen[filepath.Base(f)] = f
 	}
@@ -262,7 +262,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 func (c *Config) sandbox(name string) *Sandbox {
 	top := c.Workspaces[name].Folders[0]
 	repo := filepath.Base(top)
-	// The agent works in the first repo; a workspace of input folders only
+	// The agent works in the first repo; a workspace of input directories only
 	// has no checkout.
 	dir := "/tmp/zero"
 	for _, f := range c.Workspaces[name].Folders {
@@ -293,7 +293,7 @@ func (c *Config) sandbox(name string) *Sandbox {
 	return s
 }
 
-// sandboxDir is where a host folder lives inside the sandbox.
+// sandboxDir is where a host directory lives inside the sandbox.
 func sandboxDir(top string) string {
 	if isInput(top) {
 		return inputMount + "/" + filepath.Base(top)
@@ -301,7 +301,7 @@ func sandboxDir(top string) string {
 	return "/tmp/zero/" + filepath.Base(top)
 }
 
-// paths resolves the given folders, or cwd when none are given.
+// paths resolves the given directories, or cwd when none are given.
 func paths(args []string) ([]string, error) {
 	if len(args) == 0 {
 		args = []string{"."}
@@ -313,15 +313,15 @@ func paths(args []string) ([]string, error) {
 			return nil, err
 		}
 		if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
-			return nil, fmt.Errorf("%s is not a folder", a)
+			return nil, fmt.Errorf("%s is not a directory", a)
 		}
 		out = append(out, p)
 	}
 	return out, nil
 }
 
-// listed resolves the folders to take out of a workspace. A path that is in
-// the workspace as written wins over what it links to now; a folder that no
+// listed resolves the directories to take out of a workspace. A path that is in
+// the workspace as written wins over what it links to now; a directory that no
 // longer exists is matched the same way.
 func listed(folders, args []string) ([]string, error) {
 	if len(args) == 0 {
@@ -374,7 +374,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			}
 			fmt.Fprintf(out, "%s %-20s %s\n", mark, n, strings.Join(c.Workspaces[n].Folders, " "))
 		}
-		fmt.Fprintln(os.Stderr, "legend: * current workspace, + workspace of this folder")
+		fmt.Fprintln(os.Stderr, "legend: * current workspace, + workspace of this directory")
 		return nil
 	case "--prompt":
 		if name, _, err := c.resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd); err == nil {
@@ -432,7 +432,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			}
 		}
 		if len(w.Folders) == 0 {
-			return fmt.Errorf("a workspace needs at least one folder; to delete the workspace: zero ctx rm %s", name)
+			return fmt.Errorf("a workspace needs at least one directory; to delete the workspace: zero ctx rm %s", name)
 		}
 		fmt.Fprintf(out, "%s: %s\n", name, strings.Join(w.Folders, " "))
 	case "rm":

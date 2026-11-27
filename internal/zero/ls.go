@@ -42,7 +42,7 @@ func loadOverview() (*overview, error) {
 	}
 	sort.Strings(names)
 
-	// Forges in use: recorded in a state dir, or the remote of a folder.
+	// Forges in use: recorded in a state dir, or the remote of a directory.
 	forges := map[string]Forge{}
 	dirs, _ := filepath.Glob(filepath.Join(stateRoot(), "zero-*"))
 	for _, d := range dirs {
@@ -141,7 +141,7 @@ func loadOverview() (*overview, error) {
 	return &overview{c, rows, tokens, liveTokens, sandboxes, dirs, warn}, nil
 }
 
-// policyState compares the policy in the workspace's folders with the one
+// policyState compares the policy in the workspace's directories with the one
 // the sandbox runs with: "ok", or "changed" until the next zero up applies it
 // (also when the policy cannot be read; zero up says why).
 func (s *Sandbox) policyState() string {
@@ -166,12 +166,12 @@ func (s *Sandbox) policyState() string {
 
 // lsLegend explains the table; it goes to stderr, the rows stay as they are
 // for scripts.
-const lsLegend = "legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = the folders' .zero/policy.yaml differs from what runs; zero up applies it or says why not"
+const lsLegend = "legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = the directories' .zero/policy.yaml differs from what runs; zero up applies it or says why not"
 
 // writeRows prints the workspace table.
 func writeRows(out io.Writer, rows []wsRow) error {
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "  WORKSPACE\tSTATUS\tFOLDERS\tTOKEN\tPOLICY")
+	fmt.Fprintln(tw, "  WORKSPACE\tSTATUS\tDIRS\tTOKEN\tPOLICY")
 	for _, r := range rows {
 		mark := " "
 		if r.Current {
@@ -293,14 +293,14 @@ func (s *Sandbox) unpushedIn(top string) string {
 	return strings.Join(strings.Split(res, "\n"), ", ")
 }
 
-// unpushed is the summary over all repo folders, as printed before a delete.
+// unpushed is the summary over all repo directories, as printed before a delete.
 func (s *Sandbox) unpushed() string {
 	var parts []string
 	for _, top := range s.repos() {
 		parts = append(parts, filepath.Base(top)+": "+s.unpushedIn(top))
 	}
 	if len(parts) == 0 {
-		return "no repo folders"
+		return "no repo directories"
 	}
 	return strings.Join(parts, "; ")
 }

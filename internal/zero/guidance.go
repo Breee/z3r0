@@ -12,7 +12,7 @@ import (
 )
 
 // Instructions and skills of a workspace (ADR 0049): plain files on the host,
-// copied read-only into the sandbox next to the input folders and named in
+// copied read-only into the sandbox next to the input directories and named in
 // the opencode user config of the sandbox.
 
 // guidanceDir is the entry of the staging directory that holds them.
@@ -65,7 +65,7 @@ func guidance(w *Workspace) (instr, skills []string, err error) {
 			return nil, nil, err
 		}
 		if !st.IsDir() || !fileExists(filepath.Join(q, "SKILL.md")) {
-			return nil, nil, fmt.Errorf("skill %s: not a folder with a SKILL.md", p)
+			return nil, nil, fmt.Errorf("skill %s: not a directory with a SKILL.md", p)
 		}
 		skills = append(skills, q)
 	}

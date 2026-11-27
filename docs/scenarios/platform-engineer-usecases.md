@@ -16,7 +16,7 @@ Priya is a platform engineer. Her team runs three clusters (dev, qa, prod) for 9
 | Kargo | promotes a build (Freight) dev → qa → prod by writing to `platform/gitops` | UI, `kargo promote` |
 | Grafana | dashboards, alerts; Prometheus and Loki behind it | UI, Explore |
 
-Her zero workspace: `zero ctx new platform ~/src/gitops ~/src/charts ~/docs/runbooks` — two repos and one read-only input folder (runbooks).
+Her zero workspace: `zero ctx new platform ~/src/gitops ~/src/charts ~/docs/runbooks` — two repos and one read-only input directory (runbooks).
 
 ## 2. Rule that follows from GitOps
 
@@ -37,8 +37,8 @@ Status: ✅ works with zero today · 🟡 git part works, the agent lacks read a
 | # | Task | Agent needs | Status |
 |---|---|---|---|
 | T1 | Bump an image tag or chart version in `gitops`, open the MR | `git.push`, `gitlab.mr.create` (needs `ci.run`, ADR 0044) | ✅ |
-| T2 | Onboard a team: namespace, quota, network policy, RBAC, Argo CD Application from a template | same; runbook from the input folder | ✅ |
-| T3 | Change in two repos at once: new value in `charts`, use it in `gitops` | multi-folder workspace, one token for both projects | ✅ (#76) |
+| T2 | Onboard a team: namespace, quota, network policy, RBAC, Argo CD Application from a template | same; runbook from the input directory | ✅ |
+| T3 | Change in two repos at once: new value in `charts`, use it in `gitops` | multi-directory workspace, one token for both projects | ✅ (#76) |
 | T4 | Pipeline of the MR is red: read the job log, fix, push again | `gitlab.pipeline.read` | ✅ a human starts the pipeline unless `ci.run` is approved (ADR 0035) |
 | T5 | Review someone else's MR in `gitops`: explain the diff, comment | `gitlab.mr.read`; commenting needs a capability that does not exist (`gitlab.mr.comment`) | 🟡 read only |
 | T6 | Render the change locally (`helm template`, `kustomize build`, `kubeconform`) before pushing | tools in the image; chart registries in `network.allow` | ✅ if the image has the tools; not checked |
@@ -90,7 +90,7 @@ Read (enough for T1–T17 except the UI half of T17):
 | `k8s.resource.read` | get/list/watch, logs. Never Secrets, exec, port-forward | cluster + namespaces | T10 needs cluster-wide read; ConfigMaps often hold secrets too |
 | `argocd.read` | applications, sync status, diff, resource tree, events | Argo CD project | the diff and live manifests can show Secret data unless Argo CD masks it; pod logs through Argo CD are a second path to `k8s.resource.read` |
 | `kargo.read` | stages, freight, promotions, verifications | Kargo project | Kargo permissions are Kubernetes RBAC on its own resources; a second API to cover |
-| `grafana.read` | dashboards, alert rules and state, datasource queries | folder + datasources | a query can return anything the datasource holds: logs contain tokens and personal data. Loki/Prometheus tenant limits are the real scope, not Grafana's |
+| `grafana.read` | dashboards, alert rules and state, datasource queries | directory + datasources | a query can return anything the datasource holds: logs contain tokens and personal data. Loki/Prometheus tenant limits are the real scope, not Grafana's |
 | `gitlab.mr.comment` | comment on an MR | project | spam only, reversible |
 
 Write, off by default, each one a decision of its own:

@@ -30,25 +30,25 @@ const servePort = 4096
 // state (port, forward pid, ssh config) under the state dir.
 type Sandbox struct {
 	Name         string   // zero-<workspace>
-	Folders      []string // host folders of the workspace
+	Folders      []string // host directories of the workspace
 	Tools        []string // forge MCP tools of the workspace, "default" expanded
 	Instructions []string // instruction files on the host, absolute
-	Skills       []string // skill folders on the host, absolute
+	Skills       []string // skill directories on the host, absolute
 	// Models the agents may use through the model proxy; empty: no proxy.
 	Models    []string
 	Model     string
 	Providers []string
 	// ProviderKeys: per key provider the command that prints its key.
 	ProviderKeys map[string]string
-	Repo         string // basename of the first folder
-	Top          string // first folder on the host
-	Dir          string // checkout path of the first folder inside the sandbox
+	Repo         string // basename of the first directory
+	Top          string // first directory on the host
+	Dir          string // checkout path of the first directory inside the sandbox
 	State        string // local state dir (0700)
 	Host         string // ssh host alias from `openshell sandbox ssh-config`
 	gw           string // OpenShell gateway; empty = active gateway (podman, E1)
 
 	Approve bool
-	// MaxInput is the size limit for input folders in bytes; 0 means the default.
+	// MaxInput is the size limit for input directories in bytes; 0 means the default.
 	MaxInput int64 // --approve: accept a wider policy without asking
 }
 

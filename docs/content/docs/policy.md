@@ -111,7 +111,7 @@ Without the model proxy the list decides the token's permissions only. The sandb
 
 ## Instructions and skills
 
-Instructions (text files the agent always reads) and skills (folders with a `SKILL.md`) of a workspace are set in the same file:
+Instructions (text files the agent always reads) and skills (directories with a `SKILL.md`) of a workspace are set in the same file:
 
 ```yaml {filename="~/.config/zero/config.yaml"}
 workspaces:
@@ -128,15 +128,15 @@ instructions: review.md, read-only
 skills: go-review, read-only
 ```
 
-The agent can read them and cannot change them. A changed or removed entry takes effect at the next `zero up`; `zero status` shows both lists. A path that does not exist, a skill folder without `SKILL.md` or two entries with the same name stop every zero command until corrected.
+The agent can read them and cannot change them. A changed or removed entry takes effect at the next `zero up`; `zero status` shows both lists. A path that does not exist, a skill directory without `SKILL.md` or two entries with the same name stop every zero command until corrected.
 
 Limits:
 
 - Only opencode is told about them. Other tools in the sandbox find the files under `/tmp/zero-input/.zero/` and nothing more.
 - A skill is offered to the model only if its `SKILL.md` has a `description`.
-- They count into the size limit of input folders (`zero up --max-input`), need the folder `zero install` creates, and do not work with `--vm`.
+- They count into the size limit of input directories (`zero up --max-input`), need the directory `zero install` creates, and do not work with `--vm`.
 - zero does not touch a repository's own `opencode.json`; opencode combines the lists of both.
-- A path that is a link is followed: the file or folder it points to is copied, under that name.
+- A path that is a link is followed: the file or directory it points to is copied, under that name.
 - If the sandbox already has an opencode user config that zero did not write, zero leaves it alone and says so.
 
 ## Models through the model proxy

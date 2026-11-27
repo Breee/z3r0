@@ -61,7 +61,7 @@ Short forms stay valid: a workspace with only `folders` (and today's `tools`, `i
 | `folders` | checkout or read-only copy in the sandbox | sandbox, push gate | built |
 | `capabilities`, `preset` | permissions of the forge token, gate settings | forge, push gate | built (capabilities come from `.zero/policy.yaml` today) |
 | `network` | rule `project` of the sandbox policy | OpenShell | built (from `.zero/policy.yaml` today) |
-| `instructions`, `skills` | read-only folder `/tmp/zero-input/.zero`, opencode user config | read-only mount | built for opencode (#161) |
+| `instructions`, `skills` | read-only directory `/tmp/zero-input/.zero`, opencode user config | read-only mount | built for opencode (#161) |
 | `model`, `providers` | LiteLLM `model_list`, `credential_list`; one key per sandbox with the agent's models; model list in the harness config | model proxy | PoC 17, 18 |
 | `guardrails` | LiteLLM `guardrails` | model proxy | PoC 18 |
 | `mcp` | with the model proxy: MCP servers in LiteLLM, tool list on the sandbox's key; else agentgateway targets, tool list per sandbox identity from zero-cp per request | tool gateway | PoC 22, PoC 15 |
@@ -79,7 +79,7 @@ Rules: layers only narrow (operator limits, shared definitions, repository `.zer
 |---|---|---|
 | Models, guardrails | LiteLLM, opt-in | discovery, per-key model list, mask and block shown (PoC 18). Cost: Postgres. The key stays outside the sandbox, the sandbox holds a placeholder (PoC 20, built in #162) |
 | Tool list per workspace | on the sandbox's LiteLLM key when the model proxy is on; else agentgateway | with the proxy on, the key and its database are already there and the list is set when zero mints the key; a key zero mints always carries a list or `no-mcp-servers`, because a key of the admin user without one sees every tool (PoC 22). agentgateway needs no database and takes the identity of the sandbox instead of a key, but needs SPIRE (PoC 15); it stays the way without LiteLLM |
-| Skills, instructions | plain files, read-only folder | no part needed and the file is the source of truth. LiteLLM keeps skills in its database, grants them per key and hands out a ZIP (PoC 22), but has no file form for them, does not deliver to opencode and has nothing for instructions |
+| Skills, instructions | plain files, read-only directory | no part needed and the file is the source of truth. LiteLLM keeps skills in its database, grants them per key and hands out a ZIP (PoC 22), but has no file form for them, does not deliver to opencode and has nothing for instructions |
 | Secrets | host keyring; OpenBao opt-in | as today |
 
 Sources: `ai-docs/tool-eval-litellm.md`, `pocs/15-gitlab-mcp`, `pocs/17-litellm`, `pocs/18-litellm-sandbox`.
@@ -98,7 +98,7 @@ Served by zero-cp under `/ui/`, data from `/api/` (JSON). The workspace list com
 
 | Page | Shows | Read from |
 |---|---|---|
-| Workspaces | name, status, folders, token time left, policy state | what `zero ls` reads |
+| Workspaces | name, status, directories, token time left, policy state | what `zero ls` reads |
 | Workspace | agents, what each may reach (hosts, capabilities, tools, model, instructions, skills) | config file, state directory |
 | Decisions | pushes allowed, denied, refused requests | `gate.log` |
 | Parts | which are on, health | compose state |

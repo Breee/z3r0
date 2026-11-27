@@ -14,7 +14,7 @@ The first match wins:
 
 1. `-c NAME` or `--context NAME`
 2. the variable `ZERO_CONTEXT`
-3. the workspace that contains the current folder
+3. the workspace that contains the current directory
 4. the current workspace, set by `zero switch` or `zero ctx use`
 
 Every command that acts on a workspace prints the workspace and where it came from as its first line:
@@ -31,7 +31,7 @@ workspace: developer (cwd)
 |---|---|
 | `zero up` | creates the sandbox or reuses it, clones the repositories the first time, starts opencode inside |
 | `zero up --approve` | accepts a wider `.zero/policy.yaml` without the question |
-| `zero up --max-input MiB` | size limit for input folders, instructions and skills (default 100) |
+| `zero up --max-input MiB` | size limit for input directories, instructions and skills (default 100) |
 | `zero up --vm` | new sandbox as a MicroVM instead of a container |
 | `zero status` | state of the sandbox, token, push gate |
 | `zero stop` | ends the port forward; the sandbox keeps running |
@@ -69,7 +69,7 @@ Other lines you can see there:
 |---|---|
 | `zero opencode` | `up`, then opencode in this terminal; it runs inside the sandbox, in the first repository. Needs a terminal. `--web` opens the browser instead, like `zero web` (`zero attach` still works) |
 | `zero run <prompt>` | `up`, then one prompt without the UI; opencode runs inside the sandbox and uses its default model |
-| `zero web` | `up`, then the opencode web UI in the browser. Home lists one session of the workspace's first repository under "Recent sessions"; open it to work in that folder. Other repositories: "Add project" with the path `/tmp/zero/<folder>` |
+| `zero web` | `up`, then the opencode web UI in the browser. Home lists one session of the workspace's first repository under "Recent sessions"; open it to work in that directory. Other repositories: "Add project" with the path `/tmp/zero/<directory>` |
 | `zero vscode` | `up`, then VS Code with Remote-SSH on the sandbox (`zero code` still works) |
 | `zero copilot [ARG...]` | `up`, then the GitHub Copilot CLI inside the sandbox, in the first repository. Everything after `copilot` goes to the tool, so the workspace option comes before it (`zero -c app copilot`), for example `zero copilot -p "fix the test"`; without a terminal it needs arguments. It uses the Copilot login of the host's opencode and may reach `api.githubcopilot.com` only, so its built-in GitHub tools do not connect. A sandbox made before this command existed has no Copilot CLI: `zero rm`, then `zero up`. In a workspace with `models` (model proxy) it talks to the proxy instead, needs no Copilot login in the sandbox and needs a model: `zero copilot --model github_copilot/claude-haiku-4.5 -p "fix the test"`, or `model:` for the workspace in zero's config |
 | `zero claude [ARG...]` | `up`, then Claude Code inside the sandbox, in the first repository. Only in a workspace that uses the [model proxy](../policy/#models-through-the-model-proxy): it talks to the proxy, with no Anthropic login. Name a model: `zero claude --model github_copilot/claude-haiku-4.5 -p "fix the test"`, or `model:` for the workspace in zero's config. Everything after `claude` goes to the tool, so the workspace is `zero -c app claude`. Without a terminal it needs arguments. A sandbox made before needs `zero rm`, then `zero up` |
@@ -88,11 +88,11 @@ zero run "add a test for the parser and push"
 | `zero ls` | all workspaces with status, token and policy; leftovers without a workspace |
 | `zero switch NAME` | makes NAME the current workspace |
 | `zero switch` | the same, picked from the list (up/down or j/k, enter, q) |
-| `zero ctx` | lists workspaces with their folders (`*` current, `+` contains the current folder) |
+| `zero ctx` | lists workspaces with their directories (`*` current, `+` contains the current directory) |
 | `zero ctx use NAME` | same as `zero switch NAME` |
-| `zero ctx new NAME [PATH...]` | new workspace with these folders |
-| `zero ctx add [PATH...]` | adds folders to the workspace |
-| `zero ctx remove [PATH...]` | removes folders from the workspace |
+| `zero ctx new NAME [PATH...]` | new workspace with these directories |
+| `zero ctx add [PATH...]` | adds directories to the workspace |
+| `zero ctx remove [PATH...]` | removes directories from the workspace |
 | `zero ctx rm [-y] NAME` | deletes the workspace and its sandbox; also takes a name from a `leftover:` line of `zero ls` |
 | `zero ctx --prompt` | prints the name of the workspace a command would act on, for a shell prompt |
 
@@ -101,13 +101,13 @@ zero ls
 ```
 
 ```
-  WORKSPACE  STATUS   FOLDERS  TOKEN       POLICY
+  WORKSPACE  STATUS   DIRS     TOKEN       POLICY
   developer  running  2        gitlab 38h  ok
 * z3r0       none     1        -           -
-legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = the folders' .zero/policy.yaml differs from what runs; zero up applies it or says why not
+legend: * current workspace; TOKEN: forge and time left; POLICY: ok, or changed = the directories' .zero/policy.yaml differs from what runs; zero up applies it or says why not
 ```
 
-`STATUS` is `running`, `paused`, `none` (no sandbox) or `unknown` (gateway not reachable). `POLICY` is `changed` when the `.zero/policy.yaml` in the folders differs from what the sandbox runs with; the next `zero up` applies it or says why it cannot; `-` when no policy is recorded (no sandbox yet). The legend goes to the error output, so a script reads rows only.
+`STATUS` is `running`, `paused`, `none` (no sandbox) or `unknown` (gateway not reachable). `POLICY` is `changed` when the `.zero/policy.yaml` in the directories differs from what the sandbox runs with; the next `zero up` applies it or says why it cannot; `-` when no policy is recorded (no sandbox yet). The legend goes to the error output, so a script reads rows only.
 
 What is left over without a workspace gets a line each, with the command that removes it:
 
@@ -135,13 +135,13 @@ $ zero up --bogus
 zero up: unknown option "--bogus" (options: --approve, --vm, --max-input N)
 ```
 
-A folder whose name starts with `-` is written as `./-name`.
+A directory whose name starts with `-` is written as `./-name`.
 
 ## Files
 
 | Path | Content |
 |---|---|
-| `~/.config/zero/config.yaml` | workspaces, their folders, tools, instructions, skills and models, the model proxy, the current workspace |
+| `~/.config/zero/config.yaml` | workspaces, their directories, tools, instructions, skills and models, the model proxy, the current workspace |
 | `~/.local/state/zero/zero-<name>/` | state of one sandbox (token id, capabilities, push gate log `gate.log`) |
 | `.zero/policy.yaml` in a repository | [policy](../policy) of the project |
 

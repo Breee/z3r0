@@ -281,7 +281,7 @@ func (s *Sandbox) create() error {
 		creds = append(creds, cp)
 	}
 	// The staging directory is mounted even when it is empty, so input
-	// folders can be added later without a new sandbox. The VM driver has
+	// directories can be added later without a new sandbox. The VM driver has
 	// no input mount (ADR 0039).
 	mount := ""
 	if s.gw == "" && fileExists(s.stage()) {
@@ -328,7 +328,7 @@ func (s *Sandbox) writeSSHConfig() error {
 	return s.write("ssh.conf", conf+"\n", 0o600)
 }
 
-// dirs are the checkout paths of all folders inside the sandbox.
+// dirs are the checkout paths of all directories inside the sandbox.
 func (s *Sandbox) dirs() []string {
 	var out []string
 	for _, top := range s.Folders {
@@ -337,9 +337,9 @@ func (s *Sandbox) dirs() []string {
 	return out
 }
 
-// ensureCheckout clones every folder that is not in the sandbox yet from a
+// ensureCheckout clones every directory that is not in the sandbox yet from a
 // git bundle (bundles avoid copying a raw .git from the host trust domain).
-// A folder removed from the workspace keeps its checkout in the sandbox.
+// A directory removed from the workspace keeps its checkout in the sandbox.
 // uncommitted counts changed and untracked files of a host repo; ignored files do not count.
 func uncommitted(top string) int {
 	out, err := sh("git", "-C", top, "status", "--porcelain")
@@ -484,8 +484,8 @@ func (s *Sandbox) Web(out io.Writer) error {
 }
 
 // webSession makes sure the service has a session in the workspace's first
-// folder. The web UI opens on a page that lists sessions, and a pairing link
-// cannot name a folder (C56).
+// directory. The web UI opens on a page that lists sessions, and a pairing link
+// cannot name a directory (C56).
 func (s *Sandbox) webSession() error {
 	list, err := s.ssh("opencode api get " + shellQuote("/api/session?limit=1&directory="+url.QueryEscape(s.Dir)))
 	if err != nil {
@@ -512,7 +512,7 @@ func hasSession(list string) (bool, error) {
 }
 
 // Attach is up + the opencode TUI, started inside the sandbox over ssh with
-// this terminal (ADR 0048): the host's opencode cannot open a folder that
+// this terminal (ADR 0048): the host's opencode cannot open a directory that
 // exists only in the sandbox (C38).
 // NeedTerminal is the check of `zero opencode`, exported so that the command
 // can refuse before a workspace is made.
@@ -920,7 +920,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 	if len(s.Folders) == 1 {
 		return passthrough("code", "--folder-uri", remote+sandboxDir(s.Folders[0]))
 	}
-	// Several folders open as a multi-root workspace (spec F11).
+	// Several directories open as a multi-root workspace (spec F11).
 	type folder struct {
 		Path string `json:"path"`
 	}

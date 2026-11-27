@@ -36,7 +36,7 @@ Workspaces
   ls          all workspaces with status, token and policy; leftovers
   ui          web page: workspaces, what each agent may reach, decisions
   switch      make a workspace the current one: switch NAME, or pick from the list
-  ctx         workspaces with folders; ctx new NAME [PATH...], add, remove, rm, use
+  ctx         workspaces with directories; ctx new NAME [PATH...], add, remove, rm, use
 
 This machine
   install     set up the host (sudo); --podman, --docker-rootless or --docker
@@ -49,7 +49,7 @@ Examples
   cd ~/repos/app && zero opencode
   zero -c app status
 
-Workspace: -c, else ZERO_CONTEXT, else the current folder's, else the current one.
+Workspace: -c, else ZERO_CONTEXT, else the current directory's, else the current one.
 Exit codes: 0 done, 1 failed, 2 wrong command or option (nothing ran).
 `
 

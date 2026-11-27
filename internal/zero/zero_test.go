@@ -384,7 +384,7 @@ func TestLoadPolicyUnion(t *testing.T) {
 	os.MkdirAll(filepath.Join(a, ".zero"), 0o700)
 	os.WriteFile(filepath.Join(a, ".zero", "policy.yaml"),
 		[]byte("network:\n  allow: [proxy.golang.org]\ncapabilities: [git.read, ci.run]\n"), 0o600)
-	// The input folder c is no policy source.
+	// The input directory c is no policy source.
 	c := t.TempDir()
 	os.MkdirAll(filepath.Join(a, ".git"), 0o700)
 	os.MkdirAll(filepath.Join(b, ".git"), 0o700)
@@ -697,13 +697,13 @@ func TestSyncInputs(t *testing.T) {
 		t.Fatal("copied despite the limit")
 	}
 
-	// A folder that left the workspace loses its copy.
+	// A directory that left the workspace loses its copy.
 	s.Folders, s.MaxInput = nil, 0
 	if err := s.syncInputs(&out); err != nil {
 		t.Fatal(err)
 	}
 	if fileExists(stage) {
-		t.Fatal("copy of a removed folder kept")
+		t.Fatal("copy of a removed directory kept")
 	}
 }
 
@@ -1283,18 +1283,18 @@ func TestCtxRemoveMissingFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Ctx(&out, "w", []string{"remove", b}); err != nil {
-		t.Fatalf("remove of a folder that is gone: %v", err)
+		t.Fatalf("remove of a directory that is gone: %v", err)
 	}
 	c, err := loadConfig()
 	if err != nil || !slices.Equal(c.Workspaces["w"].Folders, []string{a}) {
-		t.Fatalf("folders = %v, %v", c.Workspaces["w"], err)
+		t.Fatalf("directories = %v, %v", c.Workspaces["w"], err)
 	}
 	err = Ctx(&out, "w", []string{"remove", filepath.Join(root, "c")})
 	if err == nil || !strings.Contains(err.Error(), "zero -c w ctx remove PATH") {
-		t.Errorf("unknown folder: %v", err)
+		t.Errorf("unknown directory: %v", err)
 	}
-	// A folder that was replaced by a link to another folder of the
-	// workspace is taken out itself, not the folder it links to.
+	// A directory that was replaced by a link to another directory of the
+	// workspace is taken out itself, not the directory it links to.
 	if err := Ctx(&out, "w", []string{"add", b2(t, root)}); err != nil {
 		t.Fatal(err)
 	}

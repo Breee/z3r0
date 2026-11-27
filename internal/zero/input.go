@@ -12,7 +12,7 @@ import (
 	"syscall"
 )
 
-// Input folders (ADR 0039): a workspace folder that is no git repo is copied,
+// Input directories (ADR 0039): a workspace directory that is no git repo is copied,
 // filtered, to a staging directory on the host. The staging directory of the
 // sandbox is bind-mounted read-only at inputMount.
 
@@ -52,7 +52,7 @@ func (s *Sandbox) inputs() []string {
 	return out
 }
 
-// repos are the folders that are cloned into the sandbox.
+// repos are the directories that are cloned into the sandbox.
 func (s *Sandbox) repos() []string {
 	var out []string
 	for _, top := range s.Folders {
@@ -87,7 +87,7 @@ func matchAny(patterns []string, name, rel string) bool {
 }
 
 // readIgnore reads .zeroignore: one pattern per line (file name or path
-// relative to the folder, shell wildcards), # starts a comment.
+// relative to the directory, shell wildcards), # starts a comment.
 func readIgnore(top string) ([]string, error) {
 	f, err := os.Open(filepath.Join(top, ".zeroignore"))
 	if os.IsNotExist(err) {
@@ -112,7 +112,7 @@ func readIgnore(top string) ([]string, error) {
 	return out, sc.Err()
 }
 
-// scanInput lists the files of an input folder that may be copied and the
+// scanInput lists the files of an input directory that may be copied and the
 // entries that are left out. Symlinks and special files are never copied.
 func scanInput(top string) ([]inputFile, []skipped, error) {
 	ignore, err := readIgnore(top)
@@ -221,7 +221,7 @@ func kib(n int64) string {
 	return fmt.Sprintf("%d KiB", (n+1023)/1024)
 }
 
-// syncInputs refreshes the host copy of every input folder and of the
+// syncInputs refreshes the host copy of every input directory and of the
 // workspace's instructions and skills, and drops copies of what left the
 // workspace. The size limit holds for all of them together and is checked
 // before anything is copied.
@@ -229,7 +229,7 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 	inputs := s.inputs()
 	what := ""
 	if len(inputs) > 0 {
-		what = inputs[0] + " is an input folder (no git repo); input folders"
+		what = inputs[0] + " is an input directory (no git repo); input directories"
 	} else if len(s.Instructions)+len(s.Skills) > 0 {
 		what = "the workspace has instructions or skills; they"
 	}
@@ -285,7 +285,7 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 		total += st.Size()
 	}
 	if total > limit {
-		return fmt.Errorf("input folders, instructions and skills have %s, limit is %s; raise it: zero up --max-input <MiB>", kib(total), kib(limit))
+		return fmt.Errorf("input directories, instructions and skills have %s, limit is %s; raise it: zero up --max-input <MiB>", kib(total), kib(limit))
 	}
 	stage := s.stage()
 	if err := os.MkdirAll(stage, 0o755); err != nil {

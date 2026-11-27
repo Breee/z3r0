@@ -9,7 +9,7 @@ Contents:
 2. [Sandbox runtime and host](#2-sandbox-runtime-and-host)
 3. [Egress and credentials](#3-egress-and-credentials)
 4. [Forge, CI and the developer's checkout](#4-forge-ci-and-the-developers-checkout)
-5. [Gateway bind mounts and input folders](#5-gateway-bind-mounts-and-input-folders)
+5. [Gateway bind mounts and input directories](#5-gateway-bind-mounts-and-input-directories)
 6. [Origins of agent corruption](#6-origins-of-agent-corruption)
 7. [P14 in depth: CI is code execution outside the sandbox](#7-p14-in-depth-ci-is-code-execution-outside-the-sandbox)
 8. [Mitigable with OpenShell 0.1.2 alone?](#8-mitigable-with-openshell-012-alone)
@@ -24,7 +24,7 @@ Effort: what it takes to exploit the path, from least to most. Classified by jud
 
 | Effort | Needs | Example |
 |---|---|---|
-| E1 | a user mistake, no attacker | secret left in an input folder |
+| E1 | a user mistake, no attacker | secret left in an input directory |
 | E2 | a corrupted agent only (one injected prompt), using what it is allowed to do | data in the query of an allowed endpoint |
 | E3 | a corrupted agent plus a normal step by the developer (check out, approve, download, start a pipeline, allow an endpoint) | committed hook config runs on the host |
 | E4 | a foothold or preparation outside the sandbox (process on the host, published package or image, tampered provider) | malicious Go module |
@@ -70,8 +70,8 @@ P14 was E2 before the push gate added `ci.skip` (#102) and is E2 again where `ci
 | <a id="p31"></a>P31 | origin | E1 | Plain model error | reasoning | 6 |
 | <a id="p32"></a>P32 | medium | E4 | Gateway client key holder bind-mounts gateway user files | reasoning | 5 |
 | <a id="p33"></a>P33 | medium | E4 | Gateway client key holder attaches any podman volume | reasoning | 5 |
-| <a id="p34"></a>P34 | low | E1 | Secret in an input folder under an unknown name | by design | 5 |
-| <a id="p35"></a>P35 | low | E1 | Input folder content carries instructions | reasoning | 5 |
+| <a id="p34"></a>P34 | low | E1 | Secret in an input directory under an unknown name | by design | 5 |
+| <a id="p35"></a>P35 | low | E1 | Input directory content carries instructions | reasoning | 5 |
 | <a id="p36"></a>P36 | low | E3 | Repo bundle carries the stash into the sandbox | fixed #116 | 4 |
 | <a id="p37"></a>P37 | high | E3 | Merged gitops change points a lower environment at live data | reasoning | 4 |
 
@@ -118,10 +118,10 @@ Recorded 2026-11-10 for the zero workflow, not proven unless noted. Recorded, no
 | P20 | medium | Token inherits the developer's role (Maintainer); fine-grained permissions are the only limit — a GitLab bug or new implicit permission widens it | Merge/settings change | accepted (ADR 0020), merge not tested | — | ADR 0020 |
 | P23 | low | Resource abuse: many branches/MRs/pipelines, model quota burn | CI minutes, cost, noise | inherent | — | — |
 | P25 | high | Agent pushes to, force-pushes or deletes unprotected branches other than its session branch (token not branch-scoped) | Colleague work lost or tampered | tested 2026-11-23 (`tests/attacks/forge.sh`): refused; force-push on the own session branch stays possible | Push gate: only `zero/<name>` and below, no delete (ADR 0030); direct push to the forge blocked by policy. Force-push on the own session branch is not a gate matter (decided 2026-11-23): approvals are removed by new commits (F7). Practice: F1, F2, F7, Z1. | C43, #95 |
-| P36 | low | A repo folder is added while the agent runs; the bundle in `/tmp/.zero.bundle` was built with `--all` and carried `refs/stash` (a `git stash -u` holds untracked files such as `.env`); the agent copies the bundle before it is deleted | Stashed secrets readable by the agent | bundle content shown on the host (#116), sandbox side not run | fixed #116: bundle holds branches, tags and HEAD only Practice: G5, G6. | #116, spec §6.1 |
+| P36 | low | A repo directory is added while the agent runs; the bundle in `/tmp/.zero.bundle` was built with `--all` and carried `refs/stash` (a `git stash -u` holds untracked files such as `.env`); the agent copies the bundle before it is deleted | Stashed secrets readable by the agent | bundle content shown on the host (#116), sandbox side not run | fixed #116: bundle holds branches, tags and HEAD only Practice: G5, G6. | #116, spec §6.1 |
 | P37 | high | In a gitops repo the agent changes an allowed file of a lower environment (`qa/<service>/values.yaml`, extra manifests) so that the qa service uses live data: live database host, live secret reference, live bucket. The change looks like a normal config fix; a human merges it. The agent then reads live data through its qa read access (logs, config) | Live data reaches the agent and the model provider without any live access granted | reasoning only (2026-11-19) | open: path rules do not judge content; merge request review is the only control; candidate guards on the platform side: docs/scenarios/kubernetes-hardening.md (untested) zero's side: zero decides what is in the sandbox, not what a merged change does in a cluster; the control is the platform's (network policies, admission policies such as Kyverno or OPA), decision 2026-11-24, hardening from zero's side later. Practice: F9, C17, C18, G2, G3, G9, G10, D1, D2, D3, K3, K4, K6, K7, K8, K9, K10. | #124 |
 
-## 5. Gateway bind mounts and input folders
+## 5. Gateway bind mounts and input directories
 
 Added 2026-11-17 (#77, ADR 0039). Not proven unless noted. The agent itself gains no path: the mount is read-only for a non-root user (proven: write, delete, chmod, remount fail) and it cannot ask for mounts without the gateway client key.
 
@@ -129,8 +129,8 @@ Added 2026-11-17 (#77, ADR 0039). Not proven unless noted. The agent itself gain
 |---|---|---|---|---|---|---|
 | P32 | medium | A host process with the user's gateway client key creates a sandbox with a bind mount of any path the gateway user can read (`--driver-config-json`), also read-write | Reads the gateway user's home: gateway TLS keys, stored GitLab and Copilot credentials. Before ADR 0039 the user could not read them | not run; follows from `enable_bind_mounts = true` | Upstream read-only upload (#112), then turn the three settings off again (#111) | C52, ADR 0039, #113 |
 | P33 | medium | Same process attaches any existing podman volume (`resource_admission.enabled = false`) | Reads or changes another sandbox's workspace | not run | as P32 | C52, ADR 0039, #113 |
-| P34 | low | Secret in an input folder under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | `.zeroignore`; summary on `zero up`; list widened and content scan decided against in #72 Practice: G5, Z4. | #72, spec §6.1 |
-| P35 | low | Input content (specs, notes) carries instructions for the agent | Prompt injection, as P26 | not run | none; input folders are chosen by the developer | P26 |
+| P34 | low | Secret in an input directory under a name the pattern list does not know (`secrets.yaml`, `prod.tfvars`, a key inside a `.txt`) | Secret readable by the agent | by design: only names are matched | `.zeroignore`; summary on `zero up`; list widened and content scan decided against in #72 Practice: G5, Z4. | #72, spec §6.1 |
+| P35 | low | Input content (specs, notes) carries instructions for the agent | Prompt injection, as P26 | not run | none; input directories are chosen by the developer | P26 |
 
 ## 6. Origins of agent corruption
 

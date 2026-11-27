@@ -33,7 +33,7 @@ make install   # as your user, not with sudo: builds bin/zero and bin/zero-cp, t
 1. downloads the pinned OpenShell release and checks its checksum
 2. creates the user `openshell`; the gateway and the container runtime run under it, not under your login
 3. sets up the runtime for that user (podman: an image allowlist and its podman socket)
-4. starts the gateway and creates `/var/lib/zero/input`, the place input folders are handed over through
+4. starts the gateway and creates `/var/lib/zero/input`, the place input directories are handed over through
 5. gives your login the client certificate for the gateway
 6. copies `zero` and `zero-cp` to `/usr/local/bin` and starts `zero-cp` as a user service
 
@@ -55,7 +55,7 @@ Without a flag a later `sudo zero install` keeps the runtime it finds. `zero doc
 
 To change the runtime, remove the sandboxes first (`zero rm` in each workspace), run `sudo zero install` with the new flag, then `zero up`. Sandboxes of the old runtime are not moved.
 
-Differences under Docker: there is no image allowlist (podman's `policy.json` has no Docker counterpart). With rootless Docker older than 29.10 an input folder on a `nosuid` filesystem cannot be mounted.
+Differences under Docker: there is no image allowlist (podman's `policy.json` has no Docker counterpart). With rootless Docker older than 29.10 an input directory on a `nosuid` filesystem cannot be mounted.
 
 ## Check the setup
 
@@ -89,7 +89,7 @@ cd ~/src/api
 zero up
 ```
 
-zero creates a workspace named after the folder, a sandbox `zero-api`, clones the repository into it and creates the token. Then open the agent:
+zero creates a workspace named after the directory, a sandbox `zero-api`, clones the repository into it and creates the token. Then open the agent:
 
 ```sh
 zero opencode   # opencode in this terminal (runs inside the sandbox)
@@ -99,16 +99,16 @@ zero vscode     # VS Code on the sandbox
 
 The agent commits in the sandbox and pushes to the branch `zero/api`. Fetch that branch on the host, review it and open the merge request yourself.
 
-## More than one folder
+## More than one directory
 
-A workspace can hold several repositories and folders that are not repositories:
+A workspace can hold several repositories and directories that are not repositories:
 
 ```sh
 zero ctx new team ~/src/api ~/src/web ~/notes/specs
 zero -c team up
 ```
 
-Repositories are cloned into the sandbox. Other folders are copied in read-only as input (limit 100 MiB, change it with `zero up --max-input MiB`). One token covers all projects of the workspace.
+Repositories are cloned into the sandbox. Other directories are copied in read-only as input (limit 100 MiB, change it with `zero up --max-input MiB`). One token covers all projects of the workspace.
 
 ## Stop and remove
 

@@ -39,13 +39,13 @@ const capCIRun = "ci.run"
 
 var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
-// loadPolicy reads .zero/policy.yaml from the host folders, never from the
+// loadPolicy reads .zero/policy.yaml from the host directories, never from the
 // sandbox, so the agent cannot change its own policy. Missing file → default.
-// Several folders give the union: the token has one permission set for all
+// Several directories give the union: the token has one permission set for all
 // projects. Any error refuses; there is no fallback to something broader.
 func (s *Sandbox) loadPolicy() (*Policy, error) {
 	u := &Policy{}
-	// Input folders are no policy source (spec §6).
+	// Input directories are no policy source (spec §6).
 	for _, top := range s.repos() {
 		p, err := loadFolderPolicy(top)
 		if err != nil {
@@ -119,7 +119,7 @@ func parsePolicy(b []byte) (*Policy, error) {
 }
 
 // recordPolicy stores which policy the sandbox was created with: one line
-// per folder, "<HEAD sha> [dirty]"; further folders add their name.
+// per directory, "<HEAD sha> [dirty]"; further directories add their name.
 func (s *Sandbox) recordPolicy() error {
 	var lines []string
 	for i, top := range s.repos() {

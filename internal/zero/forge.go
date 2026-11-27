@@ -99,7 +99,7 @@ func (s *Sandbox) forge() Forge { return forgeOf(s.State) }
 // per line).
 func (s *Sandbox) forgePaths() []string { return strings.Fields(s.read("forge.path")) }
 
-// folderForge finds the forge and the project path of every folder; a folder
+// folderForge finds the forge and the project path of every directory; a directory
 // on no forge has path "". One workspace has one forge host.
 func (s *Sandbox) folderForge() (Forge, map[string]string, error) {
 	var forge Forge
@@ -111,14 +111,14 @@ func (s *Sandbox) folderForge() (Forge, map[string]string, error) {
 			continue
 		}
 		if forge != nil && f.Host() != forge.Host() {
-			return nil, nil, fmt.Errorf("folders are on %s and %s; a workspace has one forge host: move one folder to its own workspace (zero ctx remove PATH, zero ctx new NAME PATH)", forge.Host(), f.Host())
+			return nil, nil, fmt.Errorf("directories are on %s and %s; a workspace has one forge host: move one directory to its own workspace (zero ctx remove PATH, zero ctx new NAME PATH)", forge.Host(), f.Host())
 		}
 		forge, paths[top] = f, path
 	}
 	return forge, paths, nil
 }
 
-// orderedPaths lists the project paths in folder order.
+// orderedPaths lists the project paths in directory order.
 func (s *Sandbox) orderedPaths(paths map[string]string) []string {
 	var out []string
 	for _, top := range s.Folders {
@@ -146,7 +146,7 @@ func (s *Sandbox) syncForgePaths() (bool, error) {
 	}
 	cur := s.forge()
 	if cur == nil || len(paths) == 0 || f.Host() != cur.Host() {
-		return false, fmt.Errorf("the repositories of %s changed (was %s, now %s); %s; restore the folders and run zero up, or recreate: zero rm && zero up",
+		return false, fmt.Errorf("the repositories of %s changed (was %s, now %s); %s; restore the directories and run zero up, or recreate: zero rm && zero up",
 			s.Name, pathList(old), pathList(paths), s.dropToken())
 	}
 	if err := s.write("forge.stale", "1", 0o600); err != nil {

@@ -420,7 +420,7 @@ th{font-weight:600}code{background:#f3f3f3;padding:0 .2rem}.warn{color:#a40}.dim
 
 {{define "Workspaces"}}{{template "head" .}}
 {{if .Warn}}<p class="warn">{{.Warn}}</p>{{end}}
-<table><tr><th>Workspace</th><th>Sandbox</th><th>Folders</th><th>Token</th><th>Policy</th></tr>
+<table><tr><th>Workspace</th><th>Sandbox</th><th>Directories</th><th>Token</th><th>Policy</th></tr>
 {{range .List}}<tr><td><a href="/ui/workspace?workspace={{.Name}}">{{.Name}}</a>{{if .Current}} (current){{end}}</td><td>{{.Status}}</td><td>{{len .Folders}}</td><td>{{.Token}}</td><td>{{.Policy}}</td></tr>
 {{else}}<tr><td colspan="5">no workspace yet</td></tr>{{end}}</table>
 {{template "foot" .}}{{end}}
@@ -429,7 +429,7 @@ th{font-weight:600}code{background:#f3f3f3;padding:0 .2rem}.warn{color:#a40}.dim
 <h2>{{.Name}}</h2>
 <table>
 <tr><th>Sandbox</th><td>{{.Status}}</td></tr>
-<tr><th>Folders</th><td>{{range .Folders}}<code>{{.}}</code><br>{{end}}</td></tr>
+<tr><th>Directories</th><td>{{range .Folders}}<code>{{.}}</code><br>{{end}}</td></tr>
 <tr><th>Forge token</th><td>{{if .Token}}{{.Token}}{{else}}none{{end}}</td></tr>
 <tr><th>Projects it reaches</th><td>{{if .Projects}}{{join .Projects ", "}}{{else}}none{{end}}</td></tr>
 <tr><th>Capabilities</th><td>{{if .Capabilities}}{{join .Capabilities ", "}}{{else}}none recorded{{end}}</td></tr>

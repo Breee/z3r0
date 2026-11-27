@@ -153,7 +153,7 @@ enable_bind_mounts = true
 [openshell.drivers.$DRV.resource_admission]
 enabled = false
 TOML
-# staging for input folders: written by the login user, read by the gateway user
+# staging for input directories: written by the login user, read by the gateway user
 install -d -m 0755 /var/lib/zero
 echo "$RT" > /var/lib/zero/runtime
 install -d -o "$LU" -g "$(id -gn "$OU")" -m 0750 /var/lib/zero/input
