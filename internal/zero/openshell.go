@@ -47,7 +47,7 @@ func (openshell) Create(name, image, policyFile string, creds, env []string, mou
 			Target   string `json:"target"`
 			ReadOnly bool   `json:"read_only"`
 		}
-		b, _ := json.Marshal(map[string]any{"podman": map[string]any{"mounts": []mount{{"bind", mountSrc, mountDst, true}}}})
+		b, _ := json.Marshal(map[string]any{computeDriver(): map[string]any{"mounts": []mount{{"bind", mountSrc, mountDst, true}}}})
 		args = append(args, "--driver-config-json", string(b))
 	}
 	_, err := sh("openshell", args...)
@@ -202,4 +202,23 @@ func (openshell) DetachCredential(name, id string) {
 func (openshell) CredentialReady(name, id string) error {
 	_, err := sh("openshell", "sandbox", "provider", "status", "--wait", name, id)
 	return err
+}
+
+// computeDriver names the gateway's compute driver (podman or docker); the
+// mount settings are passed under that name (ADR 0057).
+func computeDriver() string {
+	out, _ := sh("openshell", "gateway", "info")
+	return parseComputeDriver(out)
+}
+
+func parseComputeDriver(info string) string {
+	lines := strings.Split(info, "\n")
+	for i, l := range lines {
+		if strings.TrimSpace(l) == "Compute drivers:" && i+1 < len(lines) {
+			if d := strings.TrimSpace(lines[i+1]); d == "docker" {
+				return d
+			}
+		}
+	}
+	return "podman"
 }

@@ -48,6 +48,15 @@ func Doctor(out io.Writer) error {
 				check("openshell gateway", "unreachable: "+err.Error())
 			} else {
 				check("openshell gateway", "")
+				if computeDriver() == "docker" {
+					if gatewayInDockerGroup() {
+						fmt.Fprintln(out, "warn  runtime: docker (rootful): the gateway's user can use the root daemon and is root on this host (ADR 0057); podman or rootless Docker is safer")
+					} else {
+						fmt.Fprintln(out, "ok    runtime: docker")
+					}
+				} else {
+					fmt.Fprintln(out, "ok    runtime: podman")
+				}
 			}
 		})
 	}
@@ -198,6 +207,35 @@ func gatewayUser() string {
 		return "no openshell-gateway process found"
 	}
 	return ""
+}
+
+// gatewayInDockerGroup reports whether a gateway process runs with the group
+// `docker`, which gives it the root daemon's socket.
+func gatewayInDockerGroup() bool {
+	g, err := user.LookupGroup("docker")
+	if err != nil {
+		return false
+	}
+	status, _ := filepath.Glob("/proc/[0-9]*/status")
+	for _, f := range status {
+		b, err := os.ReadFile(f)
+		if err != nil || !bytes.HasPrefix(b, []byte("Name:\topenshell-gatew\n")) {
+			continue
+		}
+		for _, l := range strings.Split(string(b), "\n") {
+			if rest, ok := strings.CutPrefix(l, "Groups:"); ok {
+				for _, id := range strings.Fields(rest) {
+					if id == g.Gid {
+						return true
+					}
+				}
+			}
+			if rest, ok := strings.CutPrefix(l, "Gid:"); ok && strings.Fields(rest)[0] == g.Gid {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // clientKey fails if a gateway mTLS client key is readable by others.

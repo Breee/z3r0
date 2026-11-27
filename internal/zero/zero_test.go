@@ -2041,3 +2041,16 @@ func TestProviderKeys(t *testing.T) {
 		t.Error("doctor check of the key commands")
 	}
 }
+
+func TestParseComputeDriver(t *testing.T) {
+	for in, want := range map[string]string{
+		"Gateway Info\n  Compute drivers:\n    docker\n      Driver version: 0.1.8\n": "docker",
+		"Gateway Info\n  Compute drivers:\n    podman\n":                              "podman",
+		"":                                "podman",
+		"  Extensions:\n    docker (x)\n": "podman",
+	} {
+		if got := parseComputeDriver(in); got != want {
+			t.Errorf("parseComputeDriver(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
