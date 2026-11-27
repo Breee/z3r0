@@ -421,7 +421,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			case sub == "add" && i < 0:
 				w.Folders = append(w.Folders, p)
 			case sub == "remove" && i < 0:
-				return fmt.Errorf("%s is not in workspace %s (folders: %s); name one of them: zero -c %s ctx remove PATH", p, name, strings.Join(w.Folders, " "), name)
+				return fmt.Errorf("%s is not in workspace %s (directories: %s); name one of them: zero -c %s ctx remove PATH", p, name, strings.Join(w.Folders, " "), name)
 			case sub == "remove":
 				if !isInput(p) || !fileExists(p) {
 					if s := c.sandbox(name); s.exists() {

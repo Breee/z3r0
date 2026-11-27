@@ -90,7 +90,7 @@ Read (enough for T1–T17 except the UI half of T17):
 | `k8s.resource.read` | get/list/watch, logs. Never Secrets, exec, port-forward | cluster + namespaces | T10 needs cluster-wide read; ConfigMaps often hold secrets too |
 | `argocd.read` | applications, sync status, diff, resource tree, events | Argo CD project | the diff and live manifests can show Secret data unless Argo CD masks it; pod logs through Argo CD are a second path to `k8s.resource.read` |
 | `kargo.read` | stages, freight, promotions, verifications | Kargo project | Kargo permissions are Kubernetes RBAC on its own resources; a second API to cover |
-| `grafana.read` | dashboards, alert rules and state, datasource queries | directory + datasources | a query can return anything the datasource holds: logs contain tokens and personal data. Loki/Prometheus tenant limits are the real scope, not Grafana's |
+| `grafana.read` | dashboards, alert rules and state, datasource queries | folder + datasources | a query can return anything the datasource holds: logs contain tokens and personal data. Loki/Prometheus tenant limits are the real scope, not Grafana's |
 | `gitlab.mr.comment` | comment on an MR | project | spam only, reversible |
 
 Write, off by default, each one a decision of its own:
