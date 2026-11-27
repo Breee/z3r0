@@ -64,19 +64,27 @@ OUID=$(id -u "$OU"); OH=$(getent passwd "$OU" | cut -d: -f6); LH=$(getent passwd
 chmod 700 "$OH"
 # only runtime docker puts the gateway's user into group docker; the user
 # manager has to start again to pick a change up
+as() { sudo -u "$OU" env HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG_HOME="$OH/.config" "$@"; }
+# put VAR FILE: stdin becomes FILE of the gateway's user; VAR=1 when it changed
+put() { new=$(cat); [ "$(as cat "$2" 2>/dev/null)" = "$new" ] || { printf '%s\n' "$new" | as tee "$2" >/dev/null; eval "$1=1"; }; }
+# The gateway is restarted at most once, and only when something changed:
+# a gateway stopped while it starts its sandboxes leaves them stuck (C62).
+GW=0
+gwdown() { as systemctl --user disable --now openshell-gateway.service 2>/dev/null || true; GW=1; }
 INGRP=no; id -nG "$OU" | tr ' ' '\n' | grep -qx docker && INGRP=yes
 if [ "$RT" = docker ] && [ $INGRP = no ]; then
-  usermod -aG docker "$OU"; systemctl restart "user@$OUID.service"
+  gwdown; usermod -aG docker "$OU"; systemctl restart "user@$OUID.service"
 elif [ "$RT" != docker ] && [ $INGRP = yes ]; then
-  gpasswd -d "$OU" docker >/dev/null; systemctl restart "user@$OUID.service"
+  gwdown; gpasswd -d "$OU" docker >/dev/null; systemctl restart "user@$OUID.service"
 fi
 i=0; while [ ! -S "/run/user/$OUID/bus" ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done
-as() { sudo -u "$OU" env HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG_HOME="$OH/.config" "$@"; }
 
 # 3. runtime. podman: image allowlist, user socket. docker-rootless: a daemon
 # of this user. docker: the system daemon, nothing to start.
 as mkdir -p "$OH/.config/containers" "$OH/.config/systemd/user" "$OH/.config/openshell"
-[ "$RT" = docker-rootless ] || as systemctl --user disable --now zero-docker.service 2>/dev/null || true
+if [ "$RT" != docker-rootless ] && as systemctl --user is-enabled -q zero-docker.service 2>/dev/null; then
+  gwdown; as systemctl --user disable --now zero-docker.service
+fi
 case $RT in
 podman)
 DRV=podman; SOCK="/run/user/$OUID/podman/podman.sock"; DEP=podman.socket; PTMP=true
@@ -104,7 +112,7 @@ docker-rootless)
 # no PrivateTmp: a user unit with it cannot reach the rootless socket (C61)
 DRV=docker; SOCK="/run/user/$OUID/docker.sock"; DEP=zero-docker.service; PTMP=false
 # as Docker's dockerd-rootless-setuptool.sh writes it
-as tee "$OH/.config/systemd/user/zero-docker.service" >/dev/null <<UNIT
+DK=0; put DK "$OH/.config/systemd/user/zero-docker.service" <<UNIT
 [Unit]
 Description=Docker, rootless (zero)
 Requires=dbus.socket
@@ -132,7 +140,9 @@ WantedBy=default.target
 UNIT
 as systemctl --user daemon-reload
 as systemctl --user enable zero-docker.service
-as systemctl --user restart zero-docker.service
+if [ $DK = 1 ] || ! as systemctl --user is-active -q zero-docker.service; then
+  gwdown; as systemctl --user restart zero-docker.service
+fi
 i=0; until [ -S "$SOCK" ]; do
   i=$((i+1)); [ $i -lt 60 ] || { echo "zero install: rootless Docker not up (journalctl --user-unit zero-docker as $OU)" >&2; exit 1; }; sleep 1
 done
@@ -145,7 +155,7 @@ esac
 # 4. gateway: driver of the runtime, fail closed, telemetry off. Bind mounts are on
 # for the read-only input mount (ADR 0039); they need driver config and
 # resource admission off.
-as tee "$OH/.config/openshell/gateway.toml" >/dev/null <<TOML
+put GW "$OH/.config/openshell/gateway.toml" <<TOML
 [openshell]
 version = 2
 
@@ -164,7 +174,7 @@ TOML
 # staging for input directories: written by the login user, read by the gateway user
 install -d -m 0755 /var/lib/zero
 install -d -o "$LU" -g "$(id -gn "$OU")" -m 0750 /var/lib/zero/input
-as tee "$OH/.config/systemd/user/openshell-gateway.service" >/dev/null <<UNIT
+put GW "$OH/.config/systemd/user/openshell-gateway.service" <<UNIT
 [Unit]
 Description=OpenShell Gateway (zero)
 After=default.target $DEP
@@ -188,7 +198,12 @@ WantedBy=default.target
 UNIT
 as systemctl --user daemon-reload
 as systemctl --user enable openshell-gateway.service
-as systemctl --user restart openshell-gateway.service
+if [ $GW = 1 ] || ! as systemctl --user is-active -q openshell-gateway.service; then
+  echo "zero install: restarting the gateway; running sandboxes are restarted with it" >&2
+  as systemctl --user restart openshell-gateway.service
+else
+  echo "zero install: gateway unchanged, left running" >&2
+fi
 i=0; until [ -r "$OH/.local/state/openshell/tls/client/tls.key" ] && as systemctl --user is-active -q openshell-gateway.service; do
   i=$((i+1)); [ $i -lt 30 ] || { echo "zero install: gateway not active" >&2; exit 1; }; sleep 1
 done

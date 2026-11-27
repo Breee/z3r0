@@ -870,6 +870,9 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 	}
 	if s.exists() {
 		if err := rt.Delete(s.Name); err != nil {
+			if strings.Contains(err.Error(), "driver operation is still pending") {
+				return fmt.Errorf("delete sandbox: the gateway was stopped while it worked on %s and OpenShell keeps it locked (caveat C62, NVIDIA/OpenShell#4409); state kept: %w", s.Name, err)
+			}
 			return fmt.Errorf("delete sandbox (state kept for retry): %w", err)
 		}
 	}
