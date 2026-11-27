@@ -14,35 +14,42 @@ import (
 	"github.com/Breee/z3r0/internal/zero"
 )
 
-const usageText = `zero: an opencode agent in a sandbox per workspace; it pushes only to its own branch.
+const usageText = `zero: a coding agent in a sandbox per workspace; it pushes only to its own branch.
 
-Usage: zero [-c WORKSPACE] COMMAND
+Usage: zero [-c WORKSPACE] COMMAND [OPTIONS]
+
 Work in the workspace
-  up [--approve] [--vm] [--max-input MiB]  create or continue the sandbox
-  opencode      up, then opencode in this terminal (--tui, default) or the browser (--web)
-  web           same as opencode --web
-  vscode        up, then VS Code on the sandbox
-  copilot | claude [ARG...]  up, then the Copilot CLI or Claude Code in the sandbox (zero copilot -p PROMPT)
-  run PROMPT    up, then one prompt
-  status        sandbox, token, policy and forward
-  logs [-f]     opencode log of the sandbox
-  stop          end the port forward; the sandbox keeps running
-  pause         stop the sandbox and revoke its token; files stay, zero up continues
-  rm [-y]       delete the sandbox, after listing work not pushed; the workspace is kept
+  up          create or continue the sandbox (--approve, --vm, --max-input MiB)
+  opencode    up, then opencode in this terminal; --web for the browser
+  web         same as opencode --web
+  vscode      up, then VS Code on the sandbox
+  copilot     up, then the Copilot CLI in the sandbox; arguments go to it
+  claude      up, then Claude Code in the sandbox; arguments go to it
+  run PROMPT  up, then one prompt
+  status      sandbox, token, policy and forward
+  logs        opencode log of the sandbox; -f follows it
+  stop        end the port forward; the sandbox keeps running
+  pause       stop the sandbox and revoke its token; files stay
+  rm          delete the sandbox, after listing work not pushed; -y does not ask
+
 Workspaces
-  ls            all workspaces with status, token, policy; leftovers
-  ui            read-only web page: workspaces, what each agent may reach, decisions
-  switch [NAME] make NAME the current workspace; without NAME pick from the list
-  ctx           list workspaces with folders; ctx new NAME [PATH...] | add [PATH...] |
-                remove [PATH...] | rm [-y] NAME | use NAME | --prompt
+  ls          all workspaces with status, token and policy; leftovers
+  ui          web page: workspaces, what each agent may reach, decisions
+  switch      make a workspace the current one: switch NAME, or pick from the list
+  ctx         workspaces with folders; ctx new NAME [PATH...], add, remove, rm, use
+
 This machine
-  install       (sudo) set up the host
-  doctor        check the host and, inside a repository, its forge
-  version       version of this build
-  help          this text
-  completion bash  bash completion: source <(zero completion bash)
-Examples: cd ~/repos/app && zero opencode; zero -c app status; zero up --approve
-The workspace is -c, else ZERO_CONTEXT, else the one of the current folder, else the current one.
+  install     set up the host (sudo); --podman, --docker-rootless or --docker
+  doctor      check the host and, inside a repository, its forge
+  completion  bash completion: source <(zero completion bash)
+  version     version of this build
+  help        this text
+
+Examples
+  cd ~/repos/app && zero opencode
+  zero -c app status
+
+Workspace: -c, else ZERO_CONTEXT, else the current folder's, else the current one.
 Exit codes: 0 done, 1 failed, 2 wrong command or option (nothing ran).
 `
 
@@ -104,7 +111,15 @@ func main() {
 		fmt.Println("zero", zero.Version())
 		return
 	case "install":
-		if err := zero.Install(); err != nil {
+		runtime := ""
+		for _, a := range args {
+			if runtime != "" {
+				fmt.Fprintln(os.Stderr, "zero install: one runtime, got", strings.Join(args, " "))
+				os.Exit(2)
+			}
+			runtime = strings.TrimPrefix(a, "--")
+		}
+		if err := zero.Install(runtime); err != nil {
 			fatal(err)
 		}
 		return

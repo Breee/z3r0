@@ -30,7 +30,7 @@ var argSpecs = map[string]argSpec{
 	"ui":         {},
 	"switch":     {max: 1, names: "NAME"},
 	"completion": {min: 1, max: 1, names: "bash"},
-	"install":    {},
+	"install":    {flags: []string{"--podman", "--docker-rootless", "--docker"}},
 	"doctor":     {},
 	"version":    {},
 	"help":       {},

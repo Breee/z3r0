@@ -1,16 +1,34 @@
 #!/bin/sh
-# zero install: OpenShell gateway + rootless podman under dedicated user `openshell`;
+# zero install: OpenShell gateway + container runtime under dedicated user `openshell`;
 # the login user only gets the mTLS client cert (F09, F15). Idempotent. Run as root.
+# $3 is the runtime (ADR 0057): podman, docker-rootless, docker; empty keeps
+# the installed one (podman on a first install).
 set -eu
 LU="$1"; OU=openshell; VER=0.1.8
+RT="${3:-}"
+[ -n "$RT" ] || RT=$(cat /var/lib/zero/runtime 2>/dev/null || echo podman)
 BASE="https://github.com/NVIDIA/OpenShell/releases/download/v$VER"
 LIB="/usr/local/lib/zero/openshell-$VER"
 cd /
 
 [ "$(uname -m)" = x86_64 ] || { echo "zero install: only x86_64 is pinned" >&2; exit 1; }
-for b in podman newuidmap newgidmap systemctl curl; do
-  command -v "$b" >/dev/null || { echo "zero install: missing $b (Debian/Ubuntu: apt install podman uidmap passt curl)" >&2; exit 1; }
+case $RT in
+  podman) NEED=podman; HINT="Debian/Ubuntu: apt install podman uidmap passt curl";;
+  docker-rootless) NEED="dockerd-rootless.sh rootlesskit"; HINT="https://docs.docker.com/engine/security/rootless/";;
+  docker) NEED=docker; HINT="https://docs.docker.com/engine/install/";;
+  *) echo "zero install: unknown runtime $RT (podman, docker-rootless, docker)" >&2; exit 1;;
+esac
+for b in $NEED newuidmap newgidmap systemctl curl; do
+  command -v "$b" >/dev/null || { echo "zero install: missing $b ($HINT)" >&2; exit 1; }
 done
+if [ "$RT" = docker ]; then
+  [ -S /var/run/docker.sock ] && getent group docker >/dev/null || { echo "zero install: no Docker daemon at /var/run/docker.sock with group docker" >&2; exit 1; }
+  cat >&2 <<WARN
+zero install: WARNING: runtime docker is the regular (rootful) Docker daemon.
+  The user $OU gets its socket, and that equals root on this host (ADR 0057).
+  podman or docker-rootless is safer: sudo zero install --podman | --docker-rootless
+WARN
+fi
 
 # 1. pinned OpenShell binaries (sha256 pinned in zero, see C41)
 if [ ! -x "$LIB/openshell-gateway" ]; then
@@ -36,11 +54,24 @@ grep -q "^$OU:" /etc/subgid || usermod --add-subgids 200000-265535 "$OU"
 loginctl enable-linger "$OU"
 OUID=$(id -u "$OU"); OH=$(getent passwd "$OU" | cut -d: -f6); LH=$(getent passwd "$LU" | cut -d: -f6)
 chmod 700 "$OH"
+# only runtime docker puts the gateway's user into group docker; the user
+# manager has to start again to pick a change up
+INGRP=no; id -nG "$OU" | tr ' ' '\n' | grep -qx docker && INGRP=yes
+if [ "$RT" = docker ] && [ $INGRP = no ]; then
+  usermod -aG docker "$OU"; systemctl restart "user@$OUID.service"
+elif [ "$RT" != docker ] && [ $INGRP = yes ]; then
+  gpasswd -d "$OU" docker >/dev/null; systemctl restart "user@$OUID.service"
+fi
 i=0; while [ ! -S "/run/user/$OUID/bus" ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done
 as() { sudo -u "$OU" env HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG_HOME="$OH/.config" "$@"; }
 
-# 3. rootless podman: image allowlist, user socket
+# 3. runtime. podman: image allowlist, user socket. docker-rootless: a daemon
+# of this user. docker: the system daemon, nothing to start.
 as mkdir -p "$OH/.config/containers" "$OH/.config/systemd/user" "$OH/.config/openshell"
+[ "$RT" = docker-rootless ] || as systemctl --user disable --now zero-docker.service 2>/dev/null || true
+case $RT in
+podman)
+DRV=podman; SOCK="/run/user/$OUID/podman/podman.sock"; DEP=podman.socket; PTMP=true
 as tee "$OH/.config/containers/policy.json" >/dev/null <<'JSON'
 {
   "default": [{"type": "reject"}],
@@ -60,8 +91,50 @@ as tee "$OH/.config/containers/policy.json" >/dev/null <<'JSON'
 }
 JSON
 as systemctl --user enable --now podman.socket
+;;
+docker-rootless)
+# no PrivateTmp: a user unit with it cannot reach the rootless socket (C61)
+DRV=docker; SOCK="/run/user/$OUID/docker.sock"; DEP=zero-docker.service; PTMP=false
+# as Docker's dockerd-rootless-setuptool.sh writes it
+as tee "$OH/.config/systemd/user/zero-docker.service" >/dev/null <<UNIT
+[Unit]
+Description=Docker, rootless (zero)
+Requires=dbus.socket
 
-# 4. gateway: podman driver, fail closed, telemetry off. Bind mounts are on
+[Service]
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=$(command -v dockerd-rootless.sh)
+ExecReload=/bin/kill -s HUP \$MAINPID
+TimeoutSec=0
+RestartSec=2
+Restart=always
+StartLimitBurst=3
+StartLimitInterval=60s
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+Delegate=yes
+Type=notify
+NotifyAccess=all
+KillMode=mixed
+
+[Install]
+WantedBy=default.target
+UNIT
+as systemctl --user daemon-reload
+as systemctl --user enable zero-docker.service
+as systemctl --user restart zero-docker.service
+i=0; until [ -S "$SOCK" ]; do
+  i=$((i+1)); [ $i -lt 60 ] || { echo "zero install: rootless Docker not up (journalctl --user-unit zero-docker as $OU)" >&2; exit 1; }; sleep 1
+done
+;;
+docker)
+DRV=docker; SOCK=/var/run/docker.sock; DEP=; PTMP=true
+;;
+esac
+
+# 4. gateway: driver of the runtime, fail closed, telemetry off. Bind mounts are on
 # for the read-only input mount (ADR 0039); they need driver config and
 # resource admission off.
 as tee "$OH/.config/openshell/gateway.toml" >/dev/null <<TOML
@@ -69,25 +142,26 @@ as tee "$OH/.config/openshell/gateway.toml" >/dev/null <<TOML
 version = 2
 
 [openshell.gateway]
-compute_driver = "podman"
+compute_driver = "$DRV"
 policy_validation_failure_mode = "fail_closed"
 
-[openshell.drivers.podman]
-socket_path = "/run/user/$OUID/podman/podman.sock"
+[openshell.drivers.$DRV]
+socket_path = "$SOCK"
 allow_driver_config = true
 enable_bind_mounts = true
 
-[openshell.drivers.podman.resource_admission]
+[openshell.drivers.$DRV.resource_admission]
 enabled = false
 TOML
 # staging for input folders: written by the login user, read by the gateway user
 install -d -m 0755 /var/lib/zero
+echo "$RT" > /var/lib/zero/runtime
 install -d -o "$LU" -g "$(id -gn "$OU")" -m 0750 /var/lib/zero/input
 as tee "$OH/.config/systemd/user/openshell-gateway.service" >/dev/null <<UNIT
 [Unit]
 Description=OpenShell Gateway (zero)
-After=default.target podman.socket
-Requires=podman.socket
+After=default.target $DEP
+${DEP:+Requires=$DEP}
 
 [Service]
 Type=simple
@@ -99,7 +173,7 @@ ExecStartPre=$LIB/openshell-gateway generate-certs --output-dir \${OPENSHELL_LOC
 ExecStart=$LIB/openshell-gateway
 Restart=on-failure
 RestartSec=5s
-PrivateTmp=true
+PrivateTmp=$PTMP
 UMask=0077
 
 [Install]
@@ -174,4 +248,4 @@ if [ -S "/run/user/$LUID/bus" ]; then
 else
   echo "zero install: no user session bus for $LU; zero up will start zero-cp"
 fi
-echo "zero install: done (gateway as $OU, OpenShell $VER). Next: zero doctor"
+echo "zero install: done (gateway as $OU, runtime $RT, OpenShell $VER). Next: zero doctor"

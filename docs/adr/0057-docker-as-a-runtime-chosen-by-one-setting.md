@@ -21,6 +21,7 @@ The two Docker modes are not equal. A rootless daemon runs as an ordinary user, 
 4. `docker` (the regular, rootful daemon) is offered, and zero says plainly that it may be dangerous: the user that runs the gateway gets the root daemon's socket, which equals root on the host. The warning is shown at install, as a line in `zero doctor`, and in the guide. It is a warning, not a refusal.
 5. The separate user `openshell` stays the default for every runtime, as an extra layer between the login user and the sandboxes. Running the gateway as the login user is an opt-out.
 6. The agent's side does not change: no runtime socket in the sandbox, agent never root (ADR 05), under every runtime.
+7. Under `docker-rootless` the gateway unit runs without `PrivateTmp` (it shares the host's `/tmp`): a user unit with that setting cannot connect to the rootless Docker socket (C61). podman and `docker` keep it. Decided 2026-11-27.
 
 ## Consequences
 
