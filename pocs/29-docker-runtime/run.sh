@@ -15,6 +15,8 @@ LIB=${LIB:-/usr/local/lib/zero/openshell-0.1.8}
 G=$LIB/openshell-gateway
 NAME=poc29
 D=$(mktemp -d)
+# not under /tmp: see README, finding on nosuid/nodev sources under rootless Docker
+IN=$(mktemp -d -p "${INPUT_PARENT:-${XDG_CACHE_HOME:-$HOME/.cache}}" zero-poc29.XXXXXX)
 REG=${XDG_CONFIG_HOME:-$HOME/.config}/openshell/gateways/$NAME
 PID=
 DOCKER="docker -H unix://$SOCKET"
@@ -35,7 +37,7 @@ cleanup() {
 	ss -ltn 2>/dev/null | grep -q ":$PORT " && echo "CLEANUP FAILED: something still listens on port $PORT"
 	openshell gateway remove $NAME >/dev/null 2>&1 || true
 	openshell gateway select openshell >/dev/null 2>&1 || echo "CLEANUP FAILED: active gateway not put back to openshell"
-	rm -rf "$REG" "$D"
+	rm -rf "$REG" "$D" "$IN"
 	left=$($DOCKER ps -aq --filter "name=openshell-default--$NAME" | wc -l)
 	[ "$left" = 0 ] || echo "CLEANUP FAILED: $left containers of $NAME left at $SOCKET"
 }
@@ -56,7 +58,15 @@ policy_validation_failure_mode = "fail_closed"
 
 [openshell.drivers.docker]
 socket_path = "$SOCKET"
+allow_driver_config = true
+enable_bind_mounts = true
+
+[openshell.drivers.docker.resource_admission]
+enabled = false
 EOF
+# an input folder as zero mounts it: read-only bind mount (ADR 0039)
+chmod 755 "$IN"; echo from-host > "$IN/note.txt"; chmod 644 "$IN/note.txt"
+MOUNT="{\"docker\":{\"mounts\":[{\"type\":\"bind\",\"source\":\"$IN\",\"target\":\"/tmp/zero-input\",\"read_only\":true}]}}"
 gw config preflight >"$D/preflight.log" 2>&1 || { cat "$D/preflight.log"; echo "FAIL gateway config"; exit 1; }
 gw generate-certs --output-dir "$D/tls" --server-san host.openshell.internal >"$D/certs.log" 2>&1
 # exec in a subshell, so that PID is the gateway itself and cleanup stops it.
@@ -78,7 +88,7 @@ cp "$D/tls/client/tls.key" "$REG/mtls/tls.key"
 chmod 600 "$REG/mtls/"*
 
 i=0
-until O sandbox create --name $NAME --from "$IMAGE" --policy ../../internal/zero/policy.yaml --detach >"$D/create.log" 2>&1; do
+until O sandbox create --name $NAME --from "$IMAGE" --policy ../../internal/zero/policy.yaml --driver-config-json "$MOUNT" --detach >>"$D/create.log" 2>&1; do
 	i=$((i+1)); [ $i -lt 5 ] || { cat "$D/create.log"; tail -n 8 "$D/gw.log"; echo "FAIL sandbox create"; exit 1; }
 	sleep 3
 done
@@ -91,6 +101,9 @@ pass "sandbox ready"
 
 has "agent is not root" "$(O sandbox exec $NAME -- id 2>&1)" "uid=1000"
 is "host outside the policy refused" "$(O sandbox exec $NAME -- curl -s -o /dev/null -m 10 -w '%{http_code}' https://example.com 2>/dev/null || true)" 000
+has "input folder readable in the sandbox" "$(O sandbox exec $NAME -- cat /tmp/zero-input/note.txt 2>&1)" "from-host"
+O sandbox exec $NAME -- touch /tmp/zero-input/new.txt >/dev/null 2>&1 || true
+is "input folder not writable from the sandbox" "$(ls "$IN" | tr '\n' ' ')" "note.txt "
 
 n=$($DOCKER ps --filter "name=openshell-default--$NAME" --format '{{.Names}}' | wc -l)
 is "two containers at this daemon (workload, supervisor)" "$n" 2
