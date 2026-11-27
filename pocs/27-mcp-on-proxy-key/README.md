@@ -2,7 +2,7 @@
 
 Question: can zero declare MCP servers in the LiteLLM config it writes, give each sandbox key its tool list, change that list without a new key, and put GitLab's own MCP endpoint behind the proxy with a token that stays there?
 
-Result (2026-11-27, LiteLLM v1.110.3 with Postgres, Docker 29.5.2, gitlab.com): **yes**, 15 PASS, 1 NOTE. Two things the build has to solve: the upstream token is one per server entry and read when the proxy starts, and the proxy keeps no record per tool call that names key and tool.
+Result (2026-11-27, LiteLLM v1.110.3 with Postgres, Docker 29.5.2, gitlab.com): **yes**, 17 PASS, 2 NOTE. Two things the build has to solve: the upstream token is one per server entry and read when the proxy starts, and the proxy keeps no record per tool call that names key and tool.
 
 ## Sources
 
@@ -29,6 +29,7 @@ client --key--> LiteLLM /mcp --token from its environment--> stand-in server "no
 | GitLab's endpoint behind the proxy: key limited to `get_project` lists `gitlab-get_project` only | PASS |
 | `gitlab-get_project` answers through the proxy; no GitLab token in the answer | PASS |
 | Another GitLab tool is refused by the proxy; a key without the server sees none of its tools | PASS |
+| Old upstream token revoked: the tool gives no project. New token in the environment, proxy made anew (answers again after 21 s): the same key's call answers | PASS |
 | No key or token in the proxy log | PASS |
 | Spend log rows for the tool calls | NOTE: none |
 
@@ -37,7 +38,7 @@ client --key--> LiteLLM /mcp --token from its environment--> stand-in server "no
 1. MCP servers go into the config file; the lists per key go through the API and need the database. Tool names reach the client as `<server>-<tool>`.
 2. A key's list can be changed while the key lives; the change holds at the next request. zero does not need a new key when a workspace's tools change.
 3. GitLab's instance endpoint works behind LiteLLM as it is.
-4. The upstream token is one per server entry, read from the proxy's environment at start. Tokens per workspace mean one entry per workspace, and a new token means the proxy is started again. Not run.
+4. The upstream token is one per server entry, read from the proxy's environment at start. Tokens per workspace mean one entry per workspace, and a new token means the proxy is made anew: run, it answered again after 21 s, and the sandbox key stayed the same. All sandboxes wait that long.
 5. The proxy's log shows `POST /mcp` and, for a refused call, the tool name; it names no key. The spend log holds no row per tool call. A record with key and tool needs the documented hook (`async_post_mcp_tool_call_hook`). Not run.
 
 ## Limits

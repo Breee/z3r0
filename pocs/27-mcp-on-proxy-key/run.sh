@@ -20,6 +20,7 @@ C="$COMPOSE -f ../17-litellm/compose.yaml -f ../17-litellm/compose.ui.yaml -f ..
 P=http://127.0.0.1:4000
 W=$(mktemp -d)
 TID=
+TID2=
 ALIASES='"poc27-a","poc27-none","poc27-g"'
 
 glapi() { glab api "$@" --hostname "$FORGE_HOST"; }
@@ -29,7 +30,7 @@ api() { adm -H 'content-type: application/json' "$P$1" -d "$2"; }
 
 cleanup() {
   api /key/delete "{\"key_aliases\":[$ALIASES]}" >/dev/null 2>&1 || true
-  if [ -n "$TID" ]; then glapi -X DELETE "/personal_access_tokens/$TID" >/dev/null 2>&1 || echo "CLEANUP FAILED: GitLab token $TID not revoked"; fi
+  for t in $TID $TID2; do glapi -X DELETE "/personal_access_tokens/$t" >/dev/null 2>&1 || echo "CLEANUP FAILED: GitLab token $t not revoked"; done
   [ "${KEEP:-}" = 1 ] || $C down >/dev/null 2>&1 || true
   rm -rf "$W"
 }
@@ -44,18 +45,18 @@ has() { if printf %s "$2" | grep -q -- "$3"; then pass "$1"; else fail "$1" "$2"
 hasnot() { if [ -n "$2" ] && ! printf %s "$2" | grep -q -- "$3"; then pass "$1"; else fail "$1" "$2"; fi; }
 
 # GitLab token for the proxy
-body=$(jq -n --arg e "$(date -u -d tomorrow +%F)" --argjson id "$PROJECT_ID" \
-  '{name:"zero-poc27", expires_at:$e, granular_scopes:[{access:"selected_memberships", permissions:["read_project"], project_ids:[$id]}, {access:"user", permissions:["execute_mcp_tool"]}]}')
-out=$(printf %s "$body" | glapi -X POST /user/personal_access_tokens -H 'Content-Type: application/json' --input -)
+mint() { jq -n --arg e "$(date -u -d tomorrow +%F)" --argjson id "$PROJECT_ID" \
+  '{name:"zero-poc27", expires_at:$e, granular_scopes:[{access:"selected_memberships", permissions:["read_project"], project_ids:[$id]}, {access:"user", permissions:["execute_mcp_tool"]}]}' |
+  glapi -X POST /user/personal_access_tokens -H 'Content-Type: application/json' --input -; }
+up() { i=0; until [ "$(curl -s -o /dev/null -w '%{http_code}' "$P/health/liveliness")" = 200 ]; do
+  i=$((i+1)); [ $i -lt 150 ] || { echo "FAIL proxy not up after 300 s"; exit 1; }; sleep 2; done; }
+out=$(mint)
 TID=$(printf %s "$out" | jq -er .id) || { echo "FAIL GitLab token not minted"; exit 1; }
 export GITLAB_MCP_TOKEN="$(printf %s "$out" | jq -er .token)"
 out=
 
 $C up -d > "$W/up.log" 2>&1 || { grep -v -e "$LITELLM_MASTER_KEY" -e "$GITLAB_MCP_TOKEN" "$W/up.log"; echo "FAIL compose up"; exit 1; }
-i=0
-until [ "$(curl -s -o /dev/null -w '%{http_code}' "$P/health/liveliness")" = 200 ]; do
-  i=$((i+1)); [ $i -lt 150 ] || { echo "FAIL proxy not up after 300 s"; exit 1; }; sleep 2
-done
+up
 
 key() { k=$(api /key/generate "{\"key_alias\":\"poc27-$1\",\"duration\":\"1h\",$2}" | jq -r .key); [ -n "$k" ] && [ "$k" != null ] || { echo "FAIL no key $1" >&2; kill $$; }; echo "$k"; }
 # mcp HEADERNAME KEY METHOD PARAMS
@@ -87,6 +88,21 @@ has "get_project answers through the proxy" "$r" "\"id\\\\*\":[ ]*$PROJECT_ID"
 hasnot "answer holds no GitLab token" "$r" "$GITLAB_MCP_TOKEN"
 has "another GitLab tool refused by the proxy" "$(mcp x-litellm-api-key "$G" tools/call "{\"name\":\"gitlab-list_commits\",\"arguments\":{\"project_id\":\"$PROJECT_ID\"}}")" "not allowed"
 is "key without the gitlab server: none of its tools" "$(tools "$N")" '[]'
+
+echo "== a new upstream token: the proxy is made anew"
+call() { mcp x-litellm-api-key "$G" tools/call "{\"name\":\"gitlab-get_project\",\"arguments\":{\"project_id\":\"$PROJECT_ID\"}}"; }
+glapi -X DELETE "/personal_access_tokens/$TID" >/dev/null 2>&1 && TID=
+r=$(call)
+if [ -n "$r" ] && ! printf %s "$r" | grep -q "\"id\\\\*\":[ ]*$PROJECT_ID"; then pass "old token revoked: the tool gives no project"; else fail "old token revoked: the tool gives no project" "$r"; fi
+out=$(mint)
+TID2=$(printf %s "$out" | jq -er .id) || { echo "FAIL second GitLab token not minted"; exit 1; }
+export GITLAB_MCP_TOKEN="$(printf %s "$out" | jq -er .token)"
+out=
+t0=$(date +%s)
+$C up -d > "$W/up2.log" 2>&1 || { echo "FAIL compose up with the new token"; exit 1; }
+sleep 3; up
+echo "NOTE proxy answers again $(( $(date +%s) - t0 )) s after the new token"
+has "new token: the same key's call answers again" "$(call)" "\"id\\\\*\":[ ]*$PROJECT_ID"
 
 echo "== what the proxy records for a tool call"
 sleep 3
