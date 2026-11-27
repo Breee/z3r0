@@ -67,7 +67,7 @@ Short forms stay valid: a workspace with only `folders` (and today's `tools`, `i
 | `mcp` | with the model proxy: MCP servers in LiteLLM, tool list on the sandbox's key; else agentgateway targets, tool list per sandbox identity from zero-cp per request | tool gateway | PoC 22, PoC 15 |
 | `secret://NAME` | lookup at the part that needs it | secret store | PoC 10, 12 (OpenBao) |
 
-A sandbox of a workspace with models gets no Copilot login (#162, PoC 23). Still open in the model path: the proxy key is readable in the sandbox until zero holds it outside as a placeholder (#162). Shown: a key minted with `no-mcp-servers` sees no tool; the key can be a placeholder (PoC 20); the Copilot CLI needs no GitHub login behind the proxy (PoC 23); opencode finds no model of the proxy by itself, so zero writes the list, with the token limits of each model for which the proxy reports both, and without the models the proxy marks as not for chat (embedding and the like) (PoC 21).
+A sandbox of a workspace with models gets no Copilot login (#162, PoC 23). Its key for the proxy stays outside too: the sandbox holds a placeholder that is swapped only on the way to the proxy (#162, PoC 20). Shown: a key minted with `no-mcp-servers` sees no tool; the key can be a placeholder (PoC 20); the Copilot CLI needs no GitHub login behind the proxy (PoC 23); opencode finds no model of the proxy by itself, so zero writes the list, with the token limits of each model for which the proxy reports both, and without the models the proxy marks as not for chat (embedding and the like) (PoC 21).
 
 zero-cp decides and hands out; the traffic itself goes from the sandbox to the part (model proxy, tool gateway) under an egress rule, as in PoC 15 and 18, not through zero-cp.
 
@@ -77,7 +77,7 @@ Rules: layers only narrow (operator limits, shared definitions, repository `.zer
 
 | Job | Choice | Reason |
 |---|---|---|
-| Models, guardrails | LiteLLM, opt-in | discovery, per-key model list, mask and block shown (PoC 18). Cost: Postgres. The key can stay outside the sandbox as a placeholder (PoC 20); zero does not do that yet (#162) |
+| Models, guardrails | LiteLLM, opt-in | discovery, per-key model list, mask and block shown (PoC 18). Cost: Postgres. The key stays outside the sandbox, the sandbox holds a placeholder (PoC 20, built in #162) |
 | Tool list per workspace | on the sandbox's LiteLLM key when the model proxy is on; else agentgateway | with the proxy on, the key and its database are already there and the list is set when zero mints the key; a key zero mints always carries a list or `no-mcp-servers`, because a key of the admin user without one sees every tool (PoC 22). agentgateway needs no database and takes the identity of the sandbox instead of a key, but needs SPIRE (PoC 15); it stays the way without LiteLLM |
 | Skills, instructions | plain files, read-only folder | no part needed and the file is the source of truth. LiteLLM keeps skills in its database, grants them per key and hands out a ZIP (PoC 22), but has no file form for them, does not deliver to opencode and has nothing for instructions |
 | Secrets | host keyring; OpenBao opt-in | as today |

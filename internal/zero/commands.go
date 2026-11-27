@@ -48,6 +48,10 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		os.Remove(s.path("copilot.done"))
 		os.Remove(s.path("copilot-auth.done"))
 		os.Remove(s.path("copilot-cli.rule"))
+		if s.read("models.provider") != "" {
+			rt.UnbindCredential(s.modelProvider())
+			os.Remove(s.path("models.provider"))
+		}
 	} else {
 		pol, err := s.loadPolicy()
 		if err != nil {
@@ -575,13 +579,11 @@ func hasModelArg(args []string) bool {
 }
 
 // copilotProxyScript is the command run in a sandbox whose workspace uses the
-// model proxy (PoC 23): the CLI talks to the proxy with the sandbox's key and
-// asks GitHub for nothing. The key is read inside the sandbox from the
-// opencode service settings, where zero put it.
+// model proxy (PoC 23): the CLI talks to the proxy and asks GitHub for
+// nothing. Its key is the placeholder of the sandbox's environment (PoC 20).
 func copilotProxyScript(dir string, args []string) string {
-	key := `python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.config/opencode/service.json")))["env"]["` + modelKeyEnv + `"])' 2>/dev/null`
-	script := "cd " + shellQuote(dir) + " && KEY=$(" + key + "); [ -n \"$KEY\" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=" +
-		fmt.Sprintf("http://%s:%d/v1", gateHost, modelPort) + " COPILOT_PROVIDER_API_KEY=\"$KEY\" exec " + copilotBin + " --no-auto-update"
+	script := "cd " + shellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=` +
+		fmt.Sprintf("http://%s:%d/v1", gateHost, modelPort) + ` COPILOT_PROVIDER_API_KEY="$` + modelKeyEnv + `" exec ` + copilotBin + " --no-auto-update"
 	for _, a := range args {
 		script += " " + shellQuote(a)
 	}
@@ -752,6 +754,7 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	rt.UnbindCredential(s.copilotProvider())
+	s.dropModelProvider()
 	if err := os.RemoveAll(s.stage()); err != nil {
 		return fmt.Errorf("remove input copy: %w", err)
 	}

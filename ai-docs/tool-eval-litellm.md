@@ -138,8 +138,8 @@ LiteLLM's "agent" is a remote agent service reached through the proxy, not a cod
 | Skills | Skills Hub, per key | partly | database, not declarative; not used: skills stay plain files (ADR 0049, PoC 22) |
 | Instructions | nothing | no | read-only folder by zero |
 | MCP servers | `mcp_servers:` | yes | none beyond the proxy |
-| Tool list per workspace | `object_permission` on the key | yes | database; key readable in the sandbox until it is a placeholder (PoC 20, #162); a key of the admin user without a list sees every tool, so zero always sends a list or `no-mcp-servers` (PoC 22) |
-| Credentials outside the sandbox | provider logins and MCP tokens stay in the proxy | yes | the LiteLLM key can be a placeholder for clients that send it as Bearer (PoC 20, #170); zero's code still puts the key in the sandbox (#162) |
+| Tool list per workspace | `object_permission` on the key | yes | database; a key of the admin user without a list sees every tool, so zero always sends a list or `no-mcp-servers` (PoC 22) |
+| Credentials outside the sandbox | provider logins and MCP tokens stay in the proxy | yes | the LiteLLM key can be a placeholder for clients that send it as Bearer (PoC 20, #170); built into zero in #162 |
 | Identity of a sandbox | virtual key per sandbox; `custom_auth` could take zero's identity | partly | key mint and revoke by zero; hook is own Python code in the proxy |
 | Guardrails, DSGVO | content filter, Presidio | partly | pattern data yes; free text needs Presidio; forge traffic does not pass LiteLLM |
 | Audit per call | spend logs, callbacks | partly | database; change audit is Enterprise |
@@ -155,7 +155,7 @@ The sandbox, its egress rules, the push gate, the forge token and its permission
 
 | Job | Recommendation | Reason |
 |---|---|---|
-| Models | LiteLLM, opt-in | shown end to end; a sandbox of a workspace with models holds no provider login (PoC 23, #162); the proxy key is still readable there until it is a placeholder (#162) |
+| Models | LiteLLM, opt-in | shown end to end; a sandbox of a workspace with models holds no provider login (PoC 23, #162); the proxy key is a placeholder there (#162) |
 | Guardrails | LiteLLM, with the models | declared in config, no extra service for patterns |
 | MCP servers and tool lists | decided (ADR 0049, amended 2026-11-27): on the LiteLLM key when the model proxy is on, agentgateway without it | LiteLLM: one place and UI, but database, key in the sandbox, fail-open found. agentgateway (ADR 0043): no database, identity verified, list per request from zero-cp, no UI |
 | Skills, instructions | plain files, read-only folder from zero's config | LiteLLM has no declared form and none for opencode; instructions not at all |

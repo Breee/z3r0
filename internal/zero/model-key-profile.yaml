@@ -1,0 +1,13 @@
+# The model proxy key of a sandbox (ADR 0049, PoC 20). No endpoint here: the
+# sandbox's models rule binds it to the proxy, nothing else gets it.
+id: zero-model-key
+display_name: zero model proxy key
+description: Key of one sandbox at zero's model proxy
+category: inference
+credentials:
+  - name: key
+    description: Model proxy key
+    env_vars: [LITELLM_API_KEY]
+    required: true
+    auth_style: bearer
+    header_name: authorization

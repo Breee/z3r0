@@ -186,3 +186,20 @@ func (openshell) RotateCredential(id, env, secret string) error {
 	}
 	return nil
 }
+
+// AttachCredential does not wait: until a rule binds the credential to a
+// host the sandbox withholds it, and the rule can only name an attached one
+// (PoC 20).
+func (openshell) AttachCredential(name, id string) error {
+	_, err := sh("openshell", "sandbox", "provider", "attach", name, id)
+	return err
+}
+
+func (openshell) DetachCredential(name, id string) {
+	sh("openshell", "sandbox", "provider", "detach", "--wait", name, id)
+}
+
+func (openshell) CredentialReady(name, id string) error {
+	_, err := sh("openshell", "sandbox", "provider", "status", "--wait", name, id)
+	return err
+}

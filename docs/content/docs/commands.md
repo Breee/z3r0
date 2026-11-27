@@ -139,7 +139,7 @@ A folder whose name starts with `-` is written as `./-name`.
 
 | Path | Content |
 |---|---|
-| `~/.config/zero/config.yaml` | workspaces, their folders, tools, instructions and skills, the current workspace |
+| `~/.config/zero/config.yaml` | workspaces, their folders, tools, instructions, skills and models, the model proxy, the current workspace |
 | `~/.local/state/zero/zero-<name>/` | state of one sandbox (token id, capabilities, push gate log `gate.log`) |
 | `.zero/policy.yaml` in a repository | [policy](../policy) of the project |
 

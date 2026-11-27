@@ -126,6 +126,36 @@ Limits:
 - A path that is a link is followed: the file or folder it points to is copied, under that name.
 - If the sandbox already has an opencode user config that zero did not write, zero leaves it alone and says so.
 
+## Models through the model proxy
+
+By default the sandbox uses the Copilot login of the host's opencode. With the model proxy, the sandbox holds no provider login at all: it reaches models only through a LiteLLM proxy that zero starts on your machine. This is set in zero's own configuration:
+
+```yaml
+# ~/.config/zero/config.yaml
+parts:
+  models: litellm
+providers: [github_copilot]
+workspaces:
+  developer:
+    folders: [...]
+    models: [github_copilot/*]
+```
+
+`zero up` then starts the proxy (two containers, on `127.0.0.1:18096`), makes a key for this sandbox that is good for the listed models only, and writes the model list for opencode:
+
+```
+models: 64 through the model proxy (github_copilot/*)
+```
+
+Once, connect your Copilot account to the proxy: open `http://127.0.0.1:18096/ui/`, user `admin`, password in `~/.local/state/zero/parts/models.key`, then Models + Endpoints, LLM Credentials, Connect. Until then `zero up` says that no answer will come.
+
+- The proxy runs under Docker (`docker compose`); `zero doctor` checks it. Another compose command can be named in `ZERO_COMPOSE`. Sandboxes stay on podman.
+- The sandbox holds a placeholder for its proxy key, not the key. The placeholder is swapped for the key only on the way to the proxy.
+- From the sandbox only the proxy is reachable for models; the model hosts are not.
+- `zero pause` and `zero rm` delete the key at the proxy; `zero up` makes a new one.
+- `zero copilot` needs a model here: `zero copilot --model github_copilot/claude-haiku-4.5`.
+- A workspace without `models` works as before.
+
 ## Background
 
 - [Policy source and lifecycle](https://github.com/Breee/z3r0/blob/main/docs/architecture/07a-policy-sources-and-lifecycle.md)

@@ -38,6 +38,12 @@ type Runtime interface {
 	UnbindCredential(id string)
 	// RotateCredential replaces the secret of an existing binding.
 	RotateCredential(id, env, secret string) error
+	// AttachCredential gives a running sandbox a binding made after it was
+	// created; the sandbox holds it back until a rule names it.
+	// CredentialReady waits until the sandbox has applied it.
+	AttachCredential(name, id string) error
+	DetachCredential(name, id string)
+	CredentialReady(name, id string) error
 }
 
 var rt Runtime = openshell{}

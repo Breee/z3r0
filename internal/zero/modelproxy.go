@@ -21,6 +21,9 @@ import (
 // sandbox. It holds the provider logins; a sandbox gets a key of its own
 // that is limited to the workspace's models and to no MCP server.
 
+//go:embed model-key-profile.yaml
+var modelKeyProfile []byte
+
 //go:embed parts/compose.yaml
 var partsCompose []byte
 
@@ -43,6 +46,15 @@ func compose() []string {
 		return v
 	}
 	return []string{"docker", "compose"}
+}
+
+// composeProblem says why the compose command of the parts does not run.
+func composeProblem() string {
+	c := compose()
+	if _, err := sh(c[0], append(c[1:], "version")...); err != nil {
+		return fmt.Sprintf("%s does not run (%s); the model proxy needs Docker with its compose plugin and a user who may use it, or another compose command in ZERO_COMPOSE", strings.Join(c, " "), clean(strings.SplitN(err.Error(), "\n", 2)[0]))
+	}
+	return ""
 }
 
 // modelConfig is the proxy's config file for the given providers.
@@ -262,11 +274,15 @@ func modelProvider(ms []proxyModel) map[string]any {
 	}
 }
 
-func modelPolicy() map[string]any {
+// modelPolicy lets the sandbox's model clients reach the proxy and binds the
+// sandbox's key to it: the sandbox holds a placeholder, the real key is put
+// in on the way to the proxy and nowhere else (PoC 20).
+func modelPolicy(provider string) map[string]any {
 	return map[string]any{
 		"name": modelRule,
 		"endpoints": []map[string]any{{
 			"host": gateHost, "port": modelPort, "protocol": "rest", "enforcement": "enforce", "access": "read-write",
+			"credential_binding": map[string]any{"provider": provider},
 		}},
 		"binaries": []map[string]any{{"path": opencodeBin}, {"path": copilotBin}, {"path": "/usr/bin/curl"}},
 	}
@@ -286,6 +302,7 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 		if err := rt.SetRule(s.Name, modelRule, nil); err != nil {
 			return nil, err
 		}
+		s.dropModelProvider()
 		_, err := s.ssh("opencode service unset env " + modelKeyEnv + " && opencode service restart")
 		return nil, err
 	}
@@ -309,7 +326,7 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 	if err := s.write("models.key", "1", 0o600); err != nil {
 		return nil, err
 	}
-	if err := rt.SetRule(s.Name, modelRule, modelPolicy()); err != nil {
+	if err := s.bindModelKey(k.Key); err != nil {
 		return nil, err
 	}
 	// A sandbox that used the Copilot CLI before the workspace got models
@@ -320,8 +337,10 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 		}
 		os.Remove(s.path("copilot-cli.rule"))
 	}
-	if _, err := s.ssh("opencode service set env " + modelKeyEnv + " " + shellQuote(k.Key) + " >/dev/null && opencode service restart >/dev/null"); err != nil {
-		return nil, err
+	// A new session has the placeholder in its environment; that is what
+	// opencode's service keeps, not the key.
+	if _, err := s.ssh(`[ -n "$` + modelKeyEnv + `" ] && opencode service set env ` + modelKeyEnv + ` "$` + modelKeyEnv + `" >/dev/null && opencode service restart >/dev/null`); err != nil {
+		return nil, fmt.Errorf("model proxy key not handed to opencode in %s: %w; check: zero logs, then zero up", s.Name, err)
 	}
 	list, err := modelAPI(k.Key, "GET", "/v1/models", nil)
 	if err != nil {
@@ -336,6 +355,46 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 		fmt.Fprintf(out, "models: %s is not connected, no answer will come; connect it in the proxy's UI: %s/ui/ (user admin, password in %s), Models + Endpoints, LLM Credentials, Connect\n", n, modelURL(), filepath.Join(partsDir(), "models.key"))
 	}
 	return ids, nil
+}
+
+func (s *Sandbox) modelProvider() string { return s.Name + "-models" }
+
+// bindModelKey puts the key outside the sandbox. Order (PoC 20): binding,
+// attach, rule that names it, then wait until the sandbox has it. A binding
+// from an earlier run only gets the new key.
+func (s *Sandbox) bindModelKey(key string) error {
+	id := s.modelProvider()
+	if s.read("models.provider") == "" || rt.RotateCredential(id, modelKeyEnv, key) != nil {
+		rt.SetRule(s.Name, modelRule, nil)
+		rt.DetachCredential(s.Name, id)
+		if err := rt.ImportCredentialType("zero-model-key", modelKeyProfile); err != nil {
+			return err
+		}
+		if err := rt.BindCredential(id, "zero-model-key", modelKeyEnv, key); err != nil {
+			return err
+		}
+		if err := rt.AttachCredential(s.Name, id); err != nil {
+			return err
+		}
+		if err := s.write("models.provider", id, 0o600); err != nil {
+			return err
+		}
+	}
+	if err := rt.SetRule(s.Name, modelRule, modelPolicy(id)); err != nil {
+		return err
+	}
+	return rt.CredentialReady(s.Name, id)
+}
+
+// dropModelProvider takes the binding away; the rule that names it must be
+// gone or the sandbox deleted.
+func (s *Sandbox) dropModelProvider() {
+	if s.read("models.provider") == "" {
+		return
+	}
+	rt.DetachCredential(s.Name, s.modelProvider())
+	rt.UnbindCredential(s.modelProvider())
+	os.Remove(s.path("models.provider"))
 }
 
 func conns() []byte {

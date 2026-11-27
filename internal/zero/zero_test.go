@@ -1526,9 +1526,8 @@ func TestCopilotScript(t *testing.T) {
 func TestCopilotProxyScript(t *testing.T) {
 	got := copilotProxyScript("/tmp/zero/a", []string{"--model", "github_copilot/x", "-p", "it's"})
 	for _, w := range []string{
-		"cd '/tmp/zero/a' && KEY=$(python3 -c ",
-		`["env"]["LITELLM_API_KEY"]`,
-		"COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=http://host.openshell.internal:18096/v1 COPILOT_PROVIDER_API_KEY=\"$KEY\" exec /usr/local/bin/copilot --no-auto-update '--model' 'github_copilot/x' '-p' 'it'\\''s'",
+		`cd '/tmp/zero/a' && [ -n "$LITELLM_API_KEY" ] || `,
+		"COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=http://host.openshell.internal:18096/v1 COPILOT_PROVIDER_API_KEY=\"$LITELLM_API_KEY\" exec /usr/local/bin/copilot --no-auto-update '--model' 'github_copilot/x' '-p' 'it'\\''s'",
 	} {
 		if !strings.Contains(got, w) {
 			t.Errorf("script lacks %q:\n%s", w, got)
@@ -1542,8 +1541,15 @@ func TestCopilotProxyScript(t *testing.T) {
 			t.Errorf("hasModelArg(%q) = %v", args, got)
 		}
 	}
-	if !strings.Contains(fmt.Sprint(modelPolicy()), copilotBin) {
+	pol := fmt.Sprint(modelPolicy("zero-a-models"))
+	if !strings.Contains(pol, copilotBin) {
 		t.Error("models rule does not name the Copilot CLI")
+	}
+	if !strings.Contains(pol, "credential_binding:map[provider:zero-a-models]") {
+		t.Errorf("models rule does not bind the key: %s", pol)
+	}
+	if strings.Contains(got, "service.json") {
+		t.Errorf("script reads the service settings: %s", got)
 	}
 }
 
@@ -1637,5 +1643,13 @@ func TestCompose(t *testing.T) {
 	t.Setenv("ZERO_COMPOSE", "podman compose")
 	if got := strings.Join(compose(), " "); got != "podman compose" {
 		t.Errorf("override: %q", got)
+	}
+	t.Setenv("ZERO_COMPOSE", "true")
+	if got := composeProblem(); got != "" {
+		t.Errorf("command that runs: %q", got)
+	}
+	t.Setenv("ZERO_COMPOSE", "false")
+	if got := composeProblem(); !strings.Contains(got, "false does not run") || !strings.Contains(got, "ZERO_COMPOSE") {
+		t.Errorf("command that fails: %q", got)
 	}
 }
