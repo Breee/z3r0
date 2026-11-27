@@ -39,12 +39,11 @@ fail() { echo "FAIL $1: $(printf %s "$2" | cut -c1-300)"; fails=$((fails+1)); }
 is() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "got $2, want $3"; fi; }
 has() { if printf %s "$2" | grep -q -- "$3"; then pass "$1"; else fail "$1" "$2"; fi; }
 # a process of `openshell`, with exactly the groups named
-asou() { setpriv --reuid "$OUID" --regid "$OGID" --groups "$1" env -i PATH=/usr/local/bin:/usr/bin:/bin \
+asou() { g=$1; shift; setpriv --reuid "$OUID" --regid "$OGID" --groups "$g" env -i PATH=/usr/local/bin:/usr/bin:/bin \
 	HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG_HOME="$D/cfg" XDG_STATE_HOME="$D/state" \
 	XDG_DATA_HOME="$D/share" OPENSHELL_LOCAL_TLS_DIR="$D/tls" OPENSHELL_TELEMETRY_ENABLED=false \
 	OPENSHELL_SERVER_PORT="$PORT" OPENSHELL_GATEWAY_CONFIG="$D/cfg/openshell/gateway.toml" \
 	DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR="$R/rootlesskit" "$@"; }
-asou_() { g=$1; shift; asou "$g" "$@"; }
 aslu() { sudo -u "$LU" -H "$@"; }
 O() { aslu openshell --gateway $NAME "$@"; }
 
@@ -71,11 +70,11 @@ trap cleanup EXIT
 trap 'exit 1' INT TERM HUP
 
 chown "$OUID:$OGID" "$D"; chmod 700 "$D"
-asou_ "$OGID" mkdir -p "$D/cfg/openshell" "$D/state" "$D/share" "$D/tls" "$D/data" "$R"
+asou "$OGID" mkdir -p "$D/cfg/openshell" "$D/state" "$D/share" "$D/tls" "$D/data" "$R"
 
 if [ "$MODE" = rootless ]; then
 	# the daemon zero install would set up as a user unit of `openshell`
-	asou_ "$OGID" dockerd-rootless.sh --host "unix://$SOCKET" --data-root "$D/data" \
+	asou "$OGID" dockerd-rootless.sh --host "unix://$SOCKET" --data-root "$D/data" \
 		--exec-root "$R/exec" --pidfile "$R/docker.pid" >"$D/dockerd.log" 2>&1 &
 	DPID=$!
 	i=0
@@ -92,7 +91,7 @@ if [ "$MODE" = rootless ]; then
 	is "daemon socket owned by $OU" "$(stat -c %U "$SOCKET")" "$OU"
 fi
 
-asou_ "$OGID" tee "$D/cfg/openshell/gateway.toml" >/dev/null <<EOF
+asou "$OGID" tee "$D/cfg/openshell/gateway.toml" >/dev/null <<EOF
 [openshell]
 version = 2
 
@@ -111,9 +110,9 @@ EOF
 # an input folder as zero stages it: under /var/lib/zero/input, read-only bind mount (ADR 0039)
 chown "$LU" "$IN"; chmod 755 "$IN"; echo from-host > "$IN/note.txt"; chmod 644 "$IN/note.txt"
 MOUNT="{\"docker\":{\"mounts\":[{\"type\":\"bind\",\"source\":\"$IN\",\"target\":\"/tmp/zero-input\",\"read_only\":true}]}}"
-asou_ "$OGID" "$G" config preflight >"$D/preflight.log" 2>&1 || { cat "$D/preflight.log"; echo "FAIL gateway config"; exit 1; }
-asou_ "$OGID" "$G" generate-certs --output-dir "$D/tls" --server-san host.openshell.internal >"$D/certs.log" 2>&1
-asou_ "$GROUPS_" "$G" >"$D/gw.log" 2>&1 &
+asou "$OGID" "$G" config preflight >"$D/preflight.log" 2>&1 || { cat "$D/preflight.log"; echo "FAIL gateway config"; exit 1; }
+asou "$OGID" "$G" generate-certs --output-dir "$D/tls" --server-san host.openshell.internal >"$D/certs.log" 2>&1
+asou "$GROUPS_" "$G" >"$D/gw.log" 2>&1 &
 PID=$!
 sleep 3
 has "gateway uses the Docker driver" "$(grep 'Using compute driver' "$D/gw.log" | tail -n 1)" "docker"
