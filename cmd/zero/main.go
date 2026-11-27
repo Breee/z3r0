@@ -17,7 +17,7 @@ import (
 const usageText = `zero: a coding agent in a sandbox per workspace; it pushes only to its own branch.
 
 Usage: zero [-c WORKSPACE] COMMAND [OPTIONS]
-       zero                                  the workspaces, to pick from
+       zero                                  the workspace screen
 
 Work in the workspace
   up          create or continue the sandbox (--approve, --vm, --max-input MiB)

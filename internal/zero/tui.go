@@ -81,6 +81,8 @@ type home struct {
 	input, filter    string
 	msg              string
 	cmd              string // opencode, vscode or new: what to do after the screen
+	want             string // the workspace to stay on while the filter changes
+	loading, again   bool   // one load at a time; again: one more after it
 }
 
 func homeLoad() tea.Msg {
@@ -93,6 +95,17 @@ func homeTicker() tea.Cmd {
 }
 
 func (m home) Init() tea.Cmd { return tea.Batch(homeLoad, homeTicker()) }
+
+// load starts a load unless one runs; then it asks for one more after it,
+// so an older answer never replaces a newer one.
+func (m *home) load() tea.Cmd {
+	if m.loading {
+		m.again = true
+		return nil
+	}
+	m.loading = true
+	return homeLoad
+}
 
 func (m home) shown() []wsRow {
 	if m.filter == "" {
@@ -135,8 +148,18 @@ func (m home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 	case homeTick:
-		return m, tea.Batch(homeLoad, homeTicker())
+		if m.loading {
+			return m, homeTicker()
+		}
+		c := m.load()
+		return m, tea.Batch(c, homeTicker())
 	case homeLoaded:
+		m.loading = false
+		if m.again {
+			m.again = false
+			c := m.load()
+			return m, c
+		}
 		if msg.err != nil {
 			m.msg = msg.err.Error()
 			return m, nil
@@ -171,7 +194,8 @@ func (m home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.msg = msg.what + ": " + msg.last
 			}
 		}
-		return m, homeLoad
+		c := m.load()
+		return m, c
 	case tea.KeyPressMsg:
 		k := msg.String()
 		switch {
@@ -215,6 +239,8 @@ func (m home) typed(k, text string) (tea.Model, tea.Cmd) {
 	}
 	if m.mode == homeFilter {
 		m.filter = m.input
+	}
+	if !m.selectName(m.want) {
 		m.clamp()
 	}
 	return m, nil
@@ -247,13 +273,19 @@ func (m home) run(c string) (tea.Model, tea.Cmd) {
 // key handles a key on the list.
 func (m home) key(k string) (tea.Model, tea.Cmd) {
 	m.msg = ""
+	m.want = ""
+	if c := m.cur(); c != nil {
+		m.want = c.Name
+	}
 	n := len(m.shown())
 	switch k {
 	case "q":
 		return m, tea.Quit
 	case "esc":
 		m.filter = ""
-		m.clamp()
+		if !m.selectName(m.want) {
+			m.clamp()
+		}
 	case "down", "j":
 		m.sel = min(m.sel+1, max(n-1, 0))
 	case "up", "k":
@@ -270,7 +302,8 @@ func (m home) key(k string) (tea.Model, tea.Cmd) {
 		m.mode = homeHelp
 	case "ctrl+r":
 		m.msg = "refreshing"
-		return m, homeLoad
+		c := m.load()
+		return m, c
 	case "n":
 		m.cmd = "new"
 		return m, tea.Quit
@@ -359,7 +392,7 @@ func (m home) header() []string {
 // box frames the lines, with the title in the top edge, to w by h cells.
 func box(title string, lines []string, w, h int) string {
 	in := w - 2
-	t := " " + title + " "
+	t := lipgloss.NewStyle().MaxWidth(max(in-2, 0)).Render(" " + title + " ")
 	fill := max(in-lipgloss.Width(t), 0)
 	out := []string{cFrame.Render("┌"+strings.Repeat("─", fill/2)) + cTitle.Render(t) + cFrame.Render(strings.Repeat("─", fill-fill/2)+"┐")}
 	for i := 0; i < h-2; i++ {
@@ -374,20 +407,26 @@ func box(title string, lines []string, w, h int) string {
 	return strings.Join(out, "\n")
 }
 
-func (m home) table(w int) []string {
+// table is the header line and the rows that fit in h lines, scrolled so
+// that the selected row is among them.
+func (m home) table(w, h int) []string {
 	rs := m.shown()
 	nw := len("NAME")
 	for _, r := range rs {
-		nw = max(nw, len(r.Name))
+		nw = max(nw, lipgloss.Width(r.Name))
 	}
 	line := func(name, status, dirs, token, policy string) string {
-		return fmt.Sprintf(" %-*s  %-8s  %-4s  %-14s  %s", nw+1, name, status, dirs, token, policy)
+		return " " + pad(name, nw+1) + fmt.Sprintf("  %-8s  %-4s  %-14s  %s", status, dirs, token, policy)
 	}
 	out := []string{cHead.Render(line("NAME", "STATUS", "DIRS", "TOKEN", "POLICY"))}
 	if !m.ready {
 		return append(out, cFaint.Render(" loading..."))
 	}
+	off := max(m.sel-max(h-1, 1)+1, 0)
 	for i, r := range rs {
+		if i < off {
+			continue
+		}
 		name := r.Name
 		if r.Current {
 			name += "*"
@@ -453,18 +492,22 @@ func (m home) frame() string {
 		out = append(out, box("describe("+c.Name+")", m.describe(c), m.w, bh))
 	case m.mode == homeHelp:
 		lines := []string{""}
-		for _, h := range homeHints {
-			lines = append(lines, " "+pad(cKey.Render("<"+h.key+">"), 10)+h.what)
+		for i := 0; i < 6; i++ {
+			l := " "
+			for _, h := range []keyHint{homeHints[i], homeHints[i+6]} {
+				l += pad(pad(cKey.Render("<"+h.key+">"), 10)+h.what, 23)
+			}
+			lines = append(lines, l)
 		}
 		lines = append(lines, " "+pad(cKey.Render("<j/k>"), 10)+"move, g first, G last",
-			"", " :NAME goes to a workspace, :all drops the filter, :new, :q", "", cFaint.Render(" esc back"))
+			" :NAME goes there, :all, :new, :q", "", cFaint.Render(" esc back"))
 		out = append(out, box("help", lines, m.w, bh))
 	default:
 		scope := "all"
 		if m.filter != "" {
 			scope = "/" + m.filter
 		}
-		out = append(out, box(fmt.Sprintf("workspaces(%s)[%d]", scope, len(m.shown())), m.table(m.w-2), m.w, bh))
+		out = append(out, box(fmt.Sprintf("workspaces(%s)[%d]", scope, len(m.shown())), m.table(m.w-2, bh-2), m.w, bh))
 	}
 	status := m.msg
 	if status == "" && len(m.warn) > 0 {
@@ -487,7 +530,7 @@ func Interactive() bool { return isTerminal(os.Stdin) && isTerminal(os.Stdout) }
 // Home shows the workspace screen until the person picks something to run
 // outside it; it returns the arguments for zero, nil to leave.
 func Home(exe string) ([]string, error) {
-	m := home{exe: exe, runtime: "-", gateway: "-"}
+	m := home{exe: exe, runtime: "-", gateway: "-", loading: true}
 	if b, err := os.ReadFile("/var/lib/zero/runtime"); err == nil && strings.TrimSpace(string(b)) != "" {
 		m.runtime = strings.TrimSpace(string(b))
 	}

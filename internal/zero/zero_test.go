@@ -2232,7 +2232,7 @@ func TestHomeKeys(t *testing.T) {
 	if f, _ := press(m, '/', 'd', 'o'); f.mode != homeFilter || len(f.shown()) != 1 || !strings.Contains(plain(f), "workspaces(/do)[1]") {
 		t.Errorf("filter: %d rows\n%s", len(f.shown()), plain(f))
 	} else if f, _ = press(f, tea.KeyEscape); len(f.shown()) != 3 {
-		t.Error("esc keeps the filter")
+		t.Error("esc does not clear the filter")
 	}
 	if c, _ := press(m, ':', 'd', 'o', 'c', 's', tea.KeyEnter); c.cur().Name != "docs" || c.mode != homeList {
 		t.Errorf("command jumps to a workspace: %s", c.cur().Name)
@@ -2276,5 +2276,61 @@ func TestHomeKeys(t *testing.T) {
 	n, _ = n.(home).Update(homeRan{what: "rm docs", last: "zero: no", err: fmt.Errorf("exit status 1")})
 	if !strings.Contains(plain(n.(home)), "rm docs: zero: no") {
 		t.Error("failed command not shown")
+	}
+	// the selection stays on its workspace while the filter changes
+	fm := m
+	fm.filter, fm.mode = "", homeList
+	fm.selectName("dev")
+	if f, _ := press(fm, '/', 'd', 'o', tea.KeyBackspace); f.cur() == nil || f.cur().Name != "dev" {
+		t.Errorf("selection after a filter edit: %+v", f.cur())
+	}
+	// the help fits the box at 80x24
+	hm := m
+	hm.w, hm.h = 80, 24
+	if h, _ := press(hm, '?'); !strings.Contains(plain(h), "esc back") || !strings.Contains(plain(h), ":NAME") {
+		t.Errorf("help cut off:\n%s", plain(h))
+	}
+	// commands carry no approval of their own
+	if c := m.exec("dev", "rm"); c == nil {
+		t.Error("no command")
+	}
+	src, _ := os.ReadFile("tui.go")
+	if !bytes.Contains(src, []byte(`exec.Command(m.exe, "-c", name, cmd)`)) {
+		t.Error("the screen must run zero -c NAME CMD and nothing more")
+	}
+	// long and wide names stay within the window; many rows keep the selection in sight
+	big := &overview{c: &Config{Workspaces: map[string]*Workspace{}}}
+	for i := 0; i < 40; i++ {
+		big.rows = append(big.rows, wsRow{Name: fmt.Sprintf("ws%02d", i), Status: "none", Token: "-", Policy: "-"})
+	}
+	big.rows = append(big.rows, wsRow{Name: "日本語-" + strings.Repeat("x", 120), Status: "none", Token: "-", Policy: "-"})
+	n, _ = home{w: 60, h: 20}.Update(homeLoaded{o: big})
+	b, _ := press(n, 'G')
+	for _, l := range strings.Split(plain(b), "\n") {
+		if lipgloss.Width(l) > 60 {
+			t.Errorf("long name: line wider than the window: %q", l)
+		}
+	}
+	if !strings.Contains(plain(b), "日本語-") || strings.Contains(plain(b), "ws00") {
+		t.Errorf("last row not scrolled into sight:\n%s", plain(b))
+	}
+	if d, _ := press(b, 'd'); strings.Count(strings.Split(plain(d), "\n")[6], "x") > 60 || lipgloss.Width(strings.Split(plain(d), "\n")[6]) > 60 {
+		t.Errorf("describe title wider than the window")
+	}
+	if b, _ = press(b, 'k', 'k', 'g'); !strings.Contains(plain(b), "ws00") {
+		t.Errorf("first row not shown:\n%s", plain(b))
+	}
+	// one load at a time: an answer that a newer request overtook is dropped
+	l := home{w: 100, h: 24, loading: true}
+	n, cmd := l.Update(homeRan{what: "stop dev"})
+	if l = n.(home); cmd != nil || !l.again {
+		t.Error("second load started while one runs")
+	}
+	n, cmd = l.Update(homeLoaded{o: o})
+	if l = n.(home); cmd == nil || len(l.rows) != 0 || !l.loading {
+		t.Errorf("stale answer used: %d rows", len(l.rows))
+	}
+	if n, _ = l.Update(homeLoaded{o: o}); len(n.(home).rows) != len(o.rows) || n.(home).loading {
+		t.Error("fresh answer not used")
 	}
 }
