@@ -123,7 +123,7 @@ A token without a sandbox is revoked by `zero-cp` within 10 minutes.
 
 | Command | What it does |
 |---|---|
-| `sudo zero install` | sets up the gateway, podman and `zero-cp`; see [Getting started](../getting-started) |
+| `sudo zero install [--podman \| --docker-rootless \| --docker]` | sets up the gateway, the container runtime (podman unless a flag says otherwise) and `zero-cp`; see [Getting started](../getting-started) |
 | `zero doctor` | checks the host setup and, inside a repository, the GitLab project settings |
 | `zero completion bash` | prints bash completion: `source <(zero completion bash)` |
 | `zero version` | prints the commit and date this build was made from; `zero --version` does the same |

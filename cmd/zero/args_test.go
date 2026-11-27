@@ -12,7 +12,7 @@ func TestCheckArgs(t *testing.T) {
 		{"opencode"}, {"opencode", "--tui"}, {"opencode", "--web"}, {"vscode"}, {"web"}, {"status"}, {"stop"}, {"pause"},
 		{"logs"}, {"logs", "-f"}, {"logs", "--follow"},
 		{"rm"}, {"rm", "-y"}, {"ls"}, {"switch"}, {"switch", "api"},
-		{"completion", "bash"}, {"install"}, {"doctor"}, {"version"}, {"help"},
+		{"completion", "bash"}, {"install"}, {"install", "--podman"}, {"install", "--docker-rootless"}, {"install", "--docker"}, {"doctor"}, {"version"}, {"help"},
 		{"run", "fix", "--the", "bug"}, {"copilot"}, {"copilot", "-p", "fix it", "--allow-all-tools"},
 		{"claude", "--model", "a/b", "-p", "fix it"},
 		{"ctx"}, {"ctx", "list"}, {"ctx", "--prompt"}, {"ctx", "use", "api"},

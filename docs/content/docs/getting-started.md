@@ -10,6 +10,7 @@ description: Install zero and start the first workspace.
 |---|---|
 | Linux on x86_64 with systemd | the installer pins OpenShell binaries for this platform |
 | `podman`, `newuidmap`, `newgidmap`, `curl` | Debian/Ubuntu: `apt install podman uidmap passt curl` |
+| Docker instead of podman (optional) | see [Runtime](#runtime) |
 | `go` 1.26, `make` | to build zero |
 | `glab`, logged in to your GitLab host | zero creates the agent's token with it |
 | `opencode`, connected to GitHub Copilot | zero copies its Copilot login into the sandbox for the model |
@@ -30,13 +31,31 @@ make install   # as your user, not with sudo: builds bin/zero and bin/zero-cp, t
 `zero install` can be run again at any time. It does this:
 
 1. downloads the pinned OpenShell release and checks its checksum
-2. creates the user `openshell`; the gateway and rootless podman run under it, not under your login
-3. sets a podman image allowlist for that user and enables its podman socket
+2. creates the user `openshell`; the gateway and the container runtime run under it, not under your login
+3. sets up the runtime for that user (podman: an image allowlist and its podman socket)
 4. starts the gateway and creates `/var/lib/zero/input`, the place input folders are handed over through
 5. gives your login the client certificate for the gateway
 6. copies `zero` and `zero-cp` to `/usr/local/bin` and starts `zero-cp` as a user service
 
 `zero-cp` is the service that checks every push of the agent and renews its token.
+
+## Runtime
+
+The sandboxes run in containers. Which program runs them is chosen at install:
+
+| Command | Runtime | Note |
+|---|---|---|
+| `sudo zero install` | podman, rootless, under the user `openshell` | the default |
+| `sudo zero install --docker-rootless` | a rootless Docker daemon of the user `openshell` | needs Docker's `dockerd-rootless.sh` and `rootlesskit` |
+| `sudo zero install --docker` | the system's Docker daemon | **dangerous**, see below |
+
+Without a flag a later `sudo zero install` keeps the runtime it finds. `zero doctor` shows it.
+
+**`--docker` is dangerous.** The system's Docker daemon runs as root, and whoever may use its socket is root on this machine. With `--docker` the user `openshell` gets that socket. The sandbox itself is as closed as under the other runtimes, but a flaw in the gateway is then a way to root. Use it only where podman and rootless Docker are no option. `zero install` prints this warning and `zero doctor` repeats it.
+
+To change the runtime, remove the sandboxes first (`zero rm` in each workspace), run `sudo zero install` with the new flag, then `zero up`. Sandboxes of the old runtime are not moved.
+
+Differences under Docker: there is no image allowlist (podman's `policy.json` has no Docker counterpart). With rootless Docker older than 29.10 an input folder on a `nosuid` filesystem cannot be mounted.
 
 ## Check the setup
 
