@@ -1,136 +1,522 @@
 package zero
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
 )
 
-// homeKeys maps a key of the workspace list to the command it runs.
-var homeKeys = map[string]string{
-	"enter": "opencode", "o": "opencode", "v": "vscode",
-	"s": "stop", "r": "rm", "n": "new",
+// The mark of zero, drawn in half blocks.
+const logo = ` ▄█████▄
+▄██   ██▀
+██  ▄█▀██
+██▄█▀  ██
+▄█▀   ▄██
+ ▀█████▀`
+
+type homeMode int
+
+const (
+	homeList homeMode = iota
+	homeFilter
+	homeCommand
+	homeDescribe
+	homeHelp
+)
+
+type keyHint struct{ key, what string }
+
+var homeHints = []keyHint{
+	{"enter", "opencode"}, {"v", "vscode"}, {"u", "up"}, {"s", "stop"}, {"r", "remove"}, {"n", "new"},
+	{"d", "describe"}, {"/", "filter"}, {":", "command"}, {"?", "help"}, {"ctrl-r", "refresh"}, {"q", "quit"},
 }
 
+var (
+	cTitle  = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	cKey    = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
+	cLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	cFrame  = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	cFaint  = lipgloss.NewStyle().Faint(true)
+	cHead   = lipgloss.NewStyle().Bold(true)
+	cSel    = lipgloss.NewStyle().Reverse(true)
+	cLogo   = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+	cStatus = map[string]lipgloss.Style{
+		"running": lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		"stopped": lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
+		"none":    cFaint,
+	}
+)
+
+type (
+	homeLoaded struct {
+		o   *overview
+		err error
+	}
+	homeTick struct{}
+	homeRan  struct {
+		what, last string
+		err        error
+	}
+)
+
+// home is the workspace screen behind a bare `zero` (ADR 0059).
 type home struct {
-	rows []wsRow
-	sel  int
-	cmd  string
+	exe              string
+	rows             []wsRow
+	ws               map[string]*Workspace
+	runtime, gateway string
+	warn             []string
+	ready            bool
+	sel, w, h        int
+	mode             homeMode
+	input, filter    string
+	msg              string
+	cmd              string // opencode, vscode or new: what to do after the screen
 }
 
-func (m home) Init() tea.Cmd { return nil }
+func homeLoad() tea.Msg {
+	o, err := loadOverview()
+	return homeLoaded{o, err}
+}
+
+func homeTicker() tea.Cmd {
+	return tea.Tick(5*time.Second, func(time.Time) tea.Msg { return homeTick{} })
+}
+
+func (m home) Init() tea.Cmd { return tea.Batch(homeLoad, homeTicker()) }
+
+func (m home) shown() []wsRow {
+	if m.filter == "" {
+		return m.rows
+	}
+	var out []wsRow
+	for _, r := range m.rows {
+		if strings.Contains(r.Name, m.filter) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func (m home) cur() *wsRow {
+	rs := m.shown()
+	if m.sel < 0 || m.sel >= len(rs) {
+		return nil
+	}
+	return &rs[m.sel]
+}
+
+// selectName puts the selection on the named workspace, if it is shown.
+func (m *home) selectName(name string) bool {
+	for i, r := range m.shown() {
+		if r.Name == name {
+			m.sel = i
+			return true
+		}
+	}
+	return false
+}
+
+func (m *home) clamp() {
+	m.sel = max(min(m.sel, len(m.shown())-1), 0)
+}
 
 func (m home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	k, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
-	}
-	switch key := k.String(); key {
-	case "q", "esc", "ctrl+c":
-		return m, tea.Quit
-	case "up", "k":
-		if m.sel > 0 {
-			m.sel--
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.w, m.h = msg.Width, msg.Height
+	case homeTick:
+		return m, tea.Batch(homeLoad, homeTicker())
+	case homeLoaded:
+		if msg.err != nil {
+			m.msg = msg.err.Error()
+			return m, nil
 		}
-	case "down", "j":
-		if m.sel < len(m.rows)-1 {
-			m.sel++
+		name := ""
+		if c := m.cur(); c != nil {
+			name = c.Name
 		}
-	default:
-		if c, ok := homeKeys[key]; ok && (c == "new" || len(m.rows) > 0) {
-			m.cmd = c
+		m.rows, m.ws, m.warn = msg.o.rows, msg.o.c.Workspaces, msg.o.warn
+		m.gateway = "ok"
+		for _, w := range m.warn {
+			if strings.HasPrefix(w, "gateway not reachable") {
+				m.gateway = "unreachable"
+			}
+		}
+		if !m.ready {
+			m.ready = true
+			for _, r := range m.rows {
+				if r.Current {
+					name = r.Name
+				}
+			}
+		}
+		if !m.selectName(name) {
+			m.clamp()
+		}
+	case homeRan:
+		m.msg = msg.what + ": done"
+		if msg.err != nil {
+			m.msg = msg.what + ": " + msg.err.Error()
+			if msg.last != "" {
+				m.msg = msg.what + ": " + msg.last
+			}
+		}
+		return m, homeLoad
+	case tea.KeyPressMsg:
+		k := msg.String()
+		switch {
+		case k == "ctrl+c":
 			return m, tea.Quit
+		case m.mode == homeFilter || m.mode == homeCommand:
+			return m.typed(k, msg.Text)
+		case m.mode == homeDescribe || m.mode == homeHelp:
+			if k == "esc" || k == "q" || k == "enter" {
+				m.mode = homeList
+			}
+			return m, nil
+		}
+		return m.key(k)
+	}
+	return m, nil
+}
+
+// typed handles a key while a filter or a command is being typed.
+func (m home) typed(k, text string) (tea.Model, tea.Cmd) {
+	switch k {
+	case "esc":
+		if m.mode == homeFilter {
+			m.filter = ""
+		}
+		m.mode, m.input = homeList, ""
+	case "backspace":
+		if r := []rune(m.input); len(r) > 0 {
+			m.input = string(r[:len(r)-1])
+		}
+	case "enter":
+		c := m.input
+		mode := m.mode
+		m.mode, m.input = homeList, ""
+		if mode == homeCommand {
+			return m.run(strings.TrimSpace(c))
+		}
+		return m, nil
+	default:
+		m.input += text
+	}
+	if m.mode == homeFilter {
+		m.filter = m.input
+		m.clamp()
+	}
+	return m, nil
+}
+
+// run does a command typed after the colon.
+func (m home) run(c string) (tea.Model, tea.Cmd) {
+	switch c {
+	case "":
+	case "q", "quit":
+		return m, tea.Quit
+	case "help":
+		m.mode = homeHelp
+	case "all":
+		m.filter, m.sel = "", 0
+	case "new":
+		m.cmd = "new"
+		return m, tea.Quit
+	default:
+		f := m.filter
+		m.filter = ""
+		if !m.selectName(c) {
+			m.filter = f
+			m.msg = "no command or workspace: " + c
 		}
 	}
 	return m, nil
 }
 
-func (m home) View() tea.View {
-	bold := lipgloss.NewStyle().Bold(true)
-	faint := lipgloss.NewStyle().Faint(true)
-	var b strings.Builder
-	b.WriteString(bold.Render("zero") + faint.Render("  workspaces") + "\n\n")
-	if len(m.rows) == 0 {
-		b.WriteString("  no workspace yet; n makes one\n")
+// key handles a key on the list.
+func (m home) key(k string) (tea.Model, tea.Cmd) {
+	m.msg = ""
+	n := len(m.shown())
+	switch k {
+	case "q":
+		return m, tea.Quit
+	case "esc":
+		m.filter = ""
+		m.clamp()
+	case "down", "j":
+		m.sel = min(m.sel+1, max(n-1, 0))
+	case "up", "k":
+		m.sel = max(m.sel-1, 0)
+	case "g":
+		m.sel = 0
+	case "G":
+		m.sel = max(n-1, 0)
+	case "/":
+		m.mode, m.input = homeFilter, m.filter
+	case ":":
+		m.mode, m.input = homeCommand, ""
+	case "?":
+		m.mode = homeHelp
+	case "ctrl+r":
+		m.msg = "refreshing"
+		return m, homeLoad
+	case "n":
+		m.cmd = "new"
+		return m, tea.Quit
 	}
-	w := 9
-	for _, r := range m.rows {
-		w = max(w, len(r.Name))
+	c := m.cur()
+	if c == nil {
+		return m, nil
 	}
-	for i, r := range m.rows {
-		color := "8"
-		switch r.Status {
-		case "running":
-			color = "2"
-		case "stopped":
-			color = "3"
-		}
-		line := fmt.Sprintf("%-*s  %-8s %d dir  token %-8s policy %s", w, r.Name, r.Status, r.Folders, r.Token, r.Policy)
-		cur := "  "
-		if i == m.sel {
-			cur = bold.Render("> ")
-			line = bold.Render(line)
-		}
-		b.WriteString(cur + lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render("● ") + line + "\n")
+	switch k {
+	case "d":
+		m.mode = homeDescribe
+	case "enter", "o":
+		m.cmd = "opencode"
+		return m, tea.Quit
+	case "v":
+		m.cmd = "vscode"
+		return m, tea.Quit
+	case "u", "s", "r":
+		cmd := map[string]string{"u": "up", "s": "stop", "r": "rm"}[k]
+		return m, m.exec(c.Name, cmd)
 	}
-	b.WriteString("\n" + faint.Render("enter opencode · v vscode · s stop · r remove · n new · q quit") + "\n")
-	return tea.NewView(b.String())
+	return m, nil
 }
 
-// Interactive: a person at a terminal on both ends.
-func Interactive() bool { return isTerminal(os.Stdin) && isTerminal(os.Stdout) }
-
-// Home is zero without a command on a terminal: the workspace list. It runs
-// the commands a person would type. stop, rm and new come back to the list;
-// for an agent it returns the arguments to run zero with.
-func Home(exe string) ([]string, error) {
-	sel := -1
-	for {
-		o, err := loadOverview()
-		if err != nil {
-			return nil, err
-		}
-		m := home{rows: o.rows, sel: sel}
-		if sel < 0 || sel >= len(m.rows) {
-			m.sel = 0
-			for i, r := range m.rows {
-				if r.Current {
-					m.sel = i
-				}
+// exec runs `zero -c NAME CMD` with the terminal handed over, so the command
+// asks and prints as it always does, and comes back to the screen.
+func (m home) exec(name, cmd string) tea.Cmd {
+	var buf bytes.Buffer
+	c := exec.Command(m.exe, "-c", name, cmd)
+	c.Stderr = io.MultiWriter(os.Stderr, &buf)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		last := ""
+		for _, l := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+			if l = strings.TrimSpace(l); l != "" {
+				last = l
 			}
 		}
+		return homeRan{cmd + " " + name, last, err}
+	})
+}
+
+func pad(s string, w int) string {
+	if n := w - lipgloss.Width(s); n > 0 {
+		return s + strings.Repeat(" ", n)
+	}
+	return s
+}
+
+func (m home) header() []string {
+	current := "-"
+	for _, r := range m.rows {
+		if r.Current {
+			current = r.Name
+		}
+	}
+	info := [][2]string{{"Workspace", current}, {"Runtime", m.runtime}, {"Gateway", m.gateway}, {"Zero", Version()}}
+	lines := make([]string, 6)
+	for i := range lines {
+		if i < len(info) {
+			lines[i] = cLabel.Render(fmt.Sprintf("%-11s", info[i][0]+":")) + lipgloss.NewStyle().MaxWidth(16).Render(info[i][1])
+		}
+		lines[i] = pad(lines[i], 28)
+	}
+	left := 28
+	if m.w >= 78 {
+		for i := range lines {
+			for _, h := range []keyHint{homeHints[i], homeHints[i+6]} {
+				lines[i] += pad(cKey.Render("<"+h.key+">")+" "+h.what, 18)
+			}
+		}
+		left += 36
+	}
+	if m.w >= 48 {
+		gap := strings.Repeat(" ", max(m.w-left-14, 0))
+		for i, l := range strings.Split(logo, "\n") {
+			word := "    "
+			if i == 2 {
+				word = cHead.Render("Z3R0")
+			}
+			lines[i] += gap + word + " " + cLogo.Render(l)
+		}
+	}
+	return lines
+}
+
+// box frames the lines, with the title in the top edge, to w by h cells.
+func box(title string, lines []string, w, h int) string {
+	in := w - 2
+	t := " " + title + " "
+	fill := max(in-lipgloss.Width(t), 0)
+	out := []string{cFrame.Render("┌"+strings.Repeat("─", fill/2)) + cTitle.Render(t) + cFrame.Render(strings.Repeat("─", fill-fill/2)+"┐")}
+	for i := 0; i < h-2; i++ {
+		l := ""
+		if i < len(lines) {
+			l = lines[i]
+		}
+		l = lipgloss.NewStyle().MaxWidth(in).Render(l)
+		out = append(out, cFrame.Render("│")+pad(l, in)+cFrame.Render("│"))
+	}
+	out = append(out, cFrame.Render("└"+strings.Repeat("─", in)+"┘"))
+	return strings.Join(out, "\n")
+}
+
+func (m home) table(w int) []string {
+	rs := m.shown()
+	nw := len("NAME")
+	for _, r := range rs {
+		nw = max(nw, len(r.Name))
+	}
+	line := func(name, status, dirs, token, policy string) string {
+		return fmt.Sprintf(" %-*s  %-8s  %-4s  %-14s  %s", nw+1, name, status, dirs, token, policy)
+	}
+	out := []string{cHead.Render(line("NAME", "STATUS", "DIRS", "TOKEN", "POLICY"))}
+	if !m.ready {
+		return append(out, cFaint.Render(" loading..."))
+	}
+	for i, r := range rs {
+		name := r.Name
+		if r.Current {
+			name += "*"
+		}
+		l := pad(line(name, r.Status, strconv.Itoa(r.Folders), r.Token, r.Policy), w)
+		if i == m.sel {
+			l = cSel.Render(l)
+		} else {
+			l = cStatus[r.Status].Render(l)
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+func (m home) describe(r *wsRow) []string {
+	out := []string{"", " " + cLabel.Render("Status:  ") + r.Status, " " + cLabel.Render("Token:   ") + r.Token, " " + cLabel.Render("Policy:  ") + r.Policy}
+	list := func(title string, items []string) {
+		if len(items) == 0 {
+			return
+		}
+		out = append(out, "", " "+cLabel.Render(title+":"))
+		for _, i := range items {
+			out = append(out, "   "+i)
+		}
+	}
+	if w := m.ws[r.Name]; w != nil {
+		if w.Model != "" {
+			out = append(out, " "+cLabel.Render("Model:   ")+w.Model)
+		}
+		list("Directories", w.Folders)
+		list("Tools", w.Tools)
+		list("Models", w.Models)
+	}
+	return append(out, "", cFaint.Render(" esc back"))
+}
+
+// frame is the whole screen as text.
+func (m home) frame() string {
+	if m.w == 0 {
+		return ""
+	}
+	if m.w < 20 || m.h < 8 {
+		return "zero: the window is too small"
+	}
+	var out []string
+	headH := 0
+	if m.h >= 16 {
+		out = append(out, m.header()...)
+		headH = 6
+	}
+	switch m.mode {
+	case homeFilter:
+		out = append(out, cKey.Render("/")+m.input+"█")
+		headH++
+	case homeCommand:
+		out = append(out, cKey.Render(":")+m.input+"█")
+		headH++
+	}
+	bh := m.h - headH - 1
+	switch c := m.cur(); {
+	case m.mode == homeDescribe && c != nil:
+		out = append(out, box("describe("+c.Name+")", m.describe(c), m.w, bh))
+	case m.mode == homeHelp:
+		lines := []string{""}
+		for _, h := range homeHints {
+			lines = append(lines, " "+pad(cKey.Render("<"+h.key+">"), 10)+h.what)
+		}
+		lines = append(lines, " "+pad(cKey.Render("<j/k>"), 10)+"move, g first, G last",
+			"", " :NAME goes to a workspace, :all drops the filter, :new, :q", "", cFaint.Render(" esc back"))
+		out = append(out, box("help", lines, m.w, bh))
+	default:
+		scope := "all"
+		if m.filter != "" {
+			scope = "/" + m.filter
+		}
+		out = append(out, box(fmt.Sprintf("workspaces(%s)[%d]", scope, len(m.shown())), m.table(m.w-2), m.w, bh))
+	}
+	status := m.msg
+	if status == "" && len(m.warn) > 0 {
+		status = m.warn[0]
+	}
+	out = append(out, cFaint.Render(lipgloss.NewStyle().MaxWidth(m.w).Render(" "+status)))
+	return strings.Join(out, "\n")
+}
+
+func (m home) View() tea.View {
+	v := tea.NewView(m.frame())
+	v.AltScreen = true
+	v.WindowTitle = "zero"
+	return v
+}
+
+// Interactive reports whether zero talks to a person at a terminal.
+func Interactive() bool { return isTerminal(os.Stdin) && isTerminal(os.Stdout) }
+
+// Home shows the workspace screen until the person picks something to run
+// outside it; it returns the arguments for zero, nil to leave.
+func Home(exe string) ([]string, error) {
+	m := home{exe: exe, runtime: "-", gateway: "-"}
+	if b, err := os.ReadFile("/var/lib/zero/runtime"); err == nil && strings.TrimSpace(string(b)) != "" {
+		m.runtime = strings.TrimSpace(string(b))
+	}
+	for {
+		m.cmd, m.mode = "", homeList
 		res, err := tea.NewProgram(m).Run()
 		if err != nil {
 			return nil, err
 		}
 		m = res.(home)
-		sel = m.sel
-		var args []string
-		switch m.cmd {
-		case "":
-			return nil, nil
-		case "new":
-			if args, err = newWorkspaceArgs(); err != nil {
+		switch c := m.cur(); {
+		case m.cmd == "new":
+			args, err := newWorkspaceArgs()
+			if err != nil {
 				return nil, err
 			}
 			if args == nil {
 				continue
 			}
-		case "opencode", "vscode":
-			return []string{"-c", m.rows[m.sel].Name, m.cmd}, nil
+			p := exec.Command(exe, args...)
+			p.Stdin, p.Stdout, p.Stderr = os.Stdin, os.Stdout, os.Stderr
+			if err := p.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "zero %s: %v\nenter to go on ", strings.Join(args, " "), err)
+				fmt.Scanln()
+			}
+		case m.cmd != "" && c != nil:
+			return []string{"-c", c.Name, m.cmd}, nil
 		default:
-			args = []string{"-c", m.rows[m.sel].Name, m.cmd}
-		}
-		c := exec.Command(exe, args...)
-		c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
-		if err := c.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "zero %s: %v\nenter to go on ", strings.Join(args, " "), err)
-			fmt.Scanln()
+			return nil, nil
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -2177,35 +2178,103 @@ func TestFirstRunApproval(t *testing.T) {
 }
 
 func TestHomeKeys(t *testing.T) {
-	press := func(m tea.Model, k rune) (home, bool) {
-		n, cmd := m.Update(tea.KeyPressMsg{Code: k, Text: string(k)})
-		return n.(home), cmd != nil
+	press := func(m tea.Model, keys ...rune) (home, bool) {
+		var cmd tea.Cmd
+		for _, k := range keys {
+			msg := tea.KeyPressMsg{Code: k}
+			if k >= ' ' && k < 0x7f {
+				msg.Text = string(k)
+			}
+			m, cmd = m.Update(msg)
+		}
+		return m.(home), cmd != nil
 	}
-	m := home{rows: []wsRow{{Name: "a"}, {Name: "b"}}}
-	m, _ = press(m, 'j')
-	m, _ = press(m, 'j')
-	if m.sel != 1 {
-		t.Fatalf("sel = %d", m.sel)
+	plain := func(m home) string {
+		return regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(m.frame(), "")
 	}
-	if !strings.Contains(m.View().Content, "> ") {
-		t.Fatal("no selection mark")
+	o := &overview{c: &Config{Workspaces: map[string]*Workspace{
+		"apps": {Folders: []string{"/src/apps"}},
+		"dev":  {Folders: []string{"/src/one", "/src/two"}, Model: "m1"},
+	}}, rows: []wsRow{
+		{Name: "apps", Status: "none", Token: "-", Policy: "-", Folders: 1},
+		{Name: "dev", Status: "running", Token: "ok", Policy: "default", Folders: 2, Current: true},
+		{Name: "docs", Status: "stopped", Token: "-", Policy: "-", Folders: 1},
+	}}
+	n, _ := home{w: 100, h: 24}.Update(homeLoaded{o: o})
+	m := n.(home)
+	if r := m.cur(); r == nil || r.Name != "dev" {
+		t.Fatalf("first load selects the current workspace: %+v", r)
 	}
-	if m, quit := press(m, 'v'); m.cmd != "vscode" || !quit {
-		t.Fatalf("v: %q %v", m.cmd, quit)
-	}
-	if m, quit := press(m, 'q'); m.cmd != "" || !quit {
-		t.Fatalf("q: %q %v", m.cmd, quit)
-	}
-	for k, want := range map[rune]string{tea.KeyEnter: "opencode", 'o': "opencode", tea.KeyEscape: ""} {
-		n, cmd := m.Update(tea.KeyPressMsg{Code: k})
-		if n.(home).cmd != want || cmd == nil {
-			t.Errorf("key %q: %q", k, n.(home).cmd)
+
+	for _, size := range [][2]int{{100, 24}, {80, 24}, {50, 18}} {
+		m.w, m.h = size[0], size[1]
+		out := plain(m)
+		for _, l := range strings.Split(out, "\n") {
+			if lipgloss.Width(l) > m.w {
+				t.Errorf("%dx%d: line wider than the window: %q", m.w, m.h, l)
+			}
+		}
+		for _, want := range []string{"NAME", "workspaces(all)[3]", "dev*", "█"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%dx%d: no %q in\n%s", m.w, m.h, want, out)
+			}
+		}
+		if hints := strings.Contains(out, "<v>"); hints != (m.w >= 78) {
+			t.Errorf("%dx%d: key hints shown = %v", m.w, m.h, hints)
 		}
 	}
-	if m, quit := press(home{}, 's'); m.cmd != "" || quit {
-		t.Fatal("stop with no workspace")
+	m.w, m.h = 15, 5
+	if !strings.Contains(plain(m), "too small") {
+		t.Error("small window not said")
 	}
-	if m, _ := press(home{}, 'n'); m.cmd != "new" {
-		t.Fatal("new with no workspace")
+	m.w, m.h = 100, 24
+
+	if f, _ := press(m, '/', 'd', 'o'); f.mode != homeFilter || len(f.shown()) != 1 || !strings.Contains(plain(f), "workspaces(/do)[1]") {
+		t.Errorf("filter: %d rows\n%s", len(f.shown()), plain(f))
+	} else if f, _ = press(f, tea.KeyEscape); len(f.shown()) != 3 {
+		t.Error("esc keeps the filter")
+	}
+	if c, _ := press(m, ':', 'd', 'o', 'c', 's', tea.KeyEnter); c.cur().Name != "docs" || c.mode != homeList {
+		t.Errorf("command jumps to a workspace: %s", c.cur().Name)
+	}
+	if c, _ := press(m, ':', 'x', tea.KeyEnter); !strings.Contains(plain(c), "no command or workspace: x") {
+		t.Error("unknown command not said")
+	}
+	if c, quit := press(m, ':', 'q', tea.KeyEnter); !quit || c.cmd != "" {
+		t.Error(":q does not quit")
+	}
+	if d, _ := press(m, 'd'); !strings.Contains(plain(d), "describe(dev)") || !strings.Contains(plain(d), "/src/two") {
+		t.Errorf("describe:\n%s", plain(d))
+	}
+	if h, _ := press(m, '?'); !strings.Contains(plain(h), "help") {
+		t.Error("no help")
+	}
+
+	for k, want := range map[rune]string{tea.KeyEnter: "opencode", 'o': "opencode", 'v': "vscode", 'n': "new", 'q': ""} {
+		if c, quit := press(m, k); c.cmd != want || !quit {
+			t.Errorf("key %q: cmd %q, quit %v", k, c.cmd, quit)
+		}
+	}
+	if c, quit := press(m, tea.KeyEscape); c.cmd != "" || quit {
+		t.Error("esc on the list quits")
+	}
+	for _, k := range "usrd" {
+		if c, run := press(home{w: 100, h: 24, ready: true}, k); run || c.mode != homeList {
+			t.Errorf("key %q with no workspace does something", k)
+		}
+	}
+	if _, run := press(m, 's'); !run {
+		t.Error("stop runs nothing")
+	}
+
+	m, _ = press(m, 'j')
+	o.rows = slices.Insert(o.rows, 0, wsRow{Name: "aaa", Status: "none"})
+	n, _ = m.Update(homeLoaded{o: o})
+	if r := n.(home).cur(); r.Name != "docs" {
+		t.Errorf("selection after a reload: %s", r.Name)
+	}
+	n, _ = n.(home).Update(homeRan{what: "rm docs", last: "zero: no", err: fmt.Errorf("exit status 1")})
+	if !strings.Contains(plain(n.(home)), "rm docs: zero: no") {
+		t.Error("failed command not shown")
 	}
 }
