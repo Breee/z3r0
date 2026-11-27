@@ -1971,3 +1971,53 @@ func TestMCPProxy(t *testing.T) {
 	}
 
 }
+
+func TestProviderKeys(t *testing.T) {
+	c := &Config{Parts: Parts{Models: partLiteLLM}, Providers: []string{"openrouter"},
+		Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: []string{"openrouter/*"}}}}
+	if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), "provider_keys.openrouter") {
+		t.Errorf("key provider without a command: %v", err)
+	}
+	c.ProviderKeys = map[string]string{"openrouter": "echo k"}
+	if err := c.checkModels(); err != nil {
+		t.Errorf("key provider with a command: %v", err)
+	}
+	c.ProviderKeys["github_copilot"] = "echo k"
+	if err := c.checkModels(); err == nil {
+		t.Error("a key command for a provider without key is accepted")
+	}
+	delete(c.ProviderKeys, "github_copilot")
+	c.ProviderKeys["openai"] = "echo k"
+	if err := c.checkModels(); err == nil {
+		t.Error("a key command for a provider that is not listed is accepted")
+	}
+
+	cfg := modelConfig([]string{"github_copilot", "openrouter"}, nil)
+	for _, want := range []string{`model_name: "openrouter/*"`, `api_key: os.environ/OPENROUTER_API_KEY`, `model_name: "github_copilot/*"`} {
+		if !strings.Contains(cfg, want) {
+			t.Errorf("proxy config lacks %q:\n%s", want, cfg)
+		}
+	}
+
+	keys, err := providerKeys(map[string]string{"openrouter": "printf sk-one\\nrest"})
+	if err != nil || keys["openrouter"] != "sk-one" {
+		t.Errorf("key command: %v %v", keys, err)
+	}
+	if strings.Contains(cfg, "sk-one") {
+		t.Error("key in the proxy config")
+	}
+	_, err = providerKeys(map[string]string{"openrouter": "false"})
+	if err == nil || strings.Contains(err.Error(), "sk-") || !strings.Contains(err.Error(), "openrouter") {
+		t.Errorf("failing key command: %v", err)
+	}
+	if _, err := providerKeys(map[string]string{"openrouter": "true"}); err == nil {
+		t.Error("a command that prints nothing gives a key")
+	}
+	a, b := keysSum(map[string]string{"x": "1"}), keysSum(map[string]string{"x": "2"})
+	if a == b || a != keysSum(map[string]string{"x": "1"}) || strings.Contains(a, "1=") {
+		t.Errorf("key sums: %s %s", a, b)
+	}
+	if providerKeysProblem(map[string]string{"x": "false"}) == "" || providerKeysProblem(map[string]string{"x": "echo k"}) != "" {
+		t.Error("doctor check of the key commands")
+	}
+}

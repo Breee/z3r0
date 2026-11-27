@@ -13,7 +13,15 @@ import (
 const partLiteLLM = "litellm"
 
 // modelProviders are the providers zero can put behind the model proxy.
-var modelProviders = []string{"github_copilot"}
+var modelProviders = []string{"github_copilot", "openai", "anthropic", "openrouter"}
+
+// keyProviders need an API key; the value names the variable the proxy reads
+// it from (ADR 0056).
+var keyProviders = map[string]string{
+	"openai":     "OPENAI_API_KEY",
+	"anthropic":  "ANTHROPIC_API_KEY",
+	"openrouter": "OPENROUTER_API_KEY",
+}
 
 var modelNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 
@@ -26,6 +34,16 @@ func (c *Config) checkModels() error {
 	for _, p := range c.Providers {
 		if !slices.Contains(modelProviders, p) {
 			return fmt.Errorf("providers: unknown provider %q (one of: %s)", p, strings.Join(modelProviders, ", "))
+		}
+	}
+	for _, p := range c.Providers {
+		if _, ok := keyProviders[p]; ok && len(strings.Fields(c.ProviderKeys[p])) == 0 {
+			return fmt.Errorf("providers: %s needs provider_keys.%s, a command that prints its key (e.g. pass show NAME)", p, p)
+		}
+	}
+	for p := range c.ProviderKeys {
+		if _, ok := keyProviders[p]; !ok || !slices.Contains(c.Providers, p) {
+			return fmt.Errorf("provider_keys: %s is not a listed provider that takes a key", p)
 		}
 	}
 	if c.Parts.Models == "" && len(c.Providers) > 0 {

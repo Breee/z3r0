@@ -157,6 +157,16 @@ workspaces:
 
 `model` must be one of the workspace's models. opencode starts with it, and `zero copilot` and `zero claude` use it when you give no `--model`. `--model` still wins; for opencode a repository's own `opencode.json` wins too.
 
+Other providers take a key: `openai`, `anthropic`, `openrouter`. Name the provider and a command that prints its key. zero runs the command at `zero up` and hands the key to the proxy; the key is in no file of zero and not in the sandbox.
+
+```yaml
+providers: [github_copilot, openrouter]
+provider_keys:
+  openrouter: pass show OPENROUTER_API_KEY
+```
+
+A changed key makes the proxy anew (about 20 s). `zero doctor` runs the commands (`model provider keys`).
+
 `zero up` then starts the proxy (two containers, on `127.0.0.1:18096`), makes a key for this sandbox that is good for the listed models only, and writes the model list for opencode:
 
 ```

@@ -68,6 +68,9 @@ func Doctor(out io.Writer) error {
 	if c != nil && c.Parts.Models != "" {
 		check("model proxy runtime", composeProblem())
 		check("model proxy login", proxyLogin())
+		if len(c.ProviderKeys) > 0 {
+			check("model provider keys", providerKeysProblem(c.ProviderKeys))
+		}
 	}
 
 	if top := gitTop(); top != "" {

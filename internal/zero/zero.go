@@ -38,12 +38,14 @@ type Sandbox struct {
 	Models    []string
 	Model     string
 	Providers []string
-	Repo      string // basename of the first folder
-	Top       string // first folder on the host
-	Dir       string // checkout path of the first folder inside the sandbox
-	State     string // local state dir (0700)
-	Host      string // ssh host alias from `openshell sandbox ssh-config`
-	gw        string // OpenShell gateway; empty = active gateway (podman, E1)
+	// ProviderKeys: per key provider the command that prints its key.
+	ProviderKeys map[string]string
+	Repo         string // basename of the first folder
+	Top          string // first folder on the host
+	Dir          string // checkout path of the first folder inside the sandbox
+	State        string // local state dir (0700)
+	Host         string // ssh host alias from `openshell sandbox ssh-config`
+	gw           string // OpenShell gateway; empty = active gateway (podman, E1)
 
 	Approve bool
 	// MaxInput is the size limit for input folders in bytes; 0 means the default.

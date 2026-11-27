@@ -3,6 +3,7 @@ package zero
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -68,6 +70,9 @@ func modelConfig(providers []string, entries []mcpEntry) string {
 			b.WriteString("  - model_name: \"github_copilot/*\"\n    litellm_params:\n      model: \"github_copilot/*\"\n      litellm_credential_name: github-copilot\n      github_copilot_auth_type: per_user_oauth\n")
 			creds += "  - credential_name: github-copilot\n    credential_values:\n      github_copilot_auth_type: per_user_oauth\n    credential_info:\n      custom_llm_provider: github_copilot\n"
 		}
+		if env, ok := keyProviders[p]; ok {
+			fmt.Fprintf(&b, "  - model_name: \"%s/*\"\n    litellm_params:\n      model: \"%s/*\"\n      api_key: os.environ/%s\n", p, p, env)
+		}
 	}
 	if creds != "" {
 		b.WriteString("credential_list:\n" + creds)
@@ -103,7 +108,7 @@ func modelHealthy() bool {
 
 // startModelProxy writes the compose and config files and starts the proxy;
 // a changed config restarts it.
-func startModelProxy(out io.Writer, providers []string) error {
+func startModelProxy(out io.Writer, providers []string, keyCmds map[string]string) error {
 	dir := partsDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -130,10 +135,16 @@ func startModelProxy(out io.Writer, providers []string) error {
 		return err
 	}
 	cfg, env := modelConfig(providers, entries), mcpEnv(entries)
+	keys, err := providerKeys(keyCmds)
+	if err != nil {
+		return err
+	}
+	sum := keysSum(keys)
+	oldSum, _ := os.ReadFile(filepath.Join(dir, "keys.sha"))
 	old, _ := os.ReadFile(filepath.Join(dir, "litellm.yaml"))
 	oldCompose, _ := os.ReadFile(filepath.Join(dir, "compose.yaml"))
 	oldEnv, _ := os.ReadFile(filepath.Join(dir, "mcp.env"))
-	same := string(old) == cfg && bytes.Equal(oldCompose, partsCompose) && string(oldEnv) == env
+	same := string(old) == cfg && bytes.Equal(oldCompose, partsCompose) && string(oldEnv) == env && string(oldSum) == sum
 	if same && modelHealthy() {
 		return nil
 	}
@@ -148,6 +159,9 @@ func startModelProxy(out io.Writer, providers []string) error {
 	if err := os.WriteFile(filepath.Join(dir, "mcp.env"), []byte(env), 0o600); err != nil {
 		return err
 	}
+	if err := os.WriteFile(filepath.Join(dir, "keys.sha"), []byte(sum), 0o600); err != nil {
+		return err
+	}
 	fmt.Fprintf(out, "model proxy: starting (LiteLLM on 127.0.0.1:%d)\n", modelPort)
 	c := compose()
 	args := append(c[1:], "-p", modelProject, "-f", filepath.Join(dir, "compose.yaml"), "--profile", "models", "up", "-d")
@@ -156,6 +170,9 @@ func startModelProxy(out io.Writer, providers []string) error {
 	}
 	cmd := exec.Command(c[0], args...)
 	cmd.Env = append(os.Environ(), "ZERO_MODELS_KEY="+key, "ZERO_MODELS_DB_PASSWORD="+pg)
+	for p, v := range keys {
+		cmd.Env = append(cmd.Env, "ZERO_KEY_"+strings.ToUpper(p)+"="+v)
+	}
 	if b, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("model proxy: %s failed: %v\n%s", strings.Join(c, " "), err, clean(string(b)))
 	}
@@ -356,7 +373,7 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 	if err := s.syncMCP(); err != nil {
 		return nil, err
 	}
-	if err := startModelProxy(out, providers); err != nil {
+	if err := startModelProxy(out, providers, s.ProviderKeys); err != nil {
 		return nil, err
 	}
 	alias, entry := s.modelKeyAlias(), ""
@@ -487,4 +504,46 @@ func notConnected(list []byte) []string {
 		}
 	}
 	return out
+}
+
+// providerKeys runs each provider's key command (no shell) and takes the
+// first line it prints. The key goes to the proxy through the environment of
+// the compose command only; zero writes it to no file (ADR 0056).
+func providerKeys(cmds map[string]string) (map[string]string, error) {
+	keys := map[string]string{}
+	for p, c := range cmds {
+		f := strings.Fields(c)
+		if len(f) == 0 {
+			return nil, fmt.Errorf("provider_keys.%s: no command", p)
+		}
+		out, err := exec.Command(f[0], f[1:]...).Output()
+		line, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+		if line = strings.TrimSpace(line); err != nil || line == "" {
+			return nil, fmt.Errorf("provider_keys.%s: `%s` gave no key; run it by hand to see why", p, c)
+		}
+		keys[p] = line
+	}
+	return keys, nil
+}
+
+// keysSum lets zero see that a key changed without keeping the key.
+func keysSum(keys map[string]string) string {
+	names := make([]string, 0, len(keys))
+	for p := range keys {
+		names = append(names, p)
+	}
+	slices.Sort(names)
+	h := sha256.New()
+	for _, p := range names {
+		fmt.Fprintf(h, "%s=%s\n", p, keys[p])
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// providerKeysProblem is the doctor check: every key command prints a key.
+func providerKeysProblem(cmds map[string]string) string {
+	if _, err := providerKeys(cmds); err != nil {
+		return err.Error()
+	}
+	return ""
 }

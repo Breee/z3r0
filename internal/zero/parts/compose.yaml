@@ -26,6 +26,10 @@ services:
       SERVER_ROOT_PATH: /litellm
       LITELLM_MASTER_KEY: ${ZERO_MODELS_KEY:?set by zero}
       DATABASE_URL: postgresql://litellm:${ZERO_MODELS_DB_PASSWORD:?set by zero}@models-db:5432/litellm
+      # Keys of providers that take one; empty unless zero's config names them.
+      OPENAI_API_KEY: ${ZERO_KEY_OPENAI-}
+      ANTHROPIC_API_KEY: ${ZERO_KEY_ANTHROPIC-}
+      OPENROUTER_API_KEY: ${ZERO_KEY_OPENROUTER-}
     # Tokens of the MCP entries in litellm.yaml (ADR 0055); may be empty.
     env_file:
       - ./mcp.env

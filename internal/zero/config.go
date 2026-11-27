@@ -42,8 +42,11 @@ type Config struct {
 	Current string `yaml:"current,omitempty"`
 	Parts   Parts  `yaml:"parts,omitempty"`
 	// Providers are the model providers behind the model proxy.
-	Providers  []string              `yaml:"providers,omitempty"`
-	Workspaces map[string]*Workspace `yaml:"workspaces"`
+	Providers []string `yaml:"providers,omitempty"`
+	// ProviderKeys names, per provider that takes a key, the command that
+	// prints it. The key itself is in no file of zero (ADR 0056).
+	ProviderKeys map[string]string     `yaml:"provider_keys,omitempty"`
+	Workspaces   map[string]*Workspace `yaml:"workspaces"`
 }
 
 var wsNameRe = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
@@ -279,6 +282,7 @@ func (c *Config) sandbox(name string) *Sandbox {
 		Models:       c.Workspaces[name].Models,
 		Model:        c.Workspaces[name].Model,
 		Providers:    c.Providers,
+		ProviderKeys: c.ProviderKeys,
 		Repo:         repo,
 		Top:          top,
 		Dir:          dir,
