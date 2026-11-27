@@ -29,13 +29,15 @@ Result (2026-11-26, opencode 2.2.6, LiteLLM v1.110.3, OpenShell 0.1.8): **zero m
 ## Findings
 
 1. vLLM discovery reads `/v1/models` but keeps only models owned by `vllm`; LiteLLM says `openai` for every model. LM Studio and Ollama discovery ask paths the proxy does not have.
-2. Without limits in the list opencode assumes 200,000 / 32,000 tokens. The proxy reports the real figures, for example 922,000 / 128,000 for `github_copilot/gpt-astra-latest`. zero's list carries no limits today.
-3. Four models come without limits: `gpt-41-copilot` and three embedding models. Embedding models are not chat models.
-4. Only programs named in the sandbox's `models` rule reach the proxy: `curl` does, `python3` does not.
+2. Without limits in the list opencode assumes 200,000 / 32,000 tokens. The proxy reports the real figures; the run prints the largest (`largest=github_copilot/gpt-astra-latest:922000/128000`). Since #171 zero writes them for each model that has both.
+3. The proxy marks each model with a mode (run: `modes=chat:43,completion:1,embedding:3,responses:21`). zero keeps `chat`, `responses` and models without a mode; the rest cannot chat. Four models come without limits (printed by the run).
+4. Seen while writing the PoC, not checked by `run.sh`: `python3` in the sandbox got no connection to the proxy, `curl` (named in the `models` rule) does.
 
 ## Limits
 
-- Tested with `opencode --standalone` and project config files in a scratch folder. Whether the running background service re-reads a changed config was not tested; zero restarts it at `zero up`.
+- Tested with `opencode --standalone` and project config files in a scratch folder. The opencode docs say config files normally reload automatically (https://opencode.ai/docs/models/, Caveats); for the running background service this was not tested, zero restarts it at `zero up`.
+- The sandbox key is a curl argument inside the sandbox during the run.
+- Ollama and LM Studio were pointed at the address ending in `/v1`, as their docs ask; their discovery paths were probed at the root only.
 - opencode 2.2.6 only. A plugin that registers models was not tried.
 - Whether the limits change opencode's behaviour was not measured.
 

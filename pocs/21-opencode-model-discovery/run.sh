@@ -54,7 +54,7 @@ sbx "cat > /tmp/poc21/builtin/opencode.json <<'EOF'
   \"lmstudio\": {\"settings\": {\"baseURL\": \"$URL\", \"apiKey\": \"{env:LITELLM_API_KEY}\"}}}}
 EOF" >/dev/null
 l=$(oc builtin models)
-has "opencode lists models at all (control)" "$l" "/"
+has "opencode lists models at all (control)" "$l" "^litellm/github_copilot/\|^opencode/"
 for p in vllm ollama lmstudio; do
   hasnot "$p: lists no model of the proxy" "$l" "^$p/github_copilot"
 done

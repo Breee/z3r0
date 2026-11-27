@@ -12,7 +12,14 @@ models = {m["id"]: m for m in json.load(open("/tmp/poc21/models.json"))["data"]}
 if sys.argv[1] == "stats":
     lim = [m for m in models.values() if m.get("max_input_tokens") and m.get("max_output_tokens")]
     owners = sorted({m.get("owned_by", "") for m in models.values()})
-    print("models=%d with_limits=%d owned_by=%s" % (len(models), len(lim), ",".join(owners)))
+    modes = {}
+    for m in models.values():
+        modes[m.get("mode") or "none"] = modes.get(m.get("mode") or "none", 0) + 1
+    big = max(lim, key=lambda m: m["max_input_tokens"]) if lim else None
+    print("models=%d with_limits=%d owned_by=%s modes=%s largest=%s" % (
+        len(models), len(lim), ",".join(owners),
+        ",".join("%s:%d" % kv for kv in sorted(modes.items())),
+        "%s:%d/%d" % (big["id"], big["max_input_tokens"], big["max_output_tokens"]) if big else "none"))
     sys.exit(0)
 
 if sys.argv[1] == "nolimits":

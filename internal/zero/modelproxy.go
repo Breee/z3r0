@@ -206,8 +206,9 @@ type proxyModel struct {
 	In, Out int
 }
 
-// proxyModels reads the model list a key sees. Wildcard entries and
-// embedding models are dropped: opencode cannot chat with them.
+// proxyModels reads the model list a key sees. Wildcard entries are dropped,
+// and so is every model the proxy marks with a mode opencode cannot chat with
+// (embedding, image_generation, ...). A model without a mode is kept.
 func proxyModels(list []byte) ([]proxyModel, error) {
 	var v struct {
 		Data []struct {
@@ -222,7 +223,10 @@ func proxyModels(list []byte) ([]proxyModel, error) {
 	}
 	var ms []proxyModel
 	for _, d := range v.Data {
-		if d.ID == "" || strings.Contains(d.ID, "*") || d.Mode == "embedding" {
+		if d.ID == "" || strings.Contains(d.ID, "*") {
+			continue
+		}
+		if d.Mode != "" && d.Mode != "chat" && d.Mode != "responses" {
 			continue
 		}
 		ms = append(ms, proxyModel{d.ID, d.In, d.Out})
