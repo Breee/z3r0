@@ -2,7 +2,7 @@
 
 Question: can the LiteLLM key of a sandbox stay outside the sandbox, with only a placeholder inside, the way the forge token does?
 
-Result (2026-11-26, OpenShell 0.1.8, LiteLLM v1.110.3, opencode 2.2.6, Copilot CLI 1.0.116): **yes**, for clients that send the key as `Authorization: Bearer`. `run.sh`: 12 PASS, 0 FAIL, 1 NOTE.
+Result (2026-11-27, OpenShell 0.1.8, LiteLLM v1.110.3, opencode 2.2.6, Copilot CLI 1.0.116): **yes**, for clients that send the key as `Authorization: Bearer`. `run.sh`: 14 PASS, 0 FAIL, 1 NOTE.
 
 ## Sources
 
@@ -36,6 +36,7 @@ client in the sandbox --Bearer <placeholder>--> supervisor (swaps in the key) --
 | No key | PASS: 401 from the proxy |
 | Copilot CLI with the placeholder as `COPILOT_PROVIDER_API_KEY` | PASS: answers |
 | opencode (`--standalone`) with the placeholder as `LITELLM_API_KEY` | PASS: answers |
+| opencode background service with the placeholder in its service environment (`opencode service set env`) | PASS: answers; settings put back afterwards |
 | Placeholder sent to the forge | PASS: 403 by OpenShell |
 | Forge placeholder still works on the forge | PASS |
 | After policy restore and detach: no model list | PASS |
@@ -49,7 +50,6 @@ client in the sandbox --Bearer <placeholder>--> supervisor (swaps in the key) --
 
 ## Limits
 
-- opencode ran with `--standalone`; its background service with the placeholder in the service environment was not run.
 - Claude Code not run.
 - Key rotation through `openshell provider update` not run.
 - One sandbox; `-p` style runs only.

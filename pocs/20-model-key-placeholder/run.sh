@@ -36,6 +36,7 @@ cleanup() {
   step $O provider delete poc20-key
   step $O profile delete poc20-model-key
   api /key/delete '{"key_aliases":["poc20"]}' >/dev/null 2>&1 || echo "CLEANUP FAILED: key delete"
+  sbx '[ ! -f /tmp/poc20/service.json.keep ] || { cp -p /tmp/poc20/service.json.keep ~/.config/opencode/service.json && opencode service restart >/dev/null; }' >/dev/null || echo "CLEANUP FAILED: service settings in the sandbox"
   sbx 'rm -rf /tmp/poc20' >/dev/null || echo "CLEANUP FAILED: /tmp/poc20 in the sandbox"
   rm -rf "$W"
 }
@@ -78,6 +79,14 @@ has "Copilot CLI answers with the placeholder as its key" "$r" '42'
 echo "== opencode"
 r=$(sbx "cd /tmp/poc20 && LITELLM_API_KEY=\"\$POC20_MODEL_KEY\" opencode --standalone run -m litellm/$MODEL '$ASK'")
 has "opencode answers with the placeholder as its key" "$r" '42'
+
+echo "== opencode background service"
+# The service's own settings are copied aside and put back; they are never printed.
+sbx 'cp -p ~/.config/opencode/service.json /tmp/poc20/service.json.keep' >/dev/null
+r=$(sbx "opencode service set env LITELLM_API_KEY \"\$POC20_MODEL_KEY\" >/dev/null && opencode service restart >/dev/null && cd /tmp/poc20 && opencode run -m litellm/$MODEL '$ASK'")
+has "opencode's background service answers with the placeholder as its key" "$r" '42'
+r=$(sbx 'cp -p /tmp/poc20/service.json.keep ~/.config/opencode/service.json && opencode service restart >/dev/null && echo restored')
+is "service settings put back" "$r" restored
 
 echo "== the real key"
 # The key goes in on stdin and is only held in a shell variable there.
