@@ -125,7 +125,10 @@ func startModelProxy(out io.Writer, providers []string) error {
 	if err != nil {
 		return err
 	}
-	entries := mcpEntries()
+	entries, err := mcpEntries()
+	if err != nil {
+		return err
+	}
 	cfg, env := modelConfig(providers, entries), mcpEnv(entries)
 	old, _ := os.ReadFile(filepath.Join(dir, "litellm.yaml"))
 	oldCompose, _ := os.ReadFile(filepath.Join(dir, "compose.yaml"))

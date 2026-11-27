@@ -736,6 +736,9 @@ func (s *Sandbox) Status(out io.Writer) error {
 			via := ""
 			if s.read("mcp.id") != "" {
 				via = " through the model proxy (" + mcpName(s.Name) + ", its own token)"
+				if s.mcpAged() {
+					via += "; that token may have ended, zero up makes a new one"
+				}
 			}
 			fmt.Fprintf(out, "%s tools: %s%s\n", f.Name(), strings.Join(t, ", "), via)
 		}
@@ -808,8 +811,11 @@ func (s *Sandbox) Pause(out io.Writer) error {
 	if err := s.stopForward(io.Discard); err != nil {
 		return err
 	}
-	// The model key goes first: with the proxy down the pause stops here and
-	// no key outlives a sandbox that was stopped.
+	// The tool token and the model key go first: with the forge or the proxy
+	// down the pause stops here and neither outlives a stopped sandbox.
+	if err := s.revokeMCP(); err != nil {
+		return err
+	}
 	if err := s.revokeModelKey(); err != nil {
 		return err
 	}
@@ -817,9 +823,6 @@ func (s *Sandbox) Pause(out io.Writer) error {
 		if err := rt.Stop(s.Name); err != nil {
 			return fmt.Errorf("stop sandbox: %w", err)
 		}
-	}
-	if err := s.revokeMCP(); err != nil {
-		return err
 	}
 	if err := s.pauseForge(); err != nil {
 		return err
@@ -851,16 +854,18 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 			return fmt.Errorf("delete sandbox (state kept for retry): %w", err)
 		}
 	}
+	rt.UnbindCredential(s.copilotProvider())
+	// The binding holds the only copy of the model key. Once it is gone the
+	// key cannot be used, also when the proxy is down and cannot delete it.
+	// It goes before the forge is asked, so a forge that is down leaves no
+	// usable key behind.
+	if err := s.dropModelProvider(); err != nil {
+		return fmt.Errorf("%w (state kept for retry)", err)
+	}
 	if err := s.revokeMCP(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	if err := s.revokeForge(); err != nil {
-		return fmt.Errorf("%w (state kept for retry)", err)
-	}
-	rt.UnbindCredential(s.copilotProvider())
-	// The binding holds the only copy of the model key. Once it is gone the
-	// key cannot be used, also when the proxy is down and cannot delete it.
-	if err := s.dropModelProvider(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	if err := s.revokeModelKey(); err != nil {

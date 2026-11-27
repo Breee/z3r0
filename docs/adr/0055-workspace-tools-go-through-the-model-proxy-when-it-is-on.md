@@ -29,3 +29,6 @@ A workspace can list GitLab MCP tools (`tools:`, #132). Until now the list only 
 - GitLab only. Copilot CLI and Claude Code are not told about the server.
 - Without the model proxy the agent has no MCP tool. The agentgateway way (ADR 0043) is not built (#178).
 - Amends ADR 0043 and ADR 0049.
+- After `zero pause`, `zero rm` or a removed tool list the workspace's entry stays in the proxy's files with the revoked token until the next `zero up` of a workspace with models writes them anew. The token is dead at the forge from the moment of the revoke.
+- `zero status` cannot see the token's end without asking the forge. It says the token may have ended once it is older than a day.
+- If `zero up` fails after the sandbox's token was made anew and before the tool token exists, no token carries the tool permissions. `zero up` reports the failure; the next `zero up` makes the tool token.

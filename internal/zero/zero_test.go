@@ -1951,8 +1951,23 @@ func TestMCPProxy(t *testing.T) {
 	os.WriteFile(filepath.Join(d, "mcp.token"), []byte("T"), 0o600)
 	os.WriteFile(filepath.Join(d, "forge.host"), []byte("gitlab.example"), 0o600)
 	os.MkdirAll(filepath.Join(stateRoot(), "zero-c"), 0o700)
-	got := mcpEntries()
+	got, err := mcpEntries()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0].Name != "gitlab_b" || got[0].Env != "ZERO_MCP_B" || got[0].Token != "T" || got[0].Host != "gitlab.example" {
 		t.Errorf("mcpEntries = %+v", got)
 	}
+	// A host that would break out of its line in the proxy's config is refused.
+	bad := filepath.Join(stateRoot(), "zero-bad")
+	os.MkdirAll(bad, 0o700)
+	os.WriteFile(filepath.Join(bad, "mcp.token"), []byte("tok"), 0o600)
+	os.WriteFile(filepath.Join(bad, "forge.host"), []byte("a\"b"), 0o600)
+	if _, err := mcpEntries(); err == nil {
+		t.Error("mcpEntries accepted a host with a quote")
+	}
+	if (&Sandbox{State: bad}).mcpAged() == false {
+		t.Error("a tool token without a date counts as fresh")
+	}
+
 }

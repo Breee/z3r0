@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -34,20 +35,30 @@ func mcpEnvName(sandbox string) string {
 	return "ZERO_MCP_" + strings.ReplaceAll(n, "-", "_")
 }
 
+// What goes into the proxy's config and env file is checked first: a host or
+// token with other characters would break out of its line.
+var (
+	mcpHostRe  = regexp.MustCompile(`^[A-Za-z0-9.-]+(:[0-9]+)?$`)
+	mcpTokenRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+)
+
 // mcpEntries lists the entries of every sandbox that holds a tool token.
-func mcpEntries() []mcpEntry {
+func mcpEntries() ([]mcpEntry, error) {
 	dirs, _ := filepath.Glob(filepath.Join(stateRoot(), "zero-*"))
 	sort.Strings(dirs)
 	var out []mcpEntry
 	for _, d := range dirs {
 		tok, host := readState(d, "mcp.token"), readState(d, "forge.host")
-		if tok == "" || host == "" {
+		if tok == "" {
 			continue
 		}
 		n := filepath.Base(d)
+		if !mcpHostRe.MatchString(host) || !mcpTokenRe.MatchString(tok) {
+			return nil, fmt.Errorf("%s: tool token or forge host not usable for the model proxy; zero -c %s up makes them anew", n, strings.TrimPrefix(n, "zero-"))
+		}
 		out = append(out, mcpEntry{mcpName(n), host, mcpEnvName(n), tok})
 	}
-	return out
+	return out, nil
 }
 
 // mcpConfig is the mcp_servers block of the proxy's config.
@@ -99,16 +110,32 @@ func (s *Sandbox) syncMCP() error {
 	if !slices.Contains(perms, "read_project") {
 		perms = append([]string{"read_project"}, perms...)
 	}
+	// The marker lets revokeUnrecorded find the token if zero dies before
+	// its ID is written down.
+	if err := s.write("forge.minting", "", 0o600); err != nil {
+		return err
+	}
 	tok, nid, err := f.Mint(tokenLabel(s.Name), s.forgePaths(), perms)
 	if err != nil {
 		return fmt.Errorf("token for the workspace's tools: %w", err)
 	}
-	for k, v := range map[string]string{"mcp.id": nid, "mcp.token": tok, "mcp.tools": want} {
-		if err := s.write(k, v, 0o600); err != nil {
-			f.Revoke(nid)
-			return err
+	// The token file appears whole or not at all: another zero up reads it
+	// without this sandbox's lock. The ID comes last.
+	tmp := s.path("mcp.token.new")
+	err = os.WriteFile(tmp, []byte(tok), 0o600)
+	if err == nil {
+		err = os.Rename(tmp, s.path("mcp.token"))
+	}
+	for _, kv := range [][2]string{{"mcp.tools", want}, {"mcp.minted", time.Now().UTC().Format(time.RFC3339)}, {"mcp.id", nid}} {
+		if err == nil {
+			err = s.write(kv[0], kv[1], 0o600)
 		}
 	}
+	if err != nil {
+		f.Revoke(nid)
+		return err
+	}
+	os.Remove(s.path("forge.minting"))
 	if id != "" {
 		return f.Revoke(id)
 	}
@@ -127,8 +154,15 @@ func (s *Sandbox) revokeMCP() error {
 			return err
 		}
 	}
-	for _, n := range []string{"mcp.id", "mcp.token", "mcp.tools"} {
+	for _, n := range []string{"mcp.id", "mcp.token", "mcp.tools", "mcp.minted"} {
 		os.Remove(s.path(n))
 	}
 	return nil
+}
+
+// mcpAged says whether the tool token may have ended: the forge ends it one
+// to two days after it was made, and only zero up makes a new one.
+func (s *Sandbox) mcpAged() bool {
+	t, err := time.Parse(time.RFC3339, s.read("mcp.minted"))
+	return err != nil || time.Since(t) > 24*time.Hour
 }
