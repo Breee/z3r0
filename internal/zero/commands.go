@@ -36,6 +36,7 @@ func (s *Sandbox) Up(out io.Writer) (int, error) {
 }
 
 func (s *Sandbox) up(out io.Writer) (int, error) {
+	out = stepWriter{out}
 	if err := s.syncInputs(out); err != nil {
 		return 0, err
 	}
@@ -82,7 +83,10 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 				s.forgeSynced() // minted for the new paths
 				repaths, retools = false, false
 			}
-			if err := rt.Start(s.Name); err != nil {
+			done := step("starting the sandbox")
+			err := rt.Start(s.Name)
+			done(err)
+			if err != nil {
 				return 0, fmt.Errorf("start sandbox: %w", err)
 			}
 			// Placeholders get a new version on start; the one stored in
@@ -144,22 +148,28 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	if err := s.writeSSHConfig(); err != nil {
-		return 0, err
+	done := step("connecting to the sandbox")
+	err := s.writeSSHConfig()
+	if err == nil && s.read("forge") != "" {
+		err = ensureServe()
 	}
-	if s.read("forge") != "" {
-		if err := ensureServe(); err != nil {
-			return 0, err
-		}
-	}
-	if err := s.ensureCheckout(out); err != nil {
-		return 0, err
-	}
-	models, err := s.syncModels(out, s.Providers)
+	done(err)
 	if err != nil {
 		return 0, err
 	}
-	if err := s.syncGuidance(out, models); err != nil {
+	done = step("copying the repositories in")
+	err = s.ensureCheckout(out)
+	done(err)
+	if err != nil {
+		return 0, err
+	}
+	done = step("setting up models and instructions")
+	models, err := s.syncModels(out, s.Providers)
+	if err == nil {
+		err = s.syncGuidance(out, models)
+	}
+	done(err)
+	if err != nil {
 		return 0, err
 	}
 	if s.read("copilot") != "" && len(s.Models) == 0 && !fileExists(s.path("copilot-auth.done")) {
@@ -186,11 +196,14 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	done = step("starting opencode in the sandbox")
 	var startErr error
 	if !running {
 		startErr = s.startServe()
 	}
-	if err := s.waitReady(port, startErr); err != nil {
+	err = s.waitReady(port, startErr)
+	done(err)
+	if err != nil {
 		return 0, err
 	}
 	fmt.Fprintf(out, "%s ready: %s dir %s\n", s.Name, link(out, s.url(port)), strings.Join(s.dirs(), " "))
@@ -274,7 +287,10 @@ func (s *Sandbox) create() error {
 	if s.gw == "" && fileExists(s.stage()) {
 		mount = s.stage()
 	}
-	if err := rt.Create(s.Name, image(), policy, creds, env, mount, inputMount); err != nil {
+	done := step("creating the sandbox (the first time pulls the image)")
+	err = rt.Create(s.Name, image(), policy, creds, env, mount, inputMount)
+	done(err)
+	if err != nil {
 		return fmt.Errorf("create sandbox (image %s): %w; check: zero doctor", image(), err)
 	}
 	if mount != "" {

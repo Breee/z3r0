@@ -2054,3 +2054,16 @@ func TestParseComputeDriver(t *testing.T) {
 		}
 	}
 }
+
+func TestStepPlain(t *testing.T) {
+	var b bytes.Buffer
+	old, oldTTY := progress.out, progress.tty
+	progress.out, progress.tty = &b, false
+	defer func() { progress.out, progress.tty = old, oldTTY }()
+	step("one")(nil)
+	step("bad")(fmt.Errorf("x"))
+	want := "one ...\none: done (0.0s)\nbad ...\nbad: failed (0.0s)\n"
+	if b.String() != want {
+		t.Errorf("got %q, want %q", b.String(), want)
+	}
+}
