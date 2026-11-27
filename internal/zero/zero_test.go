@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -2055,15 +2056,47 @@ func TestParseComputeDriver(t *testing.T) {
 	}
 }
 
-func TestStepPlain(t *testing.T) {
+func TestStep(t *testing.T) {
 	var b bytes.Buffer
 	old, oldTTY := progress.out, progress.tty
-	progress.out, progress.tty = &b, false
 	defer func() { progress.out, progress.tty = old, oldTTY }()
+	sec := regexp.MustCompile(`\d+\.\ds`)
+
+	progress.out, progress.tty = &b, false
 	step("one")(nil)
-	step("bad")(fmt.Errorf("x"))
-	want := "one ...\none: done (0.0s)\nbad ...\nbad: failed (0.0s)\n"
-	if b.String() != want {
-		t.Errorf("got %q, want %q", b.String(), want)
+	end := step("bad")
+	end(fmt.Errorf("x"))
+	end(nil) // a second call prints nothing
+	want := "one ...\none: done (T)\nbad ...\nbad: failed (T)\n"
+	if got := sec.ReplaceAllString(b.String(), "T"); got != want {
+		t.Errorf("plain: got %q, want %q", got, want)
+	}
+
+	b.Reset()
+	progress.tty = true
+	var o bytes.Buffer
+	end = step("slow")
+	time.Sleep(250 * time.Millisecond) // the spinner repaints meanwhile
+	fmt.Fprintln(stepWriter{&o}, "a line of the step")
+	end(nil)
+	step("broken")(fmt.Errorf("x"))
+	progress.Lock()
+	got := sec.ReplaceAllString(b.String(), "T")
+	progress.Unlock()
+	for _, w := range []string{"\r\x1b[K\x1b[32m✓\x1b[0m slow \x1b[2mT\x1b[0m\n", "\r\x1b[K\x1b[31m✗\x1b[0m broken \x1b[2mT\x1b[0m\n", "⠙"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("terminal: %q not in %q", w, got)
+		}
+	}
+	if o.String() != "a line of the step\n" {
+		t.Errorf("step output: %q", o.String())
+	}
+}
+
+func TestTook(t *testing.T) {
+	for d, want := range map[time.Duration]string{400 * time.Millisecond: "0.4s", 12 * time.Second: "12s", 65 * time.Second: "1m05s"} {
+		if got := took(time.Now().Add(-d)); got != want {
+			t.Errorf("%v: got %s, want %s", d, got, want)
+		}
 	}
 }

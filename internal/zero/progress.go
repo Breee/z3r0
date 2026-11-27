@@ -16,7 +16,6 @@ var progress = struct {
 	out  io.Writer
 	tty  bool
 	name string // step on the spinner line, "" when none
-	t0   time.Time
 }{out: os.Stderr, tty: fancy(os.Stderr)}
 
 func fancy(f *os.File) bool {
@@ -59,9 +58,14 @@ func step(name string) func(error) {
 		fmt.Fprintf(p.out, "%s ...\n", name)
 	}
 	p.Unlock()
+	ended := false
 	return func(err error) {
 		p.Lock()
 		defer p.Unlock()
+		if ended {
+			return
+		}
+		ended = true
 		close(stop)
 		switch {
 		case !p.tty && err != nil:
