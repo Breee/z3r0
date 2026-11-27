@@ -60,3 +60,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [56](0056-key-providers-behind-the-model-proxy.md) | 2026-11-27 | Providers with an API key behind the model proxy; the key comes from a command | Z-INV-2, Z-INV-4 |
 | [57](0057-docker-as-a-runtime-chosen-by-one-setting.md) | 2026-11-27 | Docker as a runtime next to podman, chosen by one setting at install; rootful Docker offered with a plain danger warning; `openshell` user stays the default | Z-OS-3 |
 | [58](0058-guided-first-run-and-a-workspace-list-built-with-charm.md) | 2026-11-28 | Guided first run (hosts, permissions, defaults) and a workspace list on bare `zero`; agent is the verb; built with Charm v2 | Z-INV-1 |
+| [59](0059-k9s-style-workspace-screen.md) | 2026-11-28 | Bare `zero` opens a k9s-style workspace screen (top block with logo, table, filter, command, describe); actions run the normal commands; replaces the list of 0058 | Z-INV-1 |

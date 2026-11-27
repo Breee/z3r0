@@ -103,7 +103,7 @@ zero vscode     # VS Code on the sandbox
 
 The agent commits in the sandbox and pushes to the branch `zero/api`. Fetch that branch on the host, review it and open the merge request yourself.
 
-`zero` without a command shows your workspaces in the terminal: enter opens opencode, `v` VS Code, `s` stops, `r` removes, `n` makes a new workspace, `q` leaves.
+`zero` without a command opens the workspace screen: enter opens opencode, `v` VS Code, `u` starts, `s` stops, `r` removes, `n` makes a new workspace, `d` shows the details, `/` filters, `?` lists every key, `q` leaves.
 
 ## More than one directory
 

@@ -42,21 +42,34 @@ Enter on every question keeps the defaults.
 
 Not a terminal, or `--approve`: no questions, behaviour as before.
 
-## 3. Workspace list
+## 3. Workspace screen
 
-`zero` on a terminal shows every workspace with status, directories, token and policy state; the current one is selected.
+`zero` on a terminal opens a full-screen view in the style of k9s (ADR 0059). Without a terminal it prints the help and exits with 2.
+
+- Top: the current workspace, runtime, gateway state and zero's version; the keys; the zero logo. Narrow windows drop the keys first (below 78 columns), then the logo (below 48), then the whole top (below 16 rows).
+- Middle: a framed table `NAME STATUS DIRS TOKEN POLICY`, titled `workspaces(all)[N]` or `workspaces(/FILTER)[N]`. The current workspace is marked `*` and selected at the start.
+- Bottom: one line with the result of the last action, or a warning.
+
+The table loads in the background and reloads every 5 seconds and after each action; the selection stays on the same workspace.
 
 | Key | Does |
 |---|---|
-| `↑` `↓` `j` `k` | Move |
-| `enter`, `o` | `zero -c NAME opencode` |
-| `v` | `zero -c NAME vscode` |
-| `s` | `zero -c NAME stop`, back to the list |
-| `r` | `zero -c NAME rm` (asks as `zero rm` does), back to the list |
-| `n` | New workspace: name and directory, then back to the list |
-| `q`, `esc`, `ctrl+c` | Quit |
+| `↑` `↓` `j` `k`, `g` `G` | Move; first, last |
+| `enter`, `o` | Leaves the screen and runs `zero -c NAME opencode` |
+| `v` | Leaves the screen and runs `zero -c NAME vscode` |
+| `u` | `zero -c NAME up`, back to the screen |
+| `s` | `zero -c NAME stop`, back to the screen |
+| `r` | `zero -c NAME rm` (asks as `zero rm` does), back to the screen |
+| `n` | New workspace: name and directory, then back to the screen |
+| `d` | Describe: status, token, policy, model, directories, tools, models |
+| `/` | Filter by name; `esc` clears it |
+| `:` | Command: `q`, `help`, `all`, `new`, or a workspace name to jump to |
+| `?` | Help |
+| `ctrl-r` | Reload now |
+| `q`, `ctrl+c` | Quit |
+| `esc` | Leaves a view or a prompt; on the table it clears the filter, it does not quit |
 
-The list runs the same commands a person would type; it has no logic of its own.
+The screen runs the same commands a person would type; it has no logic of its own. A failed command shows its last line at the bottom.
 
 ## 4. Who owns which config
 
