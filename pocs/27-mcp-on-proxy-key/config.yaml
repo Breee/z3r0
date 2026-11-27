@@ -1,0 +1,29 @@
+# PoC 27: LiteLLM with two MCP servers declared in the config.
+# notes  = the stand-in of PoC 18 (two tools).
+# gitlab = GitLab's own MCP endpoint; its token comes from the environment
+#          of the proxy and never reaches a client.
+model_list:
+  - model_name: claude-stand-in
+    litellm_params:
+      model: openai/stand-in
+      api_base: http://backend:18101/v1
+      api_key: none
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  require_key_mcp_access_defined: true
+
+litellm_settings:
+  telemetry: false
+
+mcp_servers:
+  notes:
+    url: "http://mcp:18102/mcp"
+    transport: "http"
+    auth_type: "bearer_token"
+    auth_value: os.environ/MCP_UPSTREAM_TOKEN
+  gitlab:
+    url: "https://gitlab.com/api/v4/mcp"
+    transport: "http"
+    auth_type: "bearer_token"
+    auth_value: os.environ/GITLAB_MCP_TOKEN

@@ -1,0 +1,7 @@
+# Overlay on PoC 17's and PoC 18's compose files (same project).
+services:
+  litellm:
+    environment:
+      GITLAB_MCP_TOKEN: ${GITLAB_MCP_TOKEN:?set by run.sh}
+    volumes:
+      - ${POC27}/config.yaml:/app/config.yaml:ro
