@@ -1,0 +1,15 @@
+# PoC 28: a second provider behind the proxy. Its key is named here, its value
+# comes from the container's environment.
+model_list:
+  - model_name: "acme/*"
+    litellm_params:
+      model: "openai/*"
+      api_base: http://backend:18101/v1
+      api_key: os.environ/ACME_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  telemetry: false
+  check_provider_endpoint: true

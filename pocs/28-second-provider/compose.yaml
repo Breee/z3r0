@@ -1,0 +1,12 @@
+# PoC 28: overlay on PoC 17's compose files (same project).
+services:
+  backend:
+    environment:
+      ACME_API_KEY: ${ACME_BACKEND_KEY:?set by run.sh}
+    volumes:
+      - ${POC28:?set by run.sh}/backend.py:/backend.py:ro
+  litellm:
+    environment:
+      ACME_API_KEY: ${ACME_API_KEY-}
+    volumes:
+      - ${POC28}/config.yaml:/app/config.yaml:ro
