@@ -84,7 +84,7 @@ zero run "add a test for the parser and push"
 
 | Command | What it does |
 |---|---|
-| `zero ui` | prints a link that works once (5 minutes) and opens a read-only page in the browser: every workspace, what its agent may reach (projects, capabilities, hosts, tools, models, instructions, skills), the push gate's decisions, the parts. Served by zero-cp on `127.0.0.1:18097`; no sandbox can reach it; it changes nothing and shows no token or key. With the model proxy on it links to the proxy's own page, which keeps its own login |
+| `zero ui` | prints a link that works once (5 minutes) and opens a read-only page in the browser: every workspace, what its agent may reach (projects, capabilities, hosts, tools, models, instructions, skills), the push gate's decisions, the parts. Served by zero-cp on `127.0.0.1:18097`; no sandbox can reach it; it changes nothing and shows no token or key. With the model proxy on, the proxy's own page is reached through it below `/litellm/ui/`; that page keeps its own login and is the one place there that can change something |
 | `zero ls` | all workspaces with status, token and policy; leftovers without a workspace |
 | `zero switch NAME` | makes NAME the current workspace |
 | `zero switch` | the same, picked from the list (up/down or j/k, enter, q) |

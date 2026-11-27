@@ -11,6 +11,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,6 +70,8 @@ func UI(out io.Writer) error {
 
 // uiEnter takes the code of `zero ui`: right, not older than five minutes, once.
 func uiEnter(code string) bool {
+	uiMu.Lock()
+	defer uiMu.Unlock()
 	path := filepath.Join(stateRoot(), uiCodeFile)
 	st, err := os.Stat(path)
 	if err != nil {
@@ -105,7 +109,11 @@ func uiKnown(r *http.Request) bool {
 	uiMu.Lock()
 	defer uiMu.Unlock()
 	t, ok := uiSessions[c.Value]
-	return ok && time.Now().Before(t)
+	if ok && !time.Now().Before(t) {
+		delete(uiSessions, c.Value)
+		return false
+	}
+	return ok
 }
 
 type uiWorkspace struct {
@@ -189,6 +197,9 @@ func uiDetail(c *Config, row wsRow) uiWorkspace {
 	return w
 }
 
+// uiLogFields are the fields of a gate log line the UI passes on; nothing else.
+var uiLogFields = []string{"time", "decision", "ref", "reason", "method", "path", "old", "new"}
+
 // uiDecisions gives the last lines of a workspace's gate log, newest first.
 func uiDecisions(c *Config, name string) []map[string]string {
 	if c.Workspaces[name] == nil {
@@ -207,10 +218,13 @@ func uiDecisions(c *Config, name string) []map[string]string {
 		if json.Unmarshal(sc.Bytes(), &m) != nil {
 			continue
 		}
-		for k, v := range m {
-			m[k] = clean(v)
+		d := map[string]string{}
+		for _, k := range uiLogFields {
+			if v := m[k]; v != "" {
+				d[k] = clean(v)
+			}
 		}
-		all = append(all, m)
+		all = append(all, d)
 		if len(all) > uiMaxLog {
 			all = all[1:]
 		}
@@ -229,8 +243,9 @@ func uiParts(c *Config) []uiPart {
 		if p := proxyLogin(); p != "" {
 			models.State = p
 		}
-		// LiteLLM's own page with LiteLLM's own login: zero cannot sign the user in there (C59).
-		models.URL = fmt.Sprintf("http://127.0.0.1:%d/ui/", modelPort)
+		// LiteLLM's own page, passed on below uiProxyPath, with LiteLLM's own
+		// login: zero cannot sign the user in there (C59).
+		models.URL = uiProxyPath + "/ui/"
 		models.Note = "its own login: user admin, password in " + filepath.Join(partsDir(), "models.key")
 	}
 	return []uiPart{gate, models}
@@ -245,23 +260,63 @@ func uiAllowed(r *http.Request) (int, string) {
 	if o := r.Header.Get("Origin"); o != "" && o != "http://"+r.Host {
 		return http.StatusForbidden, "foreign origin"
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		return http.StatusMethodNotAllowed, "the UI only reads"
-	}
 	return 0, ""
 }
 
+// uiProxyPath is where the model proxy's own page sits on the UI port. It is
+// LiteLLM's page with LiteLLM's login, so it is the one place that can change
+// something; zero's own pages and API only read.
+const uiProxyPath = "/litellm"
+
+var uiProxy = httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: fmt.Sprintf("127.0.0.1:%d", modelPort)})
+
+// uiPassOn hands a request below uiProxyPath to the model proxy, without
+// zero's session cookie.
+func uiPassOn(w http.ResponseWriter, r *http.Request) {
+	var keep []string
+	for _, c := range r.Cookies() {
+		if c.Name != uiCookie {
+			keep = append(keep, c.String())
+		}
+	}
+	r.Header.Del("Cookie")
+	if len(keep) > 0 {
+		r.Header.Set("Cookie", strings.Join(keep, "; "))
+	}
+	uiProxy.ServeHTTP(w, r)
+}
+
 func uiHandler(w http.ResponseWriter, r *http.Request) {
+	if code, why := uiAllowed(r); code != 0 {
+		http.Error(w, why, code)
+		return
+	}
+	if r.URL.Path == uiProxyPath || strings.HasPrefix(r.URL.Path, uiProxyPath+"/") {
+		if !uiKnown(r) {
+			http.Error(w, "no session; run: zero ui", http.StatusUnauthorized)
+			return
+		}
+		if c, err := loadConfig(); err != nil || c.Parts.Models == "" {
+			http.NotFound(w, r)
+			return
+		}
+		uiPassOn(w, r)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'")
-	if code, why := uiAllowed(r); code != 0 {
-		http.Error(w, why, code)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "the UI only reads", http.StatusMethodNotAllowed)
 		return
 	}
 	if r.URL.Path == "/ui/enter" {
+		if r.Method != http.MethodGet {
+			http.Error(w, "the link is opened, not probed", http.StatusMethodNotAllowed)
+			return
+		}
 		if !uiEnter(r.URL.Query().Get("code")) {
 			http.Error(w, "link used or too old; run: zero ui", http.StatusUnauthorized)
 			return

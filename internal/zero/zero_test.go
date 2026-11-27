@@ -1751,6 +1751,8 @@ func TestUI(t *testing.T) {
 	os.Chtimes(code, old, old)
 	want("old code", get("GET", uiAddr(), "/ui/enter?code=abc", nil), 401)
 	os.WriteFile(code, []byte("abc"), 0o600)
+	want("probe of the link", get("HEAD", uiAddr(), "/ui/enter?code=abc", nil), 405)
+	want("model proxy page, no session", get("GET", uiAddr(), "/litellm/ui/", nil), 401)
 	w := get("GET", uiAddr(), "/ui/enter?code=abc", nil)
 	want("code", w, 303)
 	c := w.Result().Cookies()
@@ -1760,6 +1762,11 @@ func TestUI(t *testing.T) {
 	want("code twice", get("GET", uiAddr(), "/ui/enter?code=abc", nil), 401)
 	ck := map[string]string{"Cookie": uiCookie + "=" + c[0].Value}
 	want("unknown path", get("GET", uiAddr(), "/api/nope", ck), 404)
+	want("model proxy page, no model proxy", get("GET", uiAddr(), "/litellm/ui/", ck), 404)
+	uiMu.Lock()
+	uiSessions["gone"] = time.Now().Add(-time.Minute)
+	uiMu.Unlock()
+	want("session that ended", get("GET", uiAddr(), "/api/parts", map[string]string{"Cookie": uiCookie + "=gone"}), 401)
 	want("made-up session", get("GET", uiAddr(), "/api/parts", map[string]string{"Cookie": uiCookie + "=x"}), 401)
 	w = get("GET", uiAddr(), "/api/parts", ck)
 	want("parts", w, 200)
@@ -1773,7 +1780,7 @@ func TestUI(t *testing.T) {
 	os.MkdirAll(st, 0o700)
 	for name, val := range map[string]string{
 		"caps": "git.read git.push", "forge.id": "123456", "gate.key": "SECRETKEY", "tools": "get_project",
-		"gate.log": `{"time":"1","ref":"refs/heads/zero/a","decision":"allow","reason":"first"}` + "\n" +
+		"gate.log": `{"time":"1","ref":"refs/heads/zero/a","decision":"allow","reason":"first","key":"SECRETKEY"}` + "\n" +
 			`{"time":"2","ref":"refs/heads/main","decision":"deny","reason":"second\u001b[2J"}` + "\n",
 	} {
 		os.WriteFile(filepath.Join(st, name), []byte(val), 0o600)

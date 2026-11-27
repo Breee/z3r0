@@ -92,9 +92,9 @@ Decided (ADR 0051): the parts run under Docker until the podman on the host runs
 
 ## 5. First UI (read-only)
 
-Built in #163 (ADR 0053): `zero ui`, port 18097, pages Workspaces, Workspace (with the gate's decisions), Parts. The model proxy's own page is linked, not passed on, and keeps its own login (C59).
+Built in #163 (ADR 0053): `zero ui`, port 18097, pages Workspaces, Workspace (with the gate's decisions), Parts. The model proxy's own page is passed on below `/litellm/` behind the session and keeps its own login (C59).
 
-Served by zero-cp under `/ui/`, data from `/api/` (JSON), which the CLI and a terminal UI use too. It gets its own listener on 127.0.0.1 with a port of its own: the gate port is reachable from every sandbox (`host.openshell.internal:18095`), so nothing but the gate may answer there, and no sandbox policy names the UI port.
+Served by zero-cp under `/ui/`, data from `/api/` (JSON). The workspace list comes from the code `zero ls` uses; the detail of a workspace reads the same state files as `zero status`, in a function of its own. It gets its own listener on 127.0.0.1 with a port of its own: the gate port is reachable from every sandbox (`host.openshell.internal:18095`), so nothing but the gate may answer there, and no sandbox policy names the UI port.
 
 | Page | Shows | Read from |
 |---|---|---|

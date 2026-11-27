@@ -147,7 +147,7 @@ workspaces:
 models: 64 through the model proxy (github_copilot/*)
 ```
 
-Once, connect your Copilot account to the proxy: open `http://127.0.0.1:18096/ui/`, user `admin`, password in `~/.local/state/zero/parts/models.key`, then Models + Endpoints, LLM Credentials, Connect. Until then `zero up` says that no answer will come.
+Once, connect your Copilot account to the proxy: open `http://127.0.0.1:18096/ui/` (or run `zero ui` and follow Parts to the proxy's page), user `admin`, password in `~/.local/state/zero/parts/models.key`, then Models + Endpoints, LLM Credentials, Connect. Until then `zero up` says that no answer will come.
 
 - The proxy runs under Docker (`docker compose`); `zero doctor` checks that this command runs (`model proxy runtime`) and that the provider is connected in the proxy (`model proxy login`). Another compose command can be named in `ZERO_COMPOSE`. Sandboxes stay on podman.
 - The sandbox holds a placeholder for its proxy key, not the key. The placeholder is swapped for the key only on the way to the proxy.
