@@ -41,7 +41,7 @@ $C up -d > "$W/up.log" 2>&1 || { cat "$W/up.log"; echo "FAIL compose up"; exit 1
 i=0; until curl -sf -o /dev/null "$P/health/liveliness"; do
   i=$((i+1)); [ $i -lt 150 ] || { echo "FAIL proxy not up after 300 s"; exit 1; }; sleep 2
 done
-cleanup_before=$(api /key/delete '{"key_aliases":["poc22-list","poc22-none","poc22-bare","poc22-with","poc22-without"]}' || true)
+api /key/delete '{"key_aliases":["poc22-list","poc22-none","poc22-bare","poc22-with","poc22-without"]}' >/dev/null || true
 adm -o /dev/null -X DELETE "$P/skill-hub/skills/$SKILL" || true
 
 fails=0
@@ -71,7 +71,7 @@ is "key with a tool list: lists that tool only" "$(tools "$L")" '["notes-read_no
 has "key with a tool list: the other tool is refused" \
   "$(mcp "$L" tools/call '{"name":"notes-write_note","arguments":{"text":"x"}}')" "not allowed"
 is "key with no-mcp-servers: no tool" "$(tools "$N")" '[]'
-echo "NOTE key of the admin user without any list: $(tools "$B") (every tool; zero must always send a list)"
+is "key of the admin user without any list: every tool (so zero always sends a list)" "$(tools "$B")" '["notes-read_note","notes-write_note"]'
 
 echo "== skills per key"
 mkdir -p "$W/src/$SKILL"
@@ -86,13 +86,14 @@ EOF
 is "skill uploaded as a ZIP by the admin" \
   "$(adm -o "$W/up.json" -w '%{http_code}' -F "file=@$W/skill.zip" -F version=1.0.0 "$P/skill-hub/skills/upload")" 200
 is "upload answer names the skill" "$(jq -r .name "$W/up.json")" "$SKILL"
+is "public right after the upload" "$(adm "$P/skill-hub/skills?limit=100" | jq -r ".skills[]|select(.name==\"$SKILL\").visibility")" public
 is "skill made private (unpublish)" "$(adm -o /dev/null -w '%{http_code}' -X POST "$P/skill-hub/skills/$SKILL/unpublish")" 200
 is "admin sees it as private" "$(adm "$P/skill-hub/skills?limit=100" | jq -r ".skills[]|select(.name==\"$SKILL\").visibility")" private
 KW=$(key with "\"models\":[\"claude-stand-in\"],\"object_permission\":{\"skills\":[\"$SKILL\"]}")
 KO=$(key without "\"models\":[\"claude-stand-in\"]")
 is "key with the grant: lists the skill" "$(as "$KW" "$P/skill-hub/skills?limit=100" | jq -c '[.skills[].name]')" "[\"$SKILL\"]"
 is "key with the grant: archive" "$(as "$KW" -o "$W/got.zip" -w '%{http_code}' "$P/skill-hub/skills/$SKILL/archive")" 200
-mkdir "$W/got" && unzip -q "$W/got.zip" -d "$W/got" || true
+mkdir "$W/got" && unzip -q "$W/got.zip" -d "$W/got" 2>/dev/null || echo "unzip failed"
 has "archive holds SKILL.md at its root" "$(cat "$W/got/SKILL.md" 2>&1)" "PONG-172"
 is "key without the grant: skill not listed" "$(as "$KO" "$P/skill-hub/skills?limit=100" | jq -c '[.skills[].name]')" '[]'
 is "key without the grant: archive" "$(as "$KO" -o /dev/null -w '%{http_code}' "$P/skill-hub/skills/$SKILL/archive")" 404

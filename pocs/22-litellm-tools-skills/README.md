@@ -2,7 +2,7 @@
 
 Question: can LiteLLM give each sandbox key its own tool list and its own skills, and how does that compare with agentgateway (PoC 15) and with plain files (#161)?
 
-Result (2026-11-27, LiteLLM v1.110.3 with Postgres, opencode 2.2.6, OpenShell 0.1.8, Docker 29.5.2): **yes, both work per key, but only through the API and the database, not from a config file.** `run.sh`: 14 PASS, 0 FAIL, 1 NOTE.
+Result (2026-11-27, LiteLLM v1.110.3 with Postgres, opencode 2.2.6, OpenShell 0.1.8, Docker 29.5.2): **yes, both work per key. The lists per key and the skills exist only through the API and the database; the MCP servers themselves can be declared in LiteLLM's config file.** `run.sh`: 16 PASS, 0 FAIL.
 
 ## Sources
 
@@ -26,8 +26,8 @@ The stack is the one of PoC 17 and 18 (LiteLLM, Postgres, MCP stand-in). The pro
 |---|---|
 | Key of the admin user with a tool list | lists that tool only, the other tool is refused |
 | Key of the admin user with `no-mcp-servers` | no tool |
-| Key of the admin user without any list | NOTE: every tool |
-| Skill uploaded as a ZIP by the admin | 200, published at once |
+| Key of the admin user without any list | every tool (checked: zero must always send a list) |
+| Skill uploaded as a ZIP by the admin | 200, `visibility: public` right after |
 | Made private (`unpublish`) | 200, the admin sees `visibility: private` |
 | Key with the skill granted | skill listed, archive 200, `SKILL.md` at the root of the ZIP |
 | Key without the grant | skill not listed, archive 404, content 404 |
@@ -48,6 +48,7 @@ Tool list per workspace:
 | | LiteLLM | agentgateway (PoC 15) | 
 |---|---|---|
 | Who the caller is | the sandbox's key | the sandbox's verified identity (SPIFFE) |
+| Per-call record with workspace and tool | not looked at in this run | gateway log line (PoC 15) |
 | Where the list lives | on the key, in LiteLLM's database, set by API | in zero, asked per request |
 | Hidden and refused | yes (run) | yes (run) |
 | Needs | Postgres; already there when the model proxy is on | SPIRE and a gateway container; no database |
@@ -70,6 +71,10 @@ Skills:
 - Tool lists: when the model proxy is on, the list goes on the sandbox's LiteLLM key. It is one part less to run locally, and the key and database are already there. agentgateway stays the way for a setup without LiteLLM or with workload identity.
 
 ## Limits
+
+- Without a gateway at all there is no tool path: plain files cannot carry a tool list, so the comparison for tools has two columns.
+- With the list on the key, Z-INV-4 holds only once the key is a placeholder (PoC 20, to build in #162); until then the key is readable in the sandbox. A record per call with workspace and tool (Z-INV-3) was not looked at here; it is a DONE item of #164.
+- `run.sh` deletes a skill named `poc22-skill` and stops the PoC 17/18 stack at the end (unless `KEEP=1`), also when the stack ran before.
 
 - One skill, one MCP stand-in with two tools, keys of one user.
 - Read-only placement in the sandbox is not shown again here; the folder was a scratch folder. #161 shows it.

@@ -1,6 +1,6 @@
 # Tool evaluation: LiteLLM, every feature area held against what zero needs (#159)
 
-State 2026-11-26. Sources: docs.litellm.ai as of that day (paths below are under `https://docs.litellm.ai`), plus two runs with LiteLLM v1.110.3: `pocs/17-litellm` (#156) and `pocs/18-litellm-sandbox` (#158). Each row says **run** (seen in one of the two PoCs) or **read** (documentation only). "Not found" means the docs searched do not say it; it does not mean impossible.
+State 2026-11-27. Sources: docs.litellm.ai as of that day (paths below are under `https://docs.litellm.ai`), plus runs with LiteLLM v1.110.3: `pocs/17-litellm` (#156), `pocs/18-litellm-sandbox` (#158), `pocs/20-model-key-placeholder` (#170), `pocs/21-opencode-model-discovery` (#171), `pocs/22-litellm-tools-skills` (#172). Each row says **run** (seen in one of these PoCs) or **read** (documentation only). "Not found" means the docs searched do not say it; it does not mean impossible.
 
 Columns: **Where** = `config` (declared in `config.yaml`), `API/UI` (only through the API or the web UI, kept in the database). **DB** = needs Postgres. **Ent.** = needs the Enterprise licence key.
 
@@ -135,10 +135,10 @@ LiteLLM's "agent" is a remote agent service reached through the proxy, not a cod
 | Agent definition (tool, model, instructions, skills, tools) | none that matches; `agents:` is something else | no | zero's own config file |
 | Model per agent | `models` list on the key; default model is the client's setting | yes | database; zero renders the client config |
 | Model list in opencode | `/v1/models` of the key | yes | zero renders it at `zero up` (PoC 18) |
-| Skills | Skills Hub, per key | partly | database, not declarative; zero would fetch the archive for opencode |
+| Skills | Skills Hub, per key | partly | database, not declarative; not used: skills stay plain files (ADR 0049, PoC 22) |
 | Instructions | nothing | no | read-only folder by zero |
 | MCP servers | `mcp_servers:` | yes | none beyond the proxy |
-| Tool list per workspace | `object_permission` on the key | partly | database; key in the sandbox; admin-user keys fail open |
+| Tool list per workspace | `object_permission` on the key | yes | database; key readable in the sandbox until it is a placeholder (PoC 20, #162); a key of the admin user without a list sees every tool, so zero always sends a list or `no-mcp-servers` (PoC 22) |
 | Credentials outside the sandbox | provider logins and MCP tokens stay in the proxy | yes | the LiteLLM key can be a placeholder for clients that send it as Bearer (PoC 20, #170); zero's code still puts the key in the sandbox (#162) |
 | Identity of a sandbox | virtual key per sandbox; `custom_auth` could take zero's identity | partly | key mint and revoke by zero; hook is own Python code in the proxy |
 | Guardrails, DSGVO | content filter, Presidio | partly | pattern data yes; free text needs Presidio; forge traffic does not pass LiteLLM |
@@ -157,7 +157,7 @@ The sandbox, its egress rules, the push gate, the forge token and its permission
 |---|---|---|
 | Models | LiteLLM, opt-in | shown end to end; removes provider logins from the sandbox once the Copilot login is dropped there |
 | Guardrails | LiteLLM, with the models | declared in config, no extra service for patterns |
-| MCP servers and tool lists | open | LiteLLM: one place and UI, but database, key in the sandbox, fail-open found. agentgateway (ADR 0043): no database, identity verified, list per request from zero-cp, no UI |
+| MCP servers and tool lists | decided (ADR 0049, amended 2026-11-27): on the LiteLLM key when the model proxy is on, agentgateway without it | LiteLLM: one place and UI, but database, key in the sandbox, fail-open found. agentgateway (ADR 0043): no database, identity verified, list per request from zero-cp, no UI |
 | Skills, instructions | plain files, read-only folder from zero's config | LiteLLM has no declared form and none for opencode; instructions not at all |
 | Agent definition, operator limits | zero's own config | no LiteLLM feature matches |
 

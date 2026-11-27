@@ -23,3 +23,4 @@ Today zero registers GitLab's MCP endpoint inside the sandbox together with the 
 - The policy entry accepts any image of that registry path without a signature check (P11); the digest pin is what fixes the content.
 - GitLab checks one token permission per tool, so zero needs a tool -> permission table to mint a token that fits the list (MG14).
 - Open before it can ship: SPIRE node attestation that survives (MG11), SPIRE entries per sandbox (MG3), gateway-to-zero-cp authentication better than a shared key (MG10), a run against a self-hosted instance, opencode as the client.
+- Amended 2026-11-27 (#172, ADR 0049): when the model proxy (LiteLLM) is on, the tool list of a workspace goes on the sandbox's proxy key and MCP servers are declared in LiteLLM; this ADR's chain stays the way for a setup without the model proxy.
