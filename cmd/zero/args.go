@@ -50,7 +50,7 @@ func (e usageError) Error() string { return string(e) }
 // checkArgs refuses what a command does not know, before anything runs.
 // The prompt of `run` is free text.
 func checkArgs(cmd string, args []string) error {
-	if cmd == "copilot" {
+	if cmd == "copilot" || cmd == "claude" {
 		return nil // arguments go to the tool
 	}
 	if cmd == "run" {

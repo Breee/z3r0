@@ -14,6 +14,7 @@ func TestCheckArgs(t *testing.T) {
 		{"rm"}, {"rm", "-y"}, {"ls"}, {"switch"}, {"switch", "api"},
 		{"completion", "bash"}, {"install"}, {"doctor"}, {"version"}, {"help"},
 		{"run", "fix", "--the", "bug"}, {"copilot"}, {"copilot", "-p", "fix it", "--allow-all-tools"},
+		{"claude", "--model", "a/b", "-p", "fix it"},
 		{"ctx"}, {"ctx", "list"}, {"ctx", "--prompt"}, {"ctx", "use", "api"},
 		{"ctx", "new", "api"}, {"ctx", "new", "api", ".", "../b"},
 		{"ctx", "add"}, {"ctx", "add", "."}, {"ctx", "remove", "../b"},

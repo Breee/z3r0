@@ -580,7 +580,59 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	return passthrough("ssh", ssh...)
 }
 
-// hasModelArg reports whether the arguments for the Copilot CLI name a model.
+// claudeBin is Claude Code in the image. /usr/local/bin/claude is a link to
+// it; the egress rule has to name the program itself.
+const claudeBin = "/usr/local/libexec/claude/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+
+// ClaudeNeedsTerminal is the check of `zero claude` without arguments, for
+// main to refuse before a workspace is made.
+func ClaudeNeedsTerminal(args []string) error {
+	if len(args) == 0 && (!isTerminal(os.Stdin) || !isTerminal(os.Stdout)) {
+		return fmt.Errorf("zero claude needs a terminal; without one: zero claude --model PROVIDER/MODEL -p PROMPT")
+	}
+	return nil
+}
+
+// Claude is up + Claude Code inside the sandbox over ssh (ADR 0052). It
+// talks to the model proxy only, so the workspace has to use the proxy.
+// Arguments go to the tool; without arguments it needs a terminal.
+func (s *Sandbox) Claude(out io.Writer, args []string) error {
+	if err := ClaudeNeedsTerminal(args); err != nil {
+		return err
+	}
+	if len(s.Models) == 0 {
+		return fmt.Errorf("zero claude needs the model proxy: set parts.models, providers and models for this workspace in zero's config")
+	}
+	if !hasModelArg(args) {
+		return fmt.Errorf("zero claude needs a model: zero claude --model PROVIDER/MODEL ... (models of the workspace: %s)", strings.Join(s.Models, ", "))
+	}
+	if _, err := s.Up(out); err != nil {
+		return err
+	}
+	if _, err := s.ssh("test -x " + claudeBin); err != nil {
+		return fmt.Errorf("the image of %s has no Claude Code; recreate it: zero rm && zero up", s.Name)
+	}
+	ssh := []string{"-F", s.path("ssh.conf"), s.Host, claudeScript(s.Dir, args)}
+	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
+		ssh = append([]string{"-t"}, ssh...)
+	}
+	return passthrough("ssh", ssh...)
+}
+
+// claudeScript is the command run in the sandbox (PoC 24): Claude Code talks
+// to the model proxy with the placeholder of the sandbox's environment as
+// its key and asks Anthropic for nothing; the image pins its version.
+func claudeScript(dir string, args []string) string {
+	script := "cd " + shellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
+		fmt.Sprintf("http://%s:%d", gateHost, modelPort) + ` ANTHROPIC_AUTH_TOKEN="$` + modelKeyEnv + `" CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + claudeBin
+	for _, a := range args {
+		script += " " + shellQuote(a)
+	}
+	return script
+}
+
+// hasModelArg reports whether the arguments for the Copilot CLI or Claude
+// Code name a model.
 func hasModelArg(args []string) bool {
 	for i, a := range args {
 		if a == "--model" && i+1 < len(args) && args[i+1] != "" || strings.HasPrefix(a, "--model=") && a != "--model=" {
@@ -669,6 +721,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 	}
 	if len(s.Models) > 0 {
 		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL)\n", copilotBin)
+		fmt.Fprintf(out, "claude: Claude Code may reach the model proxy only (zero claude --model PROVIDER/MODEL)\n")
 	} else if fileExists(s.path("copilot-cli.rule")) {
 		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
 	}

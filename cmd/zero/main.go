@@ -22,7 +22,7 @@ Work in the workspace
   opencode      up, then opencode in this terminal (--tui, default) or the browser (--web)
   web           same as opencode --web
   vscode        up, then VS Code on the sandbox
-  copilot [ARG...]  up, then the GitHub Copilot CLI in the sandbox (zero copilot -p PROMPT)
+  copilot | claude [ARG...]  up, then the Copilot CLI or Claude Code in the sandbox (zero copilot -p PROMPT)
   run PROMPT    up, then one prompt
   status        sandbox, token, policy and forward
   logs [-f]     opencode log of the sandbox
@@ -56,7 +56,7 @@ const bashCompletion = `_zero() {
     ctx)
       COMPREPLY=($(compgen -W "use new add remove rm" -- "$cur")) ;;
     zero)
-      COMPREPLY=($(compgen -W "up opencode vscode copilot web run status stop logs pause rm ls switch ctx install doctor version completion" -- "$cur")) ;;
+      COMPREPLY=($(compgen -W "up opencode vscode copilot claude web run status stop logs pause rm ls switch ctx install doctor version completion" -- "$cur")) ;;
   esac
 }
 complete -F _zero zero
@@ -87,7 +87,7 @@ func main() {
 	case "code":
 		cmd = "vscode"
 	}
-	if _, ok := argSpecs[cmd]; !ok && cmd != "run" && cmd != "copilot" {
+	if _, ok := argSpecs[cmd]; !ok && cmd != "run" && cmd != "copilot" && cmd != "claude" {
 		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
 		fmt.Fprint(os.Stderr, usageText)
 		os.Exit(2)
@@ -137,7 +137,7 @@ func main() {
 		return
 	}
 
-	create := slices.Contains([]string{"up", "opencode", "copilot", "run", "vscode", "web"}, cmd)
+	create := slices.Contains([]string{"up", "opencode", "copilot", "claude", "run", "vscode", "web"}, cmd)
 	if cmd == "opencode" && !slices.Contains(args, "--web") {
 		if err := zero.NeedTerminal(); err != nil {
 			fatal(err)
@@ -145,6 +145,11 @@ func main() {
 	}
 	if cmd == "copilot" {
 		if err := zero.CopilotNeedsTerminal(args); err != nil {
+			fatal(err)
+		}
+	}
+	if cmd == "claude" {
+		if err := zero.ClaudeNeedsTerminal(args); err != nil {
 			fatal(err)
 		}
 	}
@@ -177,6 +182,8 @@ func main() {
 		}
 	case "copilot":
 		err = z.Copilot(os.Stdout, args)
+	case "claude":
+		err = z.Claude(os.Stdout, args)
 	case "run":
 		err = z.Run(os.Stdout, args)
 	case "vscode":
@@ -220,7 +227,7 @@ func contextFlag(in []string) (ctx string, rest []string, err error) {
 	for i := 0; i < len(in); i++ {
 		a := in[i]
 		switch {
-		case len(rest) > 0 && (rest[0] == "run" || rest[0] == "copilot"):
+		case len(rest) > 0 && (rest[0] == "run" || rest[0] == "copilot" || rest[0] == "claude"):
 			rest = append(rest, a)
 		case a == "-c" || a == "--context":
 			i++

@@ -53,3 +53,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [49](0049-zero-cp-is-the-one-front-door-one-config-file.md) | 2026-11-26 | zero-cp is the one front door; agents and workspaces are defined in one config file | Z-INV-1, Z-INV-2, Z-INV-3, Z-INV-4, Z-INV-6 |
 | [50](0050-copilot-cli-runs-in-the-sandbox-with-the-login-zero-brings-in.md) | 2026-11-26 | `zero copilot` runs the GitHub Copilot CLI in the sandbox with the Copilot login zero already brings in | Z-INV-1, Z-INV-2, Z-INV-4 |
 | [51](0051-opt-in-parts-run-under-docker-until-podman-has-health-checks.md) | 2026-11-26 | The opt-in parts run under Docker until the podman here runs health checks | Z-INV-1, Z-INV-5 |
+| [52](0052-claude-code-runs-in-the-sandbox-through-the-model-proxy.md) | 2026-11-27 | `zero claude` runs Claude Code in the sandbox, through the model proxy only | Z-INV-1, Z-INV-2, Z-INV-4 |

@@ -154,7 +154,7 @@ Once, connect your Copilot account to the proxy: open `http://127.0.0.1:18096/ui
 - From the sandbox only the proxy is reachable for models; the model hosts are not, also not opencode's free models and not Copilot inside VS Code.
 - Of the proxy the sandbox reaches the model list and the model calls only. Its keys, users, credentials and settings are refused.
 - `zero pause` and `zero rm` delete the key at the proxy; `zero up` makes a new one.
-- `zero copilot` needs a model here: `zero copilot --model github_copilot/claude-haiku-4.5`.
+- `zero copilot` and `zero claude` need a model here: `zero copilot --model github_copilot/claude-haiku-4.5`. `zero claude` works only in such a workspace.
 - A workspace without `models` works as before.
 
 ## Background

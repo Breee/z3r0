@@ -1667,3 +1667,18 @@ func TestCompose(t *testing.T) {
 		t.Errorf("command that fails: %q", got)
 	}
 }
+
+func TestClaudeScript(t *testing.T) {
+	got := claudeScript("/tmp/zero/a b", []string{"--model", "github_copilot/x", "-p", "it's"})
+	for _, want := range []string{"cd '/tmp/zero/a b' &&", `[ -n "$LITELLM_API_KEY" ]`, "ANTHROPIC_BASE_URL=http://host.openshell.internal:18096 ", `ANTHROPIC_AUTH_TOKEN="$LITELLM_API_KEY"`, "DISABLE_AUTOUPDATER=1", "exec " + claudeBin + " '--model' 'github_copilot/x' '-p' 'it'\\''s'"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("script %q lacks %q", got, want)
+		}
+	}
+	if strings.Contains(got, "ANTHROPIC_API_KEY") || strings.Contains(got, "/v1") {
+		t.Errorf("script %q: x-api-key form or /v1 in the address", got)
+	}
+	if !strings.Contains(fmt.Sprint(modelPolicy("p")), claudeBin) {
+		t.Error("models rule does not name Claude Code")
+	}
+}

@@ -299,7 +299,7 @@ func modelPolicy(provider string) map[string]any {
 			"credential_binding": map[string]any{"provider": provider},
 			"rules":              rules,
 		}},
-		"binaries": []map[string]any{{"path": opencodeBin}, {"path": copilotBin}, {"path": "/usr/bin/curl"}},
+		"binaries": []map[string]any{{"path": opencodeBin}, {"path": copilotBin}, {"path": claudeBin}, {"path": "/usr/bin/curl"}},
 	}
 }
 
