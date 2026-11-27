@@ -17,6 +17,7 @@ zero runs a coding agent in a sandbox on your machine. The agent gets a copy of 
   {{< card link="getting-started" title="Getting started" subtitle="Install zero and start the first workspace." >}}
   {{< card link="commands" title="Commands" subtitle="Every command with an example." >}}
   {{< card link="policy" title="Policy" subtitle="Hosts, capabilities and tools of a workspace." >}}
+  {{< card link="providers" title="Model providers" subtitle="Where the model login lives, without and with the model proxy." >}}
   {{< card link="security" title="Security" subtitle="What the agent can do, what it cannot do, what is open." >}}
 {{< /cards >}}
 
