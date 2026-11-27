@@ -1,0 +1,5 @@
+# PoC 25: overlay on PoC 17's files. LiteLLM serves everything below /litellm.
+services:
+  litellm:
+    environment:
+      SERVER_ROOT_PATH: /litellm

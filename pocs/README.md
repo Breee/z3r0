@@ -30,3 +30,4 @@ Prereqs: host setup from `ai-docs/sprints/01-openshell-eval/F01-openshell-baseli
 | 22-litellm-tools-skills | #172: LiteLLM gives each key its own tool list and its own skills, by API and database only; skills stay plain files, tool lists go on the key when the model proxy is on | `pocs/22-litellm-tools-skills/run.sh` |
 | 23-copilot-cli-proxy | #173: the Copilot CLI in a sandbox answers and uses tools through the model proxy with the sandbox's key, no GitHub login in the sandbox; the model must be named | `pocs/23-copilot-cli-proxy/run.sh` |
 | 24-claude-code-proxy | #166: Claude Code in a sandbox answers through the model proxy with the placeholder key, no Anthropic login; model name taken as written; 9 PASS | `pocs/24-claude-code-proxy/run.sh` |
+| 25-zero-ui | #163: LiteLLM's web UI loads below a sub-path behind one loopback port a sandbox cannot reach; signing in from that port needs Enterprise (C59) | `pocs/25-zero-ui/run.sh` |
