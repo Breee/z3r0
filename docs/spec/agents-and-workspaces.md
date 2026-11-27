@@ -64,7 +64,7 @@ Short forms stay valid: a workspace with only `folders` (and today's `tools`, `i
 | `instructions`, `skills` | read-only folder `/tmp/zero-input/.zero`, opencode user config | read-only mount | built for opencode (#161) |
 | `model`, `providers` | LiteLLM `model_list`, `credential_list`; one key per sandbox with the agent's models; model list in the harness config | model proxy | PoC 17, 18 |
 | `guardrails` | LiteLLM `guardrails` | model proxy | PoC 18 |
-| `mcp` | agentgateway targets; tool list per sandbox identity from zero-cp per request | tool gateway | PoC 15 |
+| `mcp` | with the model proxy: MCP servers in LiteLLM, tool list on the sandbox's key; else agentgateway targets, tool list per sandbox identity from zero-cp per request | tool gateway | PoC 22, PoC 15 |
 | `secret://NAME` | lookup at the part that needs it | secret store | PoC 10, 12 (OpenBao) |
 
 The model path does not meet "no provider login in the sandbox" yet: in PoC 18 the sandbox kept its own Copilot login, the proxy key was readable in the sandbox, and keys of the proxy's admin user saw every tool. #162 has to show these closed before the path counts as built. Shown since: a key minted with `no-mcp-servers` sees no tool; the key can be a placeholder (PoC 20); the Copilot CLI needs no GitHub login behind the proxy (PoC 23); opencode finds no model of the proxy by itself, so zero writes the list, with the token limits of each model for which the proxy reports both, and without the models the proxy marks as not for chat (embedding and the like) (PoC 21).
@@ -78,8 +78,8 @@ Rules: layers only narrow (operator limits, shared definitions, repository `.zer
 | Job | Choice | Reason |
 |---|---|---|
 | Models, guardrails | LiteLLM, opt-in | discovery, per-key model list, mask and block shown (PoC 18). Cost: Postgres. The key can stay outside the sandbox as a placeholder (PoC 20); zero does not do that yet (#162) |
-| Tool list per workspace | agentgateway | no database, identity of the sandbox instead of a key, list asked from zero-cp per request (PoC 15). LiteLLM can do it, but keys of the admin user see every tool (PoC 18) |
-| Skills, instructions | plain files, read-only folder | no part needed; LiteLLM keeps skills only in its database and has nothing for instructions |
+| Tool list per workspace | on the sandbox's LiteLLM key when the model proxy is on; else agentgateway | with the proxy on, the key and its database are already there and the list is set when zero mints the key; a key zero mints always carries a list or `no-mcp-servers`, because a key of the admin user without one sees every tool (PoC 22). agentgateway needs no database and takes the identity of the sandbox instead of a key, but needs SPIRE (PoC 15); it stays the way without LiteLLM |
+| Skills, instructions | plain files, read-only folder | no part needed and the file is the source of truth. LiteLLM keeps skills in its database, grants them per key and hands out a ZIP (PoC 22), but has no file form for them, does not deliver to opencode and has nothing for instructions |
 | Secrets | host keyring; OpenBao opt-in | as today |
 
 Sources: `ai-docs/tool-eval-litellm.md`, `pocs/15-gitlab-mcp`, `pocs/17-litellm`, `pocs/18-litellm-sandbox`.

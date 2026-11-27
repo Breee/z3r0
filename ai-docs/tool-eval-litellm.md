@@ -11,8 +11,8 @@ Columns: **Where** = `config` (declared in `config.yaml`), `API/UI` (only throug
 | Models: one address, provider logins outside the sandbox, model list per key | yes | probe done (PoC 18); build step open |
 | Guardrails on model and tool calls (mask, block) | yes | probe done (PoC 18) |
 | MCP servers, tool and parameter filters per server | yes, in config | probe done (PoC 18) |
-| Tool list per workspace | partly: per key, database, key readable in the sandbox, admin-user keys fail open (PoC 18) | open: agentgateway (ADR 0043) or LiteLLM |
-| Skills | partly: database objects per key or team, no config form, opencode not named | probe worth running |
+| Tool list per workspace | yes when the model proxy is on: per key, database; a key without a list sees every tool when it belongs to the admin user, so zero always sends a list or `no-mcp-servers` (PoC 22) | decided (ADR 0049, amended): on the key with the proxy on, else agentgateway |
+| Skills | partly: database objects per key, no config form, archive is a ZIP someone must fetch for opencode (PoC 22) | not used; plain files |
 | Instructions (AGENTS.md and the like) | no: nothing delivers files or forces a system prompt per key (not found) | zero's job |
 | Identity of a sandbox | partly: virtual key, or a `custom_auth` hook; JWT auth is Enterprise | probe worth running |
 | Audit of each call | partly: spend logs yes; audit log of changes is Enterprise | not looked at in a run |
@@ -71,9 +71,9 @@ LiteLLM can enforce **models, tools and guardrails**. It does not replace anythi
 
 | Feature | Where | DB | Ent. | Seen | Source |
 |---|---|---|---|---|---|
-| Skills Hub: ZIP upload, import from GitHub or by URL, versions, review | API/UI | yes | not stated | read | /docs/skills_gateway |
-| Skills per key or team (`object_permission.skills`) | API/UI | yes | not stated | read | /docs/skills_gateway |
-| Delivery: Claude Code plugin marketplace, Codex index, archive download API | - | yes | not stated | read | /docs/tutorials/claude_code_plugin_marketplace, /docs/skills_gateway |
+| Skills Hub: ZIP upload, import from GitHub or by URL, versions, review | API/UI | yes | not stated | run (ZIP upload, unpublish); read (rest) | /docs/skills_gateway |
+| Skills per key or team (`object_permission.skills`) | API/UI | yes | not stated | run (per key, PoC 22); read (team) | /docs/skills_gateway |
+| Delivery: Claude Code plugin marketplace, Codex index, archive download API | - | yes | not stated | run (archive, PoC 22); read (rest) | /docs/tutorials/claude_code_plugin_marketplace, /docs/skills_gateway |
 | Skill scan before publishing (`skill_scanner`) | config | yes | not stated | read | /docs/skills_gateway |
 | Skills declared in `config.yaml` | - | - | - | not found (page read: no config form) | /docs/skills_gateway |
 | Skills for opencode | - | - | - | not found | /docs/tutorials/opencode_integration |
@@ -167,7 +167,7 @@ The sandbox, its egress rules, the push gate, the forge token and its permission
 2. LiteLLM key held outside the sandbox as an OpenShell placeholder. Done: works (PoC 20, #170).
 3. Copilot connected by a LiteLLM user who is not admin; or service account keys; does the fail-open for tool lists go away.
 4. `custom_auth` hook that accepts the sandbox identity (JWT-SVID) in place of a stored key; works without database?
-5. Skills: one skill, two keys, archive fetched into a sandbox, picked up by opencode.
+5. Skills: one skill, two keys, archive fetched into a sandbox, picked up by opencode. Done: PoC 22 (#172).
 6. Presidio for free-text personal data.
 
 ## Corrections to earlier statements

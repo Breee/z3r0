@@ -31,5 +31,6 @@ zero today isolates an agent and gates its pushes. The goal is wider: people def
 - Packaging: one compose file with a profile per part, images by digest, ports on 127.0.0.1 (`docs/spec/agents-and-workspaces.md`). Shown with Docker only so far (C57).
 - The API and UI get a listener of their own; the gate port is reachable from sandboxes.
 - LiteLLM needs Postgres for keys and its UI, and its key is readable in the sandbox as built today. A placeholder works (PoC 20, #170: provider per sandbox, bound to the proxy endpoint); building it in is part of #162.
-- Open: whether agents with different rights share one sandbox (they would share files, network and token); tool lists per workspace through agentgateway or LiteLLM; shared definitions from a pinned git repository; operator limits file.
+- Open: whether agents with different rights share one sandbox (they would share files, network and token); shared definitions from a pinned git repository; operator limits file.
 - Running agents on Kubernetes is out of scope here; the local version comes first.
+- Amended 2026-11-27 (#172, PoC 22): tool lists per workspace go on the sandbox's LiteLLM key when the model proxy is on (always a list or `no-mcp-servers`); agentgateway (ADR 0043) stays the way without LiteLLM. Skills stay plain files; the LiteLLM Skills Hub is not used.
