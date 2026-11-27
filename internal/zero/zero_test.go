@@ -1695,6 +1695,8 @@ func TestModelArg(t *testing.T) {
 		{[]string{"--model="}, ""},
 		{[]string{"--model"}, ""},
 		{[]string{"-p", "x"}, ""},
+		{[]string{"-p", "x", "--", "--model", "a/b"}, ""},
+		{[]string{"--model", "a/b", "--", "--model", "c/d"}, "a/b"},
 	} {
 		if got := modelArg(c.args); got != c.want {
 			t.Errorf("modelArg(%q) = %q, want %q", c.args, got, c.want)

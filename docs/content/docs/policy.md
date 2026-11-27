@@ -142,7 +142,7 @@ workspaces:
     model: github_copilot/claude-haiku-4.5   # optional: the default model
 ```
 
-`model` must be one of the workspace's models. opencode starts with it, and `zero copilot` and `zero claude` use it when you give no `--model`. A repository's own `opencode.json` and `--model` still win.
+`model` must be one of the workspace's models. opencode starts with it, and `zero copilot` and `zero claude` use it when you give no `--model`. `--model` still wins; for opencode a repository's own `opencode.json` wins too.
 
 `zero up` then starts the proxy (two containers, on `127.0.0.1:18096`), makes a key for this sandbox that is good for the listed models only, and writes the model list for opencode:
 

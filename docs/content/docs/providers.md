@@ -15,8 +15,8 @@ A tool in the sandbox needs a model. There are two setups. In both, no provider 
 | `zero opencode`, `zero web` | yes | yes |
 | `zero run` | yes | with `model:` for the workspace in zero's config, or `model: litellm/github_copilot/...` in the repository's `opencode.json`; opencode's own default model is not reachable here |
 | Copilot inside `zero vscode` | yes | no: it has no login and no way out |
-| `zero copilot` | yes | yes, with `--model` |
-| `zero claude` | no | yes, with `--model` |
+| `zero copilot` | yes | yes, with `--model` or `model:` for the workspace |
+| `zero claude` | no | yes, with `--model` or `model:` for the workspace |
 | Needs | the host's opencode with a Copilot login | Docker for the proxy |
 
 `zero doctor` says what is missing: `model login` for the first setup, `model proxy runtime` and `model proxy login` for the second. When every workspace uses the model proxy, `model login` is `na`: no login of the host's opencode is needed then.

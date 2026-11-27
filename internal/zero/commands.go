@@ -651,6 +651,9 @@ func claudeScript(dir string, args []string) string {
 // not a model.
 func modelArg(args []string) string {
 	for i, a := range args {
+		if a == "--" {
+			break
+		}
 		v := ""
 		if a == "--model" && i+1 < len(args) {
 			v = args[i+1]
@@ -745,10 +748,10 @@ func (s *Sandbox) Status(out io.Writer) error {
 	}
 	if len(s.Models) > 0 {
 		if s.Model != "" {
-			fmt.Fprintf(out, "model: %s (default; a repository's opencode.json and --model win)\n", s.Model)
+			fmt.Fprintf(out, "model: %s (default; --model wins, and for opencode a repository's opencode.json)\n", s.Model)
 		}
-		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL)\n", copilotBin)
-		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL)\n", claudeBin)
+		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL, or the workspace's model)\n", copilotBin)
+		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL, or the workspace's model)\n", claudeBin)
 	} else if fileExists(s.path("copilot-cli.rule")) {
 		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
 	}
