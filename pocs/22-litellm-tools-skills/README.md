@@ -2,7 +2,7 @@
 
 Question: can LiteLLM give each sandbox key its own tool list and its own skills, and how does that compare with agentgateway (PoC 15) and with plain files (#161)?
 
-Result (2026-11-27, LiteLLM v1.110.3 with Postgres, opencode 2.2.6, OpenShell 0.1.8, Docker 29.5.2): **yes, both work per key. The lists per key and the skills exist only through the API and the database; the MCP servers themselves can be declared in LiteLLM's config file.** `run.sh`: 16 PASS, 0 FAIL.
+Result (2026-11-27, LiteLLM v1.110.3 with Postgres, opencode 2.2.6, OpenShell 0.1.8, Docker 29.5.2): **yes, both work per key. The lists per key and the skills exist only through the API and the database; the MCP servers themselves can be declared in LiteLLM's config file.** `run.sh`: 17 PASS, 0 FAIL.
 
 ## Sources
 

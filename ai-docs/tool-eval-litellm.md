@@ -155,7 +155,7 @@ The sandbox, its egress rules, the push gate, the forge token and its permission
 
 | Job | Recommendation | Reason |
 |---|---|---|
-| Models | LiteLLM, opt-in | shown end to end; removes provider logins from the sandbox once the Copilot login is dropped there |
+| Models | LiteLLM, opt-in | shown end to end; a sandbox of a workspace with models holds no provider login (PoC 23, #162); the proxy key is still readable there until it is a placeholder (#162) |
 | Guardrails | LiteLLM, with the models | declared in config, no extra service for patterns |
 | MCP servers and tool lists | decided (ADR 0049, amended 2026-11-27): on the LiteLLM key when the model proxy is on, agentgateway without it | LiteLLM: one place and UI, but database, key in the sandbox, fail-open found. agentgateway (ADR 0043): no database, identity verified, list per request from zero-cp, no UI |
 | Skills, instructions | plain files, read-only folder from zero's config | LiteLLM has no declared form and none for opencode; instructions not at all |
