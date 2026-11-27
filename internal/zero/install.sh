@@ -14,7 +14,8 @@ esac
 [ -n "$RT" ] || RT=$PREV
 # the runtime is recorded only once its gateway answers; until then a plain
 # 'sudo zero install' goes back to the previous one.
-trap '[ $? -eq 0 ] || [ "$RT" = "$PREV" ] || echo "zero install: failed while changing the runtime to $RT; the gateway may be down. Go back with: sudo zero install --$PREV" >&2' EXIT
+GW=0
+trap 'rc=$?; [ $rc -eq 0 ] || { [ "$RT" = "$PREV" ] || echo "zero install: failed while changing the runtime to $RT. Go back with: sudo zero install --$PREV" >&2; [ $GW = 0 ] || echo "zero install: failed after the gateway was stopped; it is down until sudo zero install succeeds" >&2; }' EXIT
 BASE="https://github.com/NVIDIA/OpenShell/releases/download/v$VER"
 LIB="/usr/local/lib/zero/openshell-$VER"
 cd /
@@ -69,8 +70,11 @@ as() { sudo -u "$OU" env HOME="$OH" XDG_RUNTIME_DIR="/run/user/$OUID" XDG_CONFIG
 put() { new=$(cat); [ "$(as cat "$2" 2>/dev/null)" = "$new" ] || { printf '%s\n' "$new" | as tee "$2" >/dev/null; eval "$1=1"; }; }
 # The gateway is restarted at most once, and only when something changed:
 # a gateway stopped while it starts its sandboxes leaves them stuck (C62).
-GW=0
 gwdown() { as systemctl --user disable --now openshell-gateway.service 2>/dev/null || true; GW=1; }
+# before the user manager may start again, so that it does not start it anew
+if [ "$RT" != docker-rootless ] && as systemctl --user is-enabled -q zero-docker.service 2>/dev/null; then
+  gwdown; as systemctl --user disable --now zero-docker.service
+fi
 INGRP=no; id -nG "$OU" | tr ' ' '\n' | grep -qx docker && INGRP=yes
 if [ "$RT" = docker ] && [ $INGRP = no ]; then
   gwdown; usermod -aG docker "$OU"; systemctl restart "user@$OUID.service"
@@ -82,9 +86,6 @@ i=0; while [ ! -S "/run/user/$OUID/bus" ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i
 # 3. runtime. podman: image allowlist, user socket. docker-rootless: a daemon
 # of this user. docker: the system daemon, nothing to start.
 as mkdir -p "$OH/.config/containers" "$OH/.config/systemd/user" "$OH/.config/openshell"
-if [ "$RT" != docker-rootless ] && as systemctl --user is-enabled -q zero-docker.service 2>/dev/null; then
-  gwdown; as systemctl --user disable --now zero-docker.service
-fi
 case $RT in
 podman)
 DRV=podman; SOCK="/run/user/$OUID/podman/podman.sock"; DEP=podman.socket; PTMP=true
