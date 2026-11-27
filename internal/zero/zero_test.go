@@ -1800,3 +1800,24 @@ func TestUI(t *testing.T) {
 		t.Fatalf("decisions newest first, cleaned: %v", d)
 	}
 }
+
+func TestHostLoginNeeded(t *testing.T) {
+	proxy := &Workspace{Folders: []string{"/a"}, Models: []string{"github_copilot/*"}}
+	plain := &Workspace{Folders: []string{"/b"}}
+	on := Parts{Models: partLiteLLM}
+	for _, tc := range []struct {
+		name string
+		c    *Config
+		want bool
+	}{
+		{"no config", nil, true},
+		{"no proxy", &Config{Workspaces: map[string]*Workspace{"a": plain}}, true},
+		{"proxy, no workspace", &Config{Parts: on}, true},
+		{"proxy, one workspace without models", &Config{Parts: on, Workspaces: map[string]*Workspace{"a": proxy, "b": plain}}, true},
+		{"proxy, every workspace with models", &Config{Parts: on, Workspaces: map[string]*Workspace{"a": proxy}}, false},
+	} {
+		if got := hostLoginNeeded(tc.c); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

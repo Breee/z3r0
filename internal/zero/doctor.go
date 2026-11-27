@@ -59,8 +59,13 @@ func Doctor(out io.Writer) error {
 		check("zero-cp", "not running: systemctl --user start zero-cp (or zero up)")
 	}
 
-	check("model login", modelLogin())
-	if c, err := loadConfig(); err == nil && c.Parts.Models != "" {
+	c, _ := loadConfig()
+	if hostLoginNeeded(c) {
+		check("model login", modelLogin())
+	} else {
+		fmt.Fprintln(out, "na    model login: every workspace uses the model proxy")
+	}
+	if c != nil && c.Parts.Models != "" {
 		check("model proxy runtime", composeProblem())
 		check("model proxy login", proxyLogin())
 	}
@@ -203,4 +208,18 @@ func clientKey() string {
 		}
 	}
 	return ""
+}
+
+// hostLoginNeeded reports whether a workspace takes its model login from the
+// host's opencode: not when every workspace goes through the model proxy.
+func hostLoginNeeded(c *Config) bool {
+	if c == nil || c.Parts.Models == "" || len(c.Workspaces) == 0 {
+		return true
+	}
+	for _, w := range c.Workspaces {
+		if len(w.Models) == 0 {
+			return true
+		}
+	}
+	return false
 }

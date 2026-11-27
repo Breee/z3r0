@@ -19,7 +19,7 @@ A tool in the sandbox needs a model. There are two setups. In both, no provider 
 | `zero claude` | no | yes, with `--model` |
 | Needs | the host's opencode with a Copilot login | Docker for the proxy |
 
-`zero doctor` says what is missing: `model login` for the first setup, `model proxy runtime` and `model proxy login` for the second. `model login` is checked in every case today, also when no workspace needs it ([#175](https://github.com/Breee/z3r0/issues/175)).
+`zero doctor` says what is missing: `model login` for the first setup, `model proxy runtime` and `model proxy login` for the second. When every workspace uses the model proxy, `model login` is `na`: no login of the host's opencode is needed then.
 
 ## Without the model proxy
 
