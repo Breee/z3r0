@@ -6,7 +6,7 @@ Status: draft (#185). PoC 31. ADR 0058. Runtime per workspace: #180. Styled outp
 
 | Typed | Does |
 |---|---|
-| `zero` | On a terminal: the workspace list (section 3). Not a terminal: help, exit 2. |
+| `zero` | On a terminal: the workspace screen (section 3). Not a terminal: help, exit 2. |
 | `zero opencode`, `zero vscode`, `zero claude`, `zero copilot` | Sandbox up, agent open. The everyday command. |
 | `zero up` | Prepares the sandbox, opens nothing. For scripts and warm-up. |
 | `zero ls`, `zero stop`, `zero rm`, `zero doctor`, ... | Unchanged. |
