@@ -54,3 +54,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [50](0050-copilot-cli-runs-in-the-sandbox-with-the-login-zero-brings-in.md) | 2026-11-26 | `zero copilot` runs the GitHub Copilot CLI in the sandbox with the Copilot login zero already brings in | Z-INV-1, Z-INV-2, Z-INV-4 |
 | [51](0051-opt-in-parts-run-under-docker-until-podman-has-health-checks.md) | 2026-11-26 | The opt-in parts run under Docker until the podman here runs health checks | Z-INV-1, Z-INV-5 |
 | [52](0052-claude-code-runs-in-the-sandbox-through-the-model-proxy.md) | 2026-11-27 | `zero claude` runs Claude Code in the sandbox, through the model proxy only | Z-INV-1, Z-INV-2, Z-INV-4 |
+| [53](0053-read-only-api-and-ui-on-their-own-loopback-port.md) | 2026-11-27 | zero-cp serves a read-only API and UI on a loopback port of their own; the model proxy's page is linked, not passed on | Z-INV-1, Z-INV-3, Z-INV-4 |

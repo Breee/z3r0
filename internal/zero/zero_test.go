@@ -1710,3 +1710,86 @@ func TestModelArg(t *testing.T) {
 		t.Error("zero claude without arguments and without a terminal is not refused")
 	}
 }
+
+func TestUI(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	get := func(method, host, path string, h map[string]string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "http://"+host+path, nil)
+		r.Host = host
+		for k, v := range h {
+			r.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		uiHandler(w, r)
+		return w
+	}
+	want := func(what string, w *httptest.ResponseRecorder, code int) {
+		t.Helper()
+		if w.Code != code {
+			t.Fatalf("%s: got %d, want %d (%s)", what, w.Code, code, w.Body.String())
+		}
+	}
+	want("no session", get("GET", uiAddr(), "/api/workspaces", nil), 401)
+	want("no session, page", get("GET", uiAddr(), "/ui/", nil), 401)
+	want("other host name", get("GET", "host.openshell.internal:18097", "/ui/", nil), 403)
+	want("foreign origin", get("GET", uiAddr(), "/ui/", map[string]string{"Origin": "http://evil.example"}), 403)
+	want("write", get("POST", uiAddr(), "/api/workspaces", nil), 405)
+	want("no code", get("GET", uiAddr(), "/ui/enter?code=", nil), 401)
+
+	code := filepath.Join(stateRoot(), uiCodeFile)
+	if err := os.MkdirAll(stateRoot(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(code, []byte("abc"), 0o600)
+	want("wrong code", get("GET", uiAddr(), "/ui/enter?code=abd", nil), 401)
+	if fileExists(code) {
+		t.Fatal("a wrong code must use the link up")
+	}
+	os.WriteFile(code, []byte("abc"), 0o600)
+	old := time.Now().Add(-uiCodeLife - time.Minute)
+	os.Chtimes(code, old, old)
+	want("old code", get("GET", uiAddr(), "/ui/enter?code=abc", nil), 401)
+	os.WriteFile(code, []byte("abc"), 0o600)
+	w := get("GET", uiAddr(), "/ui/enter?code=abc", nil)
+	want("code", w, 303)
+	c := w.Result().Cookies()
+	if len(c) != 1 || c[0].Name != uiCookie || !c[0].HttpOnly || c[0].SameSite != http.SameSiteStrictMode {
+		t.Fatalf("cookie: %+v", c)
+	}
+	want("code twice", get("GET", uiAddr(), "/ui/enter?code=abc", nil), 401)
+	ck := map[string]string{"Cookie": uiCookie + "=" + c[0].Value}
+	want("unknown path", get("GET", uiAddr(), "/api/nope", ck), 404)
+	want("made-up session", get("GET", uiAddr(), "/api/parts", map[string]string{"Cookie": uiCookie + "=x"}), 401)
+	w = get("GET", uiAddr(), "/api/parts", ck)
+	want("parts", w, 200)
+	if !strings.Contains(w.Body.String(), "push gate") {
+		t.Fatalf("parts: %s", w.Body.String())
+	}
+
+	// What a workspace shows: no token id, no key; text from the sandbox cleaned.
+	cfg := &Config{Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x/a"}, Models: []string{"github_copilot/*"}}}}
+	st := filepath.Join(stateRoot(), "zero-a")
+	os.MkdirAll(st, 0o700)
+	for name, val := range map[string]string{
+		"caps": "git.read git.push", "forge.id": "123456", "gate.key": "SECRETKEY", "tools": "get_project",
+		"gate.log": `{"time":"1","ref":"refs/heads/zero/a","decision":"allow","reason":"first"}` + "\n" +
+			`{"time":"2","ref":"refs/heads/main","decision":"deny","reason":"second\u001b[2J"}` + "\n",
+	} {
+		os.WriteFile(filepath.Join(st, name), []byte(val), 0o600)
+	}
+	b, _ := json.Marshal(uiDetail(cfg, wsRow{Name: "a", Status: "running"}))
+	d := uiDecisions(cfg, "a")
+	bd, _ := json.Marshal(d)
+	for _, bad := range []string{"SECRETKEY", "123456", "\u001b"} {
+		if strings.Contains(string(b), bad) || strings.Contains(string(bd), bad) {
+			t.Fatalf("%q in an answer: %s %s", bad, b, bd)
+		}
+	}
+	if !strings.Contains(string(b), "git.push") || !strings.Contains(string(b), "get_project") || !strings.Contains(string(b), "zero/a") {
+		t.Fatalf("detail: %s", b)
+	}
+	if len(d) != 2 || d[0]["reason"] != "second[2J" || d[1]["reason"] != "first" {
+		t.Fatalf("decisions newest first, cleaned: %v", d)
+	}
+}

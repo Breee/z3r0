@@ -92,6 +92,8 @@ Decided (ADR 0051): the parts run under Docker until the podman on the host runs
 
 ## 5. First UI (read-only)
 
+Built in #163 (ADR 0053): `zero ui`, port 18097, pages Workspaces, Workspace (with the gate's decisions), Parts. The model proxy's own page is linked, not passed on, and keeps its own login (C59).
+
 Served by zero-cp under `/ui/`, data from `/api/` (JSON), which the CLI and a terminal UI use too. It gets its own listener on 127.0.0.1 with a port of its own: the gate port is reachable from every sandbox (`host.openshell.internal:18095`), so nothing but the gate may answer there, and no sandbox policy names the UI port.
 
 | Page | Shows | Read from |
@@ -105,7 +107,7 @@ Protection: the threat is the agent in a sandbox and a web page in the user's br
 
 ## 6. Open
 
-- Build steps: #161 (done), #162 model path, #163 API and read-only UI, #164 tool path, #165 editing in the UI.
+- Build steps: #161 (done), #162 model path, #163 API and read-only UI (done), #164 tool path, #165 editing in the UI.
 - Agents with different rights in one sandbox share files, network and token. Until decided: one sandbox per set of rights.
 - Shared definitions from a git repository pinned by commit; operator limits file.
 - How Claude Code, VS Code and Copilot CLI are told about instructions and skills.

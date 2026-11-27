@@ -33,6 +33,7 @@ func Serve() error {
 	}()
 	addr := fmt.Sprintf("127.0.0.1:%d", gatePort)
 	log.Printf("zero-cp: push gate on %s, upkeep every %s", addr, upkeepEvery)
+	go serveUI()
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           http.HandlerFunc(gateHandler),

@@ -117,4 +117,7 @@ if [ "$(sbx 'test -n "$LITELLM_API_KEY" && echo yes' | tail -n 1)" = yes ]; then
 		want "model host $h not reachable" "$(sbx "curl -s -o /dev/null -m 10 -w %{http_code} https://$h/" | tail -n 1)" 000
 	done
 fi
+# zero-cp's read-only API and UI (own port, in no sandbox rule).
+want "zero UI not reachable"        "$(sbx 'curl -s -o /dev/null -m 10 -w %{http_code} http://host.openshell.internal:18097/ui/' | tail -n 1)" 000
+want "zero API not reachable"       "$(sbx 'curl -s -o /dev/null -m 10 -w %{http_code} http://host.openshell.internal:18097/api/workspaces' | tail -n 1)" 000
 echo "fails: $FAILS"; [ "$FAILS" = 0 ]

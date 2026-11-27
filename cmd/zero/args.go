@@ -27,6 +27,7 @@ var argSpecs = map[string]argSpec{
 	"pause":      {},
 	"rm":         {flags: []string{"-y"}},
 	"ls":         {},
+	"ui":         {},
 	"switch":     {max: 1, names: "NAME"},
 	"completion": {min: 1, max: 1, names: "bash"},
 	"install":    {},

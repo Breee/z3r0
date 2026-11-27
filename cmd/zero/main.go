@@ -31,6 +31,7 @@ Work in the workspace
   rm [-y]       delete the sandbox, after listing work not pushed; the workspace is kept
 Workspaces
   ls            all workspaces with status, token, policy; leftovers
+  ui            read-only web page: workspaces, what each agent may reach, decisions
   switch [NAME] make NAME the current workspace; without NAME pick from the list
   ctx           list workspaces with folders; ctx new NAME [PATH...] | add [PATH...] |
                 remove [PATH...] | rm [-y] NAME | use NAME | --prompt
@@ -41,7 +42,6 @@ This machine
   help          this text
   completion bash  bash completion: source <(zero completion bash)
 Examples: cd ~/repos/app && zero opencode; zero -c app status; zero up --approve
-  zero ctx new both ~/repos/api ~/repos/web; zero switch both
 The workspace is -c, else ZERO_CONTEXT, else the one of the current folder, else the current one.
 Exit codes: 0 done, 1 failed, 2 wrong command or option (nothing ran).
 `
@@ -56,7 +56,7 @@ const bashCompletion = `_zero() {
     ctx)
       COMPREPLY=($(compgen -W "use new add remove rm" -- "$cur")) ;;
     zero)
-      COMPREPLY=($(compgen -W "up opencode vscode copilot claude web run status stop logs pause rm ls switch ctx install doctor version completion" -- "$cur")) ;;
+      COMPREPLY=($(compgen -W "up opencode vscode copilot claude web run status stop logs pause rm ls ui switch ctx install doctor version completion" -- "$cur")) ;;
   esac
 }
 complete -F _zero zero
@@ -110,6 +110,11 @@ func main() {
 		return
 	case "doctor":
 		if err := zero.Doctor(os.Stdout); err != nil {
+			fatal(err)
+		}
+		return
+	case "ui":
+		if err := zero.UI(os.Stdout); err != nil {
 			fatal(err)
 		}
 		return
