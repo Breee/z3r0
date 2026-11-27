@@ -13,8 +13,28 @@ with the input folder staged where zero stages it (`/var/lib/zero/input`)?
 
 ## Result
 
-Not run yet. The script needs root (it starts processes as `openshell`);
-it is waiting for a run by the user.
+Yes for both (2026-11-27, OpenShell 0.1.8, Docker 29.5.2, run by the user with sudo).
+
+| | rootless (daemon of `openshell`) | rootful (system daemon) |
+|---|---|---|
+| checks | 22 PASS, `fails: 0` | 19 PASS, `fails: 0` |
+| gateway user, groups | `openshell`, 1001 | `openshell`, 992 (`docker`) + 1001 |
+| sandbox ready, agent uid 1000 | yes | yes |
+| host outside the policy | refused (000) | refused (000) |
+| input folder from `/var/lib/zero/input` | readable, not writable | readable, not writable |
+| containers | unprivileged, all capabilities dropped, no-new-privileges | same |
+| container processes on the host | run as `openshell` | uid 65534 (supervisor), 1000 (workload) |
+
+Findings:
+
+- A rootless Docker daemon runs for the `nologin` user `openshell` with its
+  existing subuid range and linger; `dockerd-rootless.sh` needs `/usr/sbin`
+  on its PATH (`sysctl`).
+- Rootful: the gateway reaches the system daemon only with group `docker`.
+  That group equals root on the host (ADR 05, C25); `zero doctor` warns
+  when the gateway process holds it.
+- Rootful: the workload's host uid is 1000, on most machines the login
+  user's uid. Rootless maps it into the subuid range of `openshell`.
 
 ## Sources
 
