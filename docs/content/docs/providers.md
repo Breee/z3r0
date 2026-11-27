@@ -11,13 +11,15 @@ A tool in the sandbox needs a model. There are two setups. In both, no provider 
 | Set in | nothing | `parts.models`, `providers`, `models` in `~/.config/zero/config.yaml` |
 | You log in | on the host: `opencode auth login`, GitHub Copilot | once in the proxy's UI: connect GitHub Copilot |
 | The sandbox holds | a placeholder for the Copilot token | a placeholder for its own proxy key |
-| Model hosts the sandbox reaches | `api.githubcopilot.com`, `opencode.ai`, `models.opencode.ai` | none; only the proxy on your machine, and of it only the model list and the model calls |
-| `zero opencode`, `zero run`, `zero web` | yes | yes |
+| Model hosts the sandbox reaches | `api.githubcopilot.com`, `opencode.ai`, `models.opencode.ai` | none; only the proxy on your machine, and of it only the model list and the model calls (chat, responses, messages, token count, embeddings) |
+| `zero opencode`, `zero web` | yes | yes |
+| `zero run` | yes | only with `model: litellm/github_copilot/...` in the repository's `opencode.json`; opencode's own default model is not reachable here ([#176](https://github.com/Breee/z3r0/issues/176)) |
+| Copilot inside `zero vscode` | yes | no: it has no login and no way out |
 | `zero copilot` | yes | yes, with `--model` |
 | `zero claude` | no | yes, with `--model` |
 | Needs | the host's opencode with a Copilot login | Docker for the proxy |
 
-`zero doctor` says what is missing: `model login` for the first setup, `model proxy runtime` and `model proxy login` for the second.
+`zero doctor` says what is missing: `model login` for the first setup, `model proxy runtime` and `model proxy login` for the second. `model login` is checked in every case today, also when no workspace needs it ([#175](https://github.com/Breee/z3r0/issues/175)).
 
 ## Without the model proxy
 
@@ -60,10 +62,11 @@ In opencode the models appear as `litellm/github_copilot/...` in `/models`.
 
 ## Limits
 
-- Only GitHub Copilot is a provider today. Other providers of LiteLLM (API keys, clouds, local models) are not built into zero's configuration.
-- Anthropic does not support Claude Code with models that are not Claude models behind a gateway. Shown here: a Claude model served by Copilot. Another model was not tried.
-- Two LiteLLM releases were compromised in 2026 (March and October). zero pins the proxy's image by digest; the proxy holds your Copilot connection and runs under Docker.
-- The proxy needs Docker until the podman on the host can run health checks.
-- The screens of `zero copilot` and `zero claude` in a terminal were not started for this page; the lines above come from runs with `-p`.
+- The model proxy sees every prompt and every answer and holds your Copilot connection. Two LiteLLM releases were compromised in 2026 (March and October). zero pins the proxy's image by digest ([ADR 0049](https://github.com/Breee/z3r0/blob/main/docs/adr/0049-zero-cp-is-the-one-front-door-one-config-file.md)).
+- The proxy runs under Docker, a daemon with root rights, until the podman on the host can run health checks ([ADR 0051](https://github.com/Breee/z3r0/blob/main/docs/adr/0051-opt-in-parts-run-under-docker-until-podman-has-health-checks.md)).
+- Anthropic supports Claude Code behind a gateway with Claude models only. Shown here: a Claude model served by Copilot. Another model was not tried ([ADR 0052](https://github.com/Breee/z3r0/blob/main/docs/adr/0052-claude-code-runs-in-the-sandbox-through-the-model-proxy.md)).
+- Only GitHub Copilot is a provider today ([#177](https://github.com/Breee/z3r0/issues/177)).
+- No default model per workspace: `--model` each time for `zero copilot` and `zero claude` with the proxy ([#176](https://github.com/Breee/z3r0/issues/176)).
+- Run for this page: the three quoted commands, `zero up`, `zero doctor`, and opencode with a `litellm/` model inside the sandbox. Not run: the screens of `zero copilot` and `zero claude` in a terminal, `zero run` with a model set in the repository, VS Code with the proxy.
 - Instructions and skills of a workspace are told to opencode only.
-- The personal opencode configuration of the host (plugins, MCP servers, other providers) is not carried into the sandbox.
+- The personal opencode configuration of the host (plugins, MCP servers, other providers) is not carried into the sandbox ([#153](https://github.com/Breee/z3r0/issues/153)).
