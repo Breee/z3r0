@@ -48,13 +48,14 @@ func Doctor(out io.Writer) error {
 				check("openshell gateway", "unreachable: "+err.Error())
 			} else {
 				check("openshell gateway", "")
-				if computeDriver() == "docker" {
-					if gatewayInDockerGroup() {
-						fmt.Fprintln(out, "warn  runtime: docker (rootful): the gateway's user can use the root daemon and is root on this host (ADR 0057); podman or rootless Docker is safer")
-					} else {
-						fmt.Fprintln(out, "ok    runtime: docker")
-					}
-				} else {
+				switch drv, err := computeDriver(); {
+				case err != nil:
+					check("runtime", err.Error())
+				case drv == "docker" && gatewayInDockerGroup():
+					fmt.Fprintln(out, "warn  runtime: docker (rootful): the gateway's user can use the root daemon and is root on this host (ADR 0057); podman or rootless Docker is safer")
+				case drv == "docker":
+					fmt.Fprintln(out, "ok    runtime: docker-rootless")
+				default:
 					fmt.Fprintln(out, "ok    runtime: podman")
 				}
 			}

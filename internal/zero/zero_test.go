@@ -1309,7 +1309,7 @@ func TestCtxRemoveMissingFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c, _ := loadConfig(); !slices.Equal(c.Workspaces["w"].Folders, []string{a}) {
-		t.Errorf("after removing the linked folder: %v", c.Workspaces["w"].Folders)
+		t.Errorf("after removing the linked directory: %v", c.Workspaces["w"].Folders)
 	}
 }
 
@@ -2047,8 +2047,9 @@ func TestParseComputeDriver(t *testing.T) {
 	for in, want := range map[string]string{
 		"Gateway Info\n  Compute drivers:\n    docker\n      Driver version: 0.1.8\n": "docker",
 		"Gateway Info\n  Compute drivers:\n    podman\n":                              "podman",
-		"":                                "podman",
-		"  Extensions:\n    docker (x)\n": "podman",
+		"":                                "",
+		"  Extensions:\n    docker (x)\n": "",
+		"  Compute drivers:\n    vm\n":    "",
 	} {
 		if got := parseComputeDriver(in); got != want {
 			t.Errorf("parseComputeDriver(%q) = %q, want %q", in, got, want)

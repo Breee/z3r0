@@ -6,7 +6,15 @@
 set -eu
 LU="$1"; OU=openshell; VER=0.1.8
 RT="${3:-}"
-[ -n "$RT" ] || RT=$(cat /var/lib/zero/runtime 2>/dev/null || echo podman)
+PREV=$(cat /var/lib/zero/runtime 2>/dev/null || echo podman)
+case $PREV in podman|docker-rootless|docker) ;; *)
+  echo "zero install: /var/lib/zero/runtime holds '$PREV', not a runtime; name one: sudo zero install --podman | --docker-rootless | --docker" >&2
+  [ -n "$RT" ] || exit 1; PREV=podman;;
+esac
+[ -n "$RT" ] || RT=$PREV
+# the runtime is recorded only once its gateway answers; until then a plain
+# 'sudo zero install' goes back to the previous one.
+trap '[ $? -eq 0 ] || [ "$RT" = "$PREV" ] || echo "zero install: failed while changing the runtime to $RT; the gateway may be down. Go back with: sudo zero install --$PREV" >&2' EXIT
 BASE="https://github.com/NVIDIA/OpenShell/releases/download/v$VER"
 LIB="/usr/local/lib/zero/openshell-$VER"
 cd /
@@ -155,7 +163,6 @@ enabled = false
 TOML
 # staging for input directories: written by the login user, read by the gateway user
 install -d -m 0755 /var/lib/zero
-echo "$RT" > /var/lib/zero/runtime
 install -d -o "$LU" -g "$(id -gn "$OU")" -m 0750 /var/lib/zero/input
 as tee "$OH/.config/systemd/user/openshell-gateway.service" >/dev/null <<UNIT
 [Unit]
@@ -197,6 +204,7 @@ install -o "$LU" -g "$LU" -m 600 "$S/client/tls.key" "$M/tls.key"
 i=0; until sudo -u "$LU" openshell gateway info >/dev/null 2>&1; do
   i=$((i+1)); [ $i -lt 30 ] || { echo "zero install: gateway not reachable" >&2; exit 1; }; sleep 1
 done
+echo "$RT" > /var/lib/zero/runtime
 
 # 6. zero-cp, the zero service (push gate, token upkeep), as a user unit of the login user
 if [ -n "${2:-}" ] && [ "$2" != /usr/local/bin/zero ]; then
