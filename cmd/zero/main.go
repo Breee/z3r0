@@ -17,6 +17,7 @@ import (
 const usageText = `zero: a coding agent in a sandbox per workspace; it pushes only to its own branch.
 
 Usage: zero [-c WORKSPACE] COMMAND [OPTIONS]
+       zero                                  the workspaces, to pick from
 
 Work in the workspace
   up          create or continue the sandbox (--approve, --vm, --max-input MiB)
@@ -70,6 +71,21 @@ complete -F _zero zero
 `
 
 func main() {
+	if len(os.Args) < 2 && zero.Interactive() {
+		exe, err := os.Executable()
+		if err == nil {
+			var args []string
+			args, err = zero.Home(exe)
+			if err == nil && args == nil {
+				return
+			}
+			os.Args = append(os.Args[:1], args...)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "zero:", err)
+			os.Exit(1)
+		}
+	}
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usageText)
 		os.Exit(2)

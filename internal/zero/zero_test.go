@@ -3,6 +3,7 @@ package zero
 import (
 	"bufio"
 	"bytes"
+	tea "charm.land/bubbletea/v2"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -2099,5 +2100,69 @@ func TestTook(t *testing.T) {
 		if got := took(time.Now().Add(-d)); got != want {
 			t.Errorf("%v: got %s, want %s", d, got, want)
 		}
+	}
+}
+
+func TestFirstRunPolicy(t *testing.T) {
+	d := t.TempDir()
+	for _, f := range []string{"go.mod", "package.json"} {
+		if err := os.WriteFile(filepath.Join(d, f), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	found := detectPresets(d)
+	if len(found) != 2 || found[0].Name != "Go modules" || found[1].Name != "npm" {
+		t.Fatalf("detectPresets = %v", found)
+	}
+	if got := detectPresets(t.TempDir()); len(got) != 0 {
+		t.Fatalf("empty directory: %v", got)
+	}
+	p := firstRunPolicy(found, []string{"Go modules"}, defaultCaps)
+	if !slices.Equal(p.Network.Allow, []string{"proxy.golang.org", "sum.golang.org"}) {
+		t.Fatalf("hosts = %v", p.Network.Allow)
+	}
+	back, err := parsePolicy(renderPolicy(p))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(back.Network.Allow, p.Network.Allow) || !slices.Equal(back.Capabilities, p.Capabilities) {
+		t.Fatalf("round trip: %+v != %+v", back, p)
+	}
+	if strings.Contains(string(renderPolicy(firstRunPolicy(nil, nil, defaultCaps))), "network") {
+		t.Fatal("network block without hosts")
+	}
+	if checkChosenCaps(nil) == nil || checkChosenCaps([]string{capMRCreate}) == nil {
+		t.Fatal("empty set or mr.create without ci.run accepted")
+	}
+	if err := checkChosenCaps([]string{"git.read", capMRCreate, capCIRun}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHomeKeys(t *testing.T) {
+	press := func(m tea.Model, k rune) (home, bool) {
+		n, cmd := m.Update(tea.KeyPressMsg{Code: k, Text: string(k)})
+		return n.(home), cmd != nil
+	}
+	m := home{rows: []wsRow{{Name: "a"}, {Name: "b"}}}
+	m, _ = press(m, 'j')
+	m, _ = press(m, 'j')
+	if m.sel != 1 {
+		t.Fatalf("sel = %d", m.sel)
+	}
+	if !strings.Contains(m.View().Content, "> ") {
+		t.Fatal("no selection mark")
+	}
+	if m, quit := press(m, 'v'); m.cmd != "vscode" || !quit {
+		t.Fatalf("v: %q %v", m.cmd, quit)
+	}
+	if m, quit := press(m, 'q'); m.cmd != "" || !quit {
+		t.Fatalf("q: %q %v", m.cmd, quit)
+	}
+	if m, quit := press(home{}, 's'); m.cmd != "" || quit {
+		t.Fatal("stop with no workspace")
+	}
+	if m, _ := press(home{}, 'n'); m.cmd != "new" {
+		t.Fatal("new with no workspace")
 	}
 }

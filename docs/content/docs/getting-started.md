@@ -89,7 +89,11 @@ cd ~/src/api
 zero up
 ```
 
-zero creates a workspace named after the directory, a sandbox `zero-api`, clones the repository into it and creates the token. Then open the agent:
+zero creates a workspace named after the directory, a sandbox `zero-api`, clones the repository into it and creates the token.
+
+The first time, when the repository has no `.zero/policy.yaml`, zero asks two things and offers defaults: which package hosts the sandbox may reach (found from files like `go.mod` or `package.json`) and what the agent may do (read, commit and push are on; `ci.run` and `gitlab.mr.create` are off). It shows the file, writes it when you say yes and starts. Enter three times keeps the defaults. Without a terminal, or with `--approve`, it asks nothing and uses the default [policy](../policy).
+
+Then open the agent:
 
 ```sh
 zero opencode   # opencode in this terminal (runs inside the sandbox)
@@ -98,6 +102,8 @@ zero vscode     # VS Code on the sandbox
 ```
 
 The agent commits in the sandbox and pushes to the branch `zero/api`. Fetch that branch on the host, review it and open the merge request yourself.
+
+`zero` without a command shows your workspaces in the terminal: enter opens opencode, `v` VS Code, `s` stops, `r` removes, `n` makes a new workspace, `q` leaves.
 
 ## More than one directory
 

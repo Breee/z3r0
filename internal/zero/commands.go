@@ -239,6 +239,9 @@ func (s *Sandbox) create() error {
 	if err := os.WriteFile(policy, base, 0o600); err != nil {
 		return fmt.Errorf("write policy: %w", err)
 	}
+	if err := s.firstRun(); err != nil {
+		return err
+	}
 	pol, err := s.loadPolicy()
 	if err != nil {
 		return err

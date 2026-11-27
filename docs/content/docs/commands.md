@@ -25,6 +25,8 @@ workspace: developer (cwd)
 
 `zero up`, `opencode`, `vscode`, `run` and `web` in a git repository that belongs to no workspace create a new workspace for it.
 
+`zero` alone, on a terminal, shows the workspaces to pick from (enter opencode, `v` VS Code, `s` stop, `r` remove, `n` new, `q` quit). Piped, it prints the help and exits with 2.
+
 ## Sandbox
 
 | Command | What it does |
