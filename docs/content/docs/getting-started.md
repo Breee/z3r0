@@ -59,7 +59,7 @@ ok    guardrails corewire/technology-and-research/developer
 
 The first line is the version of the build. The `guardrails` line appears inside a repository only: there `zero doctor` also checks the GitLab project. It reports a default branch that allows direct or force push, merging without a green pipeline and CI variables that are not protected. These settings are what keeps a pushed branch from doing damage, so fix them before the agent works on the project.
 
-`model login` fails when the host's opencode has no GitHub Copilot login; the line names the command (`opencode auth login`). In a repository that is not on GitLab the last line is `na    forge: ...` instead: the setup is fine, a sandbox for that repository cannot push. `zero doctor` ends with exit code 1 when a line says `FAIL`.
+`model login` fails when the host's opencode has no GitHub Copilot login; the line names the command (`opencode auth login`). When every workspace uses the [model proxy](../providers/), the line is `na` instead. In a repository that is not on GitLab the last line is `na    forge: ...` instead: the setup is fine, a sandbox for that repository cannot push. `zero doctor` ends with exit code 1 when a line says `FAIL`.
 
 ## The first workspace
 

@@ -213,11 +213,11 @@ func clientKey() string {
 // hostLoginNeeded reports whether a workspace takes its model login from the
 // host's opencode: not when every workspace goes through the model proxy.
 func hostLoginNeeded(c *Config) bool {
-	if c == nil || c.Parts.Models == "" || len(c.Workspaces) == 0 {
+	if c == nil || c.Parts.Models != partLiteLLM || len(c.Workspaces) == 0 {
 		return true
 	}
 	for _, w := range c.Workspaces {
-		if len(w.Models) == 0 {
+		if w == nil || len(w.Models) == 0 {
 			return true
 		}
 	}
