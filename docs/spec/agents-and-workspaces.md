@@ -1,6 +1,6 @@
 # Spec: agents and workspaces in one config file
 
-Status: design (#157, ADR 0049). Built: `folders`, `tools` (#132), `instructions`, `skills` (#161), `parts.models`, `providers`, `models` per workspace (#162). Everything else on this page is not built.
+Status: design (#157, ADR 0049). Built: `folders`, `tools` (#132), `instructions`, `skills` (#161), `parts.models`, `providers`, `models` per workspace (#162), `model` (#176), tools through the model proxy (#164, ADR 0055). Everything else on this page is not built.
 
 ## 1. The file
 

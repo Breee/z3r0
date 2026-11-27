@@ -59,7 +59,7 @@ func composeProblem() string {
 }
 
 // modelConfig is the proxy's config file for the given providers.
-func modelConfig(providers []string) string {
+func modelConfig(providers []string, entries []mcpEntry) string {
 	var b strings.Builder
 	b.WriteString("# Written by zero; change providers in zero's config.\nmodel_list:\n")
 	creds := ""
@@ -73,6 +73,7 @@ func modelConfig(providers []string) string {
 		b.WriteString("credential_list:\n" + creds)
 	}
 	b.WriteString("general_settings:\n  master_key: os.environ/LITELLM_MASTER_KEY\n  require_key_mcp_access_defined: true\nlitellm_settings:\n  telemetry: false\n  check_provider_endpoint: true\n")
+	b.WriteString(mcpConfig(entries))
 	return b.String()
 }
 
@@ -124,10 +125,12 @@ func startModelProxy(out io.Writer, providers []string) error {
 	if err != nil {
 		return err
 	}
-	cfg := modelConfig(providers)
+	entries := mcpEntries()
+	cfg, env := modelConfig(providers, entries), mcpEnv(entries)
 	old, _ := os.ReadFile(filepath.Join(dir, "litellm.yaml"))
 	oldCompose, _ := os.ReadFile(filepath.Join(dir, "compose.yaml"))
-	same := string(old) == cfg && bytes.Equal(oldCompose, partsCompose)
+	oldEnv, _ := os.ReadFile(filepath.Join(dir, "mcp.env"))
+	same := string(old) == cfg && bytes.Equal(oldCompose, partsCompose) && string(oldEnv) == env
 	if same && modelHealthy() {
 		return nil
 	}
@@ -135,6 +138,11 @@ func startModelProxy(out io.Writer, providers []string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "litellm.yaml"), []byte(cfg), 0o644); err != nil {
+		return err
+	}
+	// The tool tokens of the MCP entries; only this file holds them.
+	os.Remove(filepath.Join(dir, "mcp.env"))
+	if err := os.WriteFile(filepath.Join(dir, "mcp.env"), []byte(env), 0o600); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "model proxy: starting (LiteLLM on 127.0.0.1:%d)\n", modelPort)
@@ -197,15 +205,17 @@ func (s *Sandbox) modelKeyAlias() string { return tokenLabel(s.Name) }
 
 // keyRequest is the body that mints a sandbox's key: its models only, no
 // MCP server, owned by the proxy's admin (who connected the providers).
-func keyRequest(alias string, models []string) map[string]any {
+func keyRequest(alias string, models []string, entry string, tools []string) map[string]any {
+	perm := map[string]any{"mcp_servers": []string{"no-mcp-servers"}}
+	if entry != "" && len(tools) > 0 {
+		perm = map[string]any{"mcp_servers": []string{entry}, "mcp_tool_permissions": map[string]any{entry: tools}}
+	}
 	return map[string]any{
-		"key_alias": alias,
-		"user_id":   modelUser,
-		"models":    models,
-		"duration":  "7d",
-		"object_permission": map[string]any{
-			"mcp_servers": []string{"no-mcp-servers"},
-		},
+		"key_alias":         alias,
+		"user_id":           modelUser,
+		"models":            models,
+		"duration":          "7d",
+		"object_permission": perm,
 	}
 }
 
@@ -314,6 +324,7 @@ var modelRoutes = []EgressRule{
 	{Method: "POST", Path: "/v1/messages"},
 	{Method: "POST", Path: "/v1/messages/count_tokens"},
 	{Method: "POST", Path: "/v1/embeddings"},
+	{Method: "POST", Path: "/mcp"},
 }
 
 // syncModels sets up the model path of a running sandbox: proxy up, a fresh
@@ -321,6 +332,9 @@ var modelRoutes = []EgressRule{
 // for the opencode config. Without models it takes the path away.
 func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, error) {
 	if len(s.Models) == 0 {
+		if err := s.revokeMCP(); err != nil {
+			return nil, err
+		}
 		if s.read("models.key") == "" && s.read("models.provider") == "" {
 			return nil, nil
 		}
@@ -336,14 +350,20 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 		_, err := s.ssh("opencode service unset env " + modelKeyEnv + " && opencode service restart")
 		return nil, err
 	}
+	if err := s.syncMCP(); err != nil {
+		return nil, err
+	}
 	if err := startModelProxy(out, providers); err != nil {
 		return nil, err
 	}
-	alias := s.modelKeyAlias()
+	alias, entry := s.modelKeyAlias(), ""
+	if s.read("mcp.id") != "" {
+		entry = mcpName(s.Name)
+	}
 	if _, err := modelAPI("", "POST", "/key/delete", map[string]any{"key_aliases": []string{alias}}); err != nil && s.read("models.key") != "" {
 		return nil, err
 	}
-	b, err := modelAPI("", "POST", "/key/generate", keyRequest(alias, s.Models))
+	b, err := modelAPI("", "POST", "/key/generate", keyRequest(alias, s.Models, entry, s.Tools))
 	if err != nil {
 		return nil, err
 	}

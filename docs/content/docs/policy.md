@@ -93,8 +93,20 @@ workspaces:
 `default` stands for 15 read tools (projects, files, branches, tags, commits, merge requests, pipelines, jobs, work items, labels). The token gets the permissions these tools need on top of the capabilities. A changed list takes effect at the next `zero up`. An unknown tool name stops every zero command until it is corrected.
 
 {{< callout type="warning" >}}
-In this version the list decides the token's permissions only. The sandbox cannot reach GitLab's MCP endpoint, so the agent has no GitLab MCP tools until the MCP gateway is built in.
-{{< /callout >}}
+With the [model proxy](#models-through-the-model-proxy) on, the agent reaches these tools through the proxy:
+
+- zero makes a second GitLab token for the workspace's projects that can do only what the listed tools need. It stays on the host; the sandbox never holds it.
+- The sandbox's own token gets no tool permissions.
+- opencode in the sandbox sees one MCP server, `gitlab`, with the listed tools and no other. Their names start with `gitlab_<workspace>-`.
+- `zero status` shows the list. `zero pause` and `zero rm` revoke the token.
+
+Limits:
+
+- A new or changed list restarts the model proxy at `zero up`; every sandbox that uses it waits about 20 seconds.
+- The tool token lasts two days and is renewed at `zero up` only.
+- No record per tool call. Only opencode is told about the server.
+
+Without the model proxy the list decides the token's permissions only. The sandbox cannot reach GitLab's MCP endpoint, so the agent has no GitLab MCP tools.
 
 ## Instructions and skills
 

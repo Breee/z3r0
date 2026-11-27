@@ -1464,16 +1464,16 @@ func TestGuidance(t *testing.T) {
 		}
 	}
 
-	if got := guidanceConfig(nil, nil, nil, ""); got != "" {
+	if got := guidanceConfig(nil, nil, nil, "", false); got != "" {
 		t.Errorf("no guidance: config %q", got)
 	}
-	got := guidanceConfig(instr, skills, nil, "")
+	got := guidanceConfig(instr, skills, nil, "", false)
 	for _, want := range []string{`"/tmp/zero-input/.zero/instructions/review.md"`, `"/tmp/zero-input/.zero/skills"`, `"$schema"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("config lacks %s:\n%s", want, got)
 		}
 	}
-	if strings.Contains(guidanceConfig(instr, nil, nil, ""), "skills") {
+	if strings.Contains(guidanceConfig(instr, nil, nil, "", false), "skills") {
 		t.Error("config names skills without a skill")
 	}
 
@@ -1599,7 +1599,7 @@ func TestCheckModels(t *testing.T) {
 }
 
 func TestModelProxyParts(t *testing.T) {
-	cfg := modelConfig([]string{"github_copilot"})
+	cfg := modelConfig([]string{"github_copilot"}, nil)
 	for _, want := range []string{`model_name: "github_copilot/*"`, "per_user_oauth", "credential_name: github-copilot", "require_key_mcp_access_defined: true", "master_key: os.environ/LITELLM_MASTER_KEY"} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("config lacks %q", want)
@@ -1615,7 +1615,7 @@ func TestModelProxyParts(t *testing.T) {
 	if !strings.Contains(string(partsCompose), `"127.0.0.1:18096:4000"`) || strings.Count(string(partsCompose), "@sha256:") != 2 {
 		t.Error("compose: loopback port and two images by digest wanted")
 	}
-	req := keyRequest("zero-a@h", []string{"github_copilot/*"})
+	req := keyRequest("zero-a@h", []string{"github_copilot/*"}, "", nil)
 	b, _ := json.Marshal(req)
 	for _, want := range []string{`"no-mcp-servers"`, `"user_id":"default_user_id"`, `"models":["github_copilot/*"]`, `"key_alias":"zero-a@h"`} {
 		if !strings.Contains(string(b), want) {
@@ -1629,7 +1629,7 @@ func TestModelProxyParts(t *testing.T) {
 	if _, err := proxyModels([]byte("nope")); err == nil {
 		t.Error("unreadable list accepted")
 	}
-	got := guidanceConfig(nil, nil, ids, "")
+	got := guidanceConfig(nil, nil, ids, "", false)
 	if strings.Contains(got, `"context": 1000`) || strings.Contains(got, "emb") || strings.Contains(got, "img") {
 		t.Errorf("opencode config has a half limit or a model that cannot chat: %s", got)
 	}
@@ -1851,10 +1851,10 @@ func TestDefaultModel(t *testing.T) {
 		t.Error("default model without models accepted")
 	}
 	ms := []proxyModel{{ID: "github_copilot/a"}}
-	if got := guidanceConfig(nil, nil, ms, "github_copilot/a"); !strings.Contains(got, `"model": "litellm/github_copilot/a"`) {
+	if got := guidanceConfig(nil, nil, ms, "github_copilot/a", false); !strings.Contains(got, `"model": "litellm/github_copilot/a"`) {
 		t.Errorf("default model not written:\n%s", got)
 	}
-	if got := guidanceConfig(nil, nil, ms, ""); strings.Contains(got, `"model":`) {
+	if got := guidanceConfig(nil, nil, ms, "", false); strings.Contains(got, `"model":`) {
 		t.Errorf("model written without a default:\n%s", got)
 	}
 	s := &Sandbox{Model: "github_copilot/a"}
@@ -1866,5 +1866,93 @@ func TestDefaultModel(t *testing.T) {
 	}
 	if got := (&Sandbox{}).withModel([]string{"-p"}); len(got) != 1 {
 		t.Errorf("withModel without default = %q", got)
+	}
+}
+
+func TestMCPProxy(t *testing.T) {
+	if got := mcpName("zero-a-b"); got != "gitlab_a_b" {
+		t.Errorf("mcpName = %q", got)
+	}
+	if got := mcpEnvName("zero-a-b"); got != "ZERO_MCP_A_B" {
+		t.Errorf("mcpEnvName = %q", got)
+	}
+	e := []mcpEntry{{Name: "gitlab_a", Host: "gitlab.example", Env: "ZERO_MCP_A", Token: "SECRETTOKEN"}}
+	c := mcpConfig(e)
+	for _, want := range []string{"mcp_servers:", "gitlab_a:", `url: "https://gitlab.example/api/v4/mcp"`, "auth_value: os.environ/ZERO_MCP_A"} {
+		if !strings.Contains(c, want) {
+			t.Errorf("mcpConfig lacks %q:\n%s", want, c)
+		}
+	}
+	if strings.Contains(c, "SECRETTOKEN") {
+		t.Error("token in the proxy config")
+	}
+	if mcpConfig(nil) != "" {
+		t.Error("mcpConfig without entries is not empty")
+	}
+	if got := mcpEnv(e); got != "ZERO_MCP_A=SECRETTOKEN\n" {
+		t.Errorf("mcpEnv = %q", got)
+	}
+	if !strings.Contains(modelConfig([]string{"github_copilot"}, e), "mcp_servers:") {
+		t.Error("modelConfig lacks the servers")
+	}
+	if strings.Contains(modelConfig([]string{"github_copilot"}, nil), "mcp_servers:") {
+		t.Error("modelConfig names servers without entries")
+	}
+
+	with := fmt.Sprint(keyRequest("k", []string{"m"}, "gitlab_a", []string{"get_project"})["object_permission"])
+	if !strings.Contains(with, "gitlab_a") || !strings.Contains(with, "get_project") || strings.Contains(with, "no-mcp-servers") {
+		t.Errorf("key with tools: %s", with)
+	}
+	for _, none := range []string{
+		fmt.Sprint(keyRequest("k", []string{"m"}, "", nil)["object_permission"]),
+		fmt.Sprint(keyRequest("k", []string{"m"}, "gitlab_a", nil)["object_permission"]),
+		fmt.Sprint(keyRequest("k", []string{"m"}, "", []string{"get_project"})["object_permission"]),
+	} {
+		if !strings.Contains(none, "no-mcp-servers") {
+			t.Errorf("key without tools: %s", none)
+		}
+	}
+
+	ms := []proxyModel{{ID: "github_copilot/a"}}
+	g := guidanceConfig(nil, nil, ms, "", true)
+	for _, want := range []string{`"mcp"`, `"gitlab"`, "/mcp", "Bearer {env:LITELLM_API_KEY}"} {
+		if !strings.Contains(g, want) {
+			t.Errorf("opencode config lacks %q:\n%s", want, g)
+		}
+	}
+	if strings.Contains(guidanceConfig(nil, nil, ms, "", false), `"mcp"`) {
+		t.Error("opencode config names the server without tools")
+	}
+
+	route := false
+	for _, r := range modelRoutes {
+		route = route || r.Method == "POST" && r.Path == "/mcp"
+	}
+	if !route {
+		t.Error("no POST /mcp in the model routes")
+	}
+
+	s := &Sandbox{Name: "zero-a", State: t.TempDir()}
+	s.write("tools", "get_project list_commits", 0o600)
+	if got := s.tokenTools(); len(got) != 2 {
+		t.Errorf("tokenTools without the proxy = %v", got)
+	}
+	s.Models, s.Tools = []string{"github_copilot/*"}, []string{"get_project"}
+	if got := s.tokenTools(); got != nil {
+		t.Errorf("tokenTools with the proxy = %v", got)
+	}
+	if !s.proxyTools() {
+		t.Error("proxyTools false with models and tools")
+	}
+
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	d := filepath.Join(stateRoot(), "zero-b")
+	os.MkdirAll(d, 0o700)
+	os.WriteFile(filepath.Join(d, "mcp.token"), []byte("T"), 0o600)
+	os.WriteFile(filepath.Join(d, "forge.host"), []byte("gitlab.example"), 0o600)
+	os.MkdirAll(filepath.Join(stateRoot(), "zero-c"), 0o700)
+	got := mcpEntries()
+	if len(got) != 1 || got[0].Name != "gitlab_b" || got[0].Env != "ZERO_MCP_B" || got[0].Token != "T" || got[0].Host != "gitlab.example" {
+		t.Errorf("mcpEntries = %+v", got)
 	}
 }

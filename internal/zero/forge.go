@@ -246,7 +246,7 @@ func (s *Sandbox) setupForge(caps []string) (string, error) {
 	if err := revokeOrphans(f); err != nil {
 		return "", err
 	}
-	perms, err := f.Permissions(caps, strings.Fields(s.read("tools")))
+	perms, err := f.Permissions(caps, s.tokenTools())
 	if err != nil {
 		return "", err
 	}
@@ -363,7 +363,7 @@ func (s *Sandbox) revokeUnrecorded(f Forge) error {
 	}
 	id := s.read("forge.id")
 	for _, t := range toks {
-		if t.Name == tokenLabel(s.Name) && t.ID != id {
+		if t.Name == tokenLabel(s.Name) && t.ID != id && t.ID != s.read("mcp.id") {
 			if err := f.Revoke(t.ID); err != nil {
 				return fmt.Errorf("revoke %s token %s: %w", f.Name(), t.ID, err)
 			}
@@ -398,7 +398,7 @@ func (s *Sandbox) resumeForge(caps []string) error {
 	if f == nil || s.read("forge.id") != "" {
 		return nil
 	}
-	perms, err := f.Permissions(caps, strings.Fields(s.read("tools")))
+	perms, err := f.Permissions(caps, s.tokenTools())
 	if err != nil {
 		return err
 	}
@@ -430,7 +430,7 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 			return nil
 		}
 	}
-	perms, err := f.Permissions(caps, strings.Fields(s.read("tools")))
+	perms, err := f.Permissions(caps, s.tokenTools())
 	if err != nil {
 		return err
 	}
@@ -497,7 +497,7 @@ func revokeOrphans(f Forge) error {
 			live := false
 			withGateway(readState(dir, "gateway"), func() {
 				// An unreachable gateway says nothing about the sandbox: keep the token.
-				live = readState(dir, "forge.id") == t.ID && (rt.Exists(name) || !rt.Reachable())
+				live = (readState(dir, "forge.id") == t.ID || readState(dir, "mcp.id") == t.ID) && (rt.Exists(name) || !rt.Reachable())
 			})
 			l.release()
 			if live {
@@ -536,4 +536,14 @@ func (s *Sandbox) configureRemote(top, path string) error {
 		return fmt.Errorf("configure %s remote: %w", f.Name(), err)
 	}
 	return nil
+}
+
+// tokenTools are the tools whose permissions the sandbox's own token
+// carries: none when the tools go through the model proxy, which holds a
+// token of its own for them (ADR 0055).
+func (s *Sandbox) tokenTools() []string {
+	if len(s.Models) > 0 {
+		return nil
+	}
+	return strings.Fields(s.read("tools"))
 }

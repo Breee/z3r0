@@ -733,7 +733,11 @@ func (s *Sandbox) Status(out io.Writer) error {
 	if f := s.forge(); f != nil && s.read("forge.id") != "" {
 		fmt.Fprintf(out, "%s token: %s; capabilities: %s\n", f.Name(), strings.Join(s.forgePaths(), ", "), strings.Join(strings.Fields(s.read("caps")), ", "))
 		if t := strings.Fields(s.read("tools")); len(t) > 0 {
-			fmt.Fprintf(out, "%s tools: %s\n", f.Name(), strings.Join(t, ", "))
+			via := ""
+			if s.read("mcp.id") != "" {
+				via = " through the model proxy (" + mcpName(s.Name) + ", its own token)"
+			}
+			fmt.Fprintf(out, "%s tools: %s%s\n", f.Name(), strings.Join(t, ", "), via)
 		}
 	} else if f != nil {
 		fmt.Fprintf(out, "%s token: none; zero up makes a new one\n", f.Name())
@@ -814,6 +818,9 @@ func (s *Sandbox) Pause(out io.Writer) error {
 			return fmt.Errorf("stop sandbox: %w", err)
 		}
 	}
+	if err := s.revokeMCP(); err != nil {
+		return err
+	}
 	if err := s.pauseForge(); err != nil {
 		return err
 	}
@@ -843,6 +850,9 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 		if err := rt.Delete(s.Name); err != nil {
 			return fmt.Errorf("delete sandbox (state kept for retry): %w", err)
 		}
+	}
+	if err := s.revokeMCP(); err != nil {
+		return fmt.Errorf("%w (state kept for retry)", err)
 	}
 	if err := s.revokeForge(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)

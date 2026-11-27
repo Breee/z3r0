@@ -116,6 +116,15 @@ if [ "$(sbx 'test -n "$LITELLM_API_KEY" && echo yes' | tail -n 1)" = yes ]; then
 	for h in api.githubcopilot.com api.anthropic.com opencode.ai; do
 		want "model host $h not reachable" "$(sbx "curl -s -o /dev/null -m 10 -w %{http_code} https://$h/" | tail -n 1)" 000
 	done
+	# Tools through the proxy (workspace with tools): only the listed ones, GitLab's endpoint not directly.
+	MCP='curl -s -m 20 -H "Authorization: Bearer $LITELLM_API_KEY" -H "content-type: application/json" -H "accept: application/json, text/event-stream" http://host.openshell.internal:18096/mcp -d'
+	T=$(sbx "$MCP '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}'" | sed -n 's/^data: //p' | jq -r '.result.tools[0].name // empty')
+	if [ -n "$T" ]; then
+		X="${T%%-*}-save_note"
+		R=$(sbx "$MCP '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"$X\",\"arguments\":{}}}'")
+		case $R in *"not allowed"*) echo "PASS tool outside the list refused ($X)";; *) echo "FAIL tool outside the list not refused ($X)"; FAILS=$((FAILS+1));; esac
+	fi
+	want "GitLab MCP endpoint not reachable directly" "$(sbx 'curl -s -o /dev/null -m 10 -w %{http_code} -X POST https://gitlab.com/api/v4/mcp' | tail -n 1)" 403
 fi
 # zero-cp's read-only API and UI (own port, in no sandbox rule).
 want "zero UI not reachable"        "$(sbx 'curl -s -o /dev/null -m 10 -w %{http_code} http://host.openshell.internal:18097/ui/' | tail -n 1)" 000
