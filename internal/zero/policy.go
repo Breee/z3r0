@@ -44,24 +44,16 @@ var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9
 // Several directories give the union: the token has one permission set for all
 // projects. Any error refuses; there is no fallback to something broader.
 func (s *Sandbox) loadPolicy() (*Policy, error) {
-	u := &Policy{}
+	var ps []*Policy
 	// Input directories are no policy source (spec §6).
 	for _, top := range s.repos() {
 		p, err := loadFolderPolicy(top)
 		if err != nil {
 			return nil, err
 		}
-		for _, h := range p.Network.Allow {
-			if !slices.Contains(u.Network.Allow, h) {
-				u.Network.Allow = append(u.Network.Allow, h)
-			}
-		}
-		for _, c := range p.Capabilities {
-			if !slices.Contains(u.Capabilities, c) {
-				u.Capabilities = append(u.Capabilities, c)
-			}
-		}
+		ps = append(ps, p)
 	}
+	u := unionPolicy(ps...)
 	if slices.Contains(u.Capabilities, capMRCreate) && !slices.Contains(u.Capabilities, capCIRun) {
 		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline; add %s or take %s out", capMRCreate, capCIRun, capCIRun, capMRCreate)
 	}
@@ -73,6 +65,24 @@ func (s *Sandbox) loadPolicy() (*Policy, error) {
 		}
 	}
 	return u, nil
+}
+
+// unionPolicy: every host and every capability of ps, each once, in order.
+func unionPolicy(ps ...*Policy) *Policy {
+	u := &Policy{}
+	for _, p := range ps {
+		for _, h := range p.Network.Allow {
+			if !slices.Contains(u.Network.Allow, h) {
+				u.Network.Allow = append(u.Network.Allow, h)
+			}
+		}
+		for _, c := range p.Capabilities {
+			if !slices.Contains(u.Capabilities, c) {
+				u.Capabilities = append(u.Capabilities, c)
+			}
+		}
+	}
+	return u
 }
 
 // checkForgeHost refuses a network.allow entry for the forge host: it would
@@ -208,6 +218,7 @@ func widened(old, p *Policy) []string {
 // approvePolicy compares p with the policy last approved for this sandbox
 // (state policy.approved; none yet = the default). A wider policy needs a yes
 // from the human at the terminal, or --approve. Narrowing needs nothing.
+// The yes at the first run covers what was shown there and nothing beyond.
 func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 	old := &Policy{Capabilities: defaultCaps}
 	if b, err := os.ReadFile(s.path("policy.approved")); err == nil {
@@ -222,7 +233,8 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 			fmt.Fprintln(os.Stderr, "  + "+l)
 		}
 	}
-	if len(w) > 0 && !s.Approve {
+	seen := s.shown != nil && len(widened(s.shown, p)) == 0
+	if len(w) > 0 && !s.Approve && !seen {
 		if !isTerminal(os.Stdin) {
 			return policyChange{}, errors.New("policy widening not approved: no terminal to ask at; to accept the lines above: zero up --approve")
 		}

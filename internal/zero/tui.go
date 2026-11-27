@@ -129,7 +129,7 @@ func Home(exe string) ([]string, error) {
 		c := exec.Command(exe, args...)
 		c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 		if err := c.Run(); err != nil {
-			fmt.Fprint(os.Stderr, "enter to go on ")
+			fmt.Fprintf(os.Stderr, "zero %s: %v\nenter to go on ", strings.Join(args, " "), err)
 			fmt.Scanln()
 		}
 	}
@@ -146,8 +146,13 @@ func newWorkspaceArgs() ([]string, error) {
 			}
 			return nil
 		}),
-		huh.NewInput().Title("Directory").Value(&dir),
-	)).Run()
+		huh.NewInput().Title("Directory").Value(&dir).Validate(func(v string) error {
+			if st, err := os.Stat(v); err != nil || !st.IsDir() {
+				return fmt.Errorf("not a directory")
+			}
+			return nil
+		}),
+	)).WithOutput(os.Stderr).Run()
 	if err == huh.ErrUserAborted {
 		return nil, nil
 	}

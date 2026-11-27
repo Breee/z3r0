@@ -86,7 +86,7 @@ func renderPolicy(p *Policy) []byte {
 
 // firstRun guides a new workspace whose directories have no policy file:
 // hosts, permissions, then the file. It asks only at a terminal; the answer
-// yes approves the written policy for this run (ADR 0058).
+// yes approves the workspace policy shown, and nothing beyond it (ADR 0058).
 func (s *Sandbox) firstRun() error {
 	if s.Approve || !isTerminal(os.Stdin) || !isTerminal(os.Stderr) {
 		return nil
@@ -139,29 +139,55 @@ func (s *Sandbox) firstRun() error {
 		return firstRunEnd(err)
 	}
 	files := map[string][]byte{}
-	for _, top := range dirs {
+	var all []*Policy
+	for _, top := range s.repos() {
+		if !slices.Contains(dirs, top) {
+			p, err := loadFolderPolicy(top)
+			if err != nil {
+				return err
+			}
+			all = append(all, p)
+			continue
+		}
 		files[top] = renderPolicy(firstRunPolicy(found[top], chosen, caps))
+		p, err := parsePolicy(files[top])
+		if err != nil {
+			return fmt.Errorf("first run: policy for %s: %w", top, err)
+		}
+		all = append(all, p)
 		fmt.Fprintf(os.Stderr, "\n%s:\n%s", filepath.Join(top, ".zero", "policy.yaml"), files[top])
+	}
+	shown := unionPolicy(all...)
+	if len(all) > 1 {
+		fmt.Fprintf(os.Stderr, "\nthe workspace policy (every directory together):\n%s", renderPolicy(shown))
 	}
 	ok := true
 	if err := huh.NewForm(huh.NewGroup(huh.NewConfirm().
 		Title("Write and use this policy?").
-		Description("No: nothing is written, the default applies.").
+		Description("Enter: yes. No: nothing is written, the default applies.").
 		Value(&ok))).WithOutput(os.Stderr).Run(); err != nil {
 		return firstRunEnd(err)
 	}
 	if !ok {
 		return nil
 	}
+	var written []string
 	for _, top := range dirs {
-		if err := os.MkdirAll(filepath.Join(top, ".zero"), 0o755); err != nil {
-			return err
+		f := filepath.Join(top, ".zero", "policy.yaml")
+		err := os.MkdirAll(filepath.Dir(f), 0o755)
+		if err == nil {
+			err = os.WriteFile(f, files[top], 0o644)
 		}
-		if err := os.WriteFile(filepath.Join(top, ".zero", "policy.yaml"), files[top], 0o644); err != nil {
-			return err
+		if err != nil {
+			done := "nothing written"
+			if len(written) > 0 {
+				done = "already written: " + strings.Join(written, ", ")
+			}
+			return fmt.Errorf("first run: %w (%s); make the directory writable, or answer no, or use --approve for the default", err, done)
 		}
+		written = append(written, f)
 	}
-	s.Approve = true
+	s.shown = shown
 	return nil
 }
 

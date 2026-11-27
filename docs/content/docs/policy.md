@@ -35,6 +35,8 @@ policy widens for zero-developer:
 approve? [y/N]
 ```
 
+At the first run of a new workspace zero shows the policy it is about to write; your yes there is the approval of what was shown, and anything beyond it still asks.
+
 `zero up --approve` prints the same lines and answers yes. Without a terminal and without `--approve`, `zero up` refuses. A policy that allows less is applied without a question. An unknown key or capability stops `zero up`; zero never falls back to a wider policy.
 
 A workspace with several repositories gets the union of their policies.

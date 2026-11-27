@@ -36,7 +36,7 @@ On a terminal (stdin and stderr), without `--approve`, zero asks once per worksp
 2. **Permissions.** The default set is selected: `git.read`, `git.commit`, `git.push`, `gitlab.issue.read`, `gitlab.mr.read`, `gitlab.pipeline.read`. Off and explained: `ci.run` (pipelines run for the agent's branch, ADR 0035), `gitlab.mr.create` (needs `ci.run`, ADR 0044).
 3. **Confirm.** zero shows the policy of the workspace as it will be and asks to write it.
 
-Yes: `.zero/policy.yaml` is written into each repo directory that had none, and this answer is the approval of that policy for this run. No, or Esc: nothing is written, the default policy applies, the sandbox starts.
+Yes: `.zero/policy.yaml` is written into each repo directory that had none, and this answer is the approval of the workspace policy that was shown (with several directories: all of them together), and of nothing beyond it. A directory whose own file allows more than what was shown still gets the `approve?` question. No: nothing is written, the default policy applies, the sandbox starts. Esc or Ctrl+C: nothing is written, the command stops.
 
 Enter on every question keeps the defaults.
 

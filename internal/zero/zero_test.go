@@ -2137,6 +2137,43 @@ func TestFirstRunPolicy(t *testing.T) {
 	if err := checkChosenCaps([]string{"git.read", capMRCreate, capCIRun}); err != nil {
 		t.Fatal(err)
 	}
+	for f, want := range map[string]string{"requirements.txt": "Python", "pyproject.toml": "Python", "Cargo.toml": "Rust"} {
+		d := t.TempDir()
+		if err := os.WriteFile(filepath.Join(d, f), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := detectPresets(d); len(got) != 1 || got[0].Name != want {
+			t.Errorf("%s: %v", f, got)
+		}
+	}
+	caps := append(slices.Clone(defaultCaps), capCIRun, capMRCreate)
+	if p := firstRunPolicy(nil, nil, caps); !slices.Equal(p.Capabilities, caps) {
+		t.Fatalf("caps = %v", p.Capabilities)
+	}
+	u := unionPolicy(&Policy{Capabilities: []string{"git.read"}}, p, p)
+	if !slices.Equal(u.Network.Allow, p.Network.Allow) || len(u.Capabilities) != len(defaultCaps) {
+		t.Fatalf("union = %+v", u)
+	}
+}
+
+// The yes at the first run covers the policy shown, not a wider one that a
+// directory of the workspace brings along unseen.
+func TestFirstRunApproval(t *testing.T) {
+	shown := &Policy{Capabilities: defaultCaps}
+	shown.Network.Allow = []string{"proxy.golang.org"}
+	s := &Sandbox{Name: "zero-t", State: t.TempDir(), shown: shown}
+	if _, err := s.approvePolicy(shown); err != nil {
+		t.Fatalf("the shown policy asked again: %v", err)
+	}
+	wider := &Policy{Capabilities: append(slices.Clone(defaultCaps), capCIRun)}
+	wider.Network.Allow = []string{"proxy.golang.org", "evil.example.com"}
+	if _, err := s.approvePolicy(wider); err == nil {
+		t.Fatal("a policy wider than the shown one passed without approval")
+	}
+	s.shown = nil
+	if _, err := s.approvePolicy(shown); err == nil {
+		t.Fatal("widening passed without first run or approval")
+	}
 }
 
 func TestHomeKeys(t *testing.T) {
@@ -2158,6 +2195,12 @@ func TestHomeKeys(t *testing.T) {
 	}
 	if m, quit := press(m, 'q'); m.cmd != "" || !quit {
 		t.Fatalf("q: %q %v", m.cmd, quit)
+	}
+	for k, want := range map[rune]string{tea.KeyEnter: "opencode", 'o': "opencode", tea.KeyEscape: ""} {
+		n, cmd := m.Update(tea.KeyPressMsg{Code: k})
+		if n.(home).cmd != want || cmd == nil {
+			t.Errorf("key %q: %q", k, n.(home).cmd)
+		}
 	}
 	if m, quit := press(home{}, 's'); m.cmd != "" || quit {
 		t.Fatal("stop with no workspace")

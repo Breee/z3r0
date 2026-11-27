@@ -48,6 +48,8 @@ type Sandbox struct {
 	gw           string // OpenShell gateway; empty = active gateway (podman, E1)
 
 	Approve bool
+	// shown is the workspace policy the human said yes to at the first run.
+	shown *Policy
 	// MaxInput is the size limit for input directories in bytes; 0 means the default.
 	MaxInput int64 // --approve: accept a wider policy without asking
 }
