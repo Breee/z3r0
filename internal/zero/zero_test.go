@@ -1523,6 +1523,20 @@ func TestCopilotScript(t *testing.T) {
 	}
 }
 
+func TestModelRoutes(t *testing.T) {
+	p := fmt.Sprint(modelPolicy("zero-a-models"))
+	for _, want := range []string{"path:/v1/models", "path:/v1/chat/completions", "path:/v1/messages", "path:/v1/responses"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("models rule lacks %s: %s", want, p)
+		}
+	}
+	for _, not := range []string{"access:", "/key/", "/user", "/credentials", "/v1/mcp", "**"} {
+		if strings.Contains(p, not) {
+			t.Errorf("models rule holds %q: %s", not, p)
+		}
+	}
+}
+
 func TestCopilotProxyScript(t *testing.T) {
 	got := copilotProxyScript("/tmp/zero/a", []string{"--model", "github_copilot/x", "-p", "it's"})
 	for _, w := range []string{

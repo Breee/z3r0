@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -104,6 +105,15 @@ func modelHealthy() bool {
 func startModelProxy(out io.Writer, providers []string) error {
 	dir := partsDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	// One zero at a time sets the parts up: two would write two master keys.
+	lf, err := os.OpenFile(filepath.Join(dir, "lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	defer lf.Close()
+	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
 		return err
 	}
 	key, err := modelMasterKey()
@@ -278,14 +288,32 @@ func modelProvider(ms []proxyModel) map[string]any {
 // sandbox's key to it: the sandbox holds a placeholder, the real key is put
 // in on the way to the proxy and nowhere else (PoC 20).
 func modelPolicy(provider string) map[string]any {
+	var rules []map[string]any
+	for _, r := range modelRoutes {
+		rules = append(rules, map[string]any{"allow": matcher(r)})
+	}
 	return map[string]any{
 		"name": modelRule,
 		"endpoints": []map[string]any{{
-			"host": gateHost, "port": modelPort, "protocol": "rest", "enforcement": "enforce", "access": "read-write",
+			"host": gateHost, "port": modelPort, "protocol": "rest", "enforcement": "enforce",
 			"credential_binding": map[string]any{"provider": provider},
+			"rules":              rules,
 		}},
 		"binaries": []map[string]any{{"path": opencodeBin}, {"path": copilotBin}, {"path": "/usr/bin/curl"}},
 	}
+}
+
+// modelRoutes is all of the proxy a sandbox may call: the model list and the
+// calls that ask a model. The key is one of the proxy's admin user, so every
+// other path (keys, users, credentials, MCP servers) is closed here, outside
+// the sandbox.
+var modelRoutes = []EgressRule{
+	{Method: "GET", Path: "/v1/models"},
+	{Method: "POST", Path: "/v1/chat/completions"},
+	{Method: "POST", Path: "/v1/responses"},
+	{Method: "POST", Path: "/v1/messages"},
+	{Method: "POST", Path: "/v1/messages/count_tokens"},
+	{Method: "POST", Path: "/v1/embeddings"},
 }
 
 // syncModels sets up the model path of a running sandbox: proxy up, a fresh
@@ -293,7 +321,7 @@ func modelPolicy(provider string) map[string]any {
 // for the opencode config. Without models it takes the path away.
 func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, error) {
 	if len(s.Models) == 0 {
-		if s.read("models.key") == "" {
+		if s.read("models.key") == "" && s.read("models.provider") == "" {
 			return nil, nil
 		}
 		if err := s.revokeModelKey(); err != nil {
@@ -302,7 +330,9 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 		if err := rt.SetRule(s.Name, modelRule, nil); err != nil {
 			return nil, err
 		}
-		s.dropModelProvider()
+		if err := s.dropModelProvider(); err != nil {
+			return nil, err
+		}
 		_, err := s.ssh("opencode service unset env " + modelKeyEnv + " && opencode service restart")
 		return nil, err
 	}
@@ -365,8 +395,10 @@ func (s *Sandbox) modelProvider() string { return s.Name + "-models" }
 func (s *Sandbox) bindModelKey(key string) error {
 	id := s.modelProvider()
 	if s.read("models.provider") == "" || rt.RotateCredential(id, modelKeyEnv, key) != nil {
-		rt.SetRule(s.Name, modelRule, nil)
-		rt.DetachCredential(s.Name, id)
+		if err := rt.SetRule(s.Name, modelRule, nil); err != nil {
+			return err
+		}
+		rt.DetachCredential(s.Name, id) // not attached on a first run
 		if err := rt.ImportCredentialType("zero-model-key", modelKeyProfile); err != nil {
 			return err
 		}
@@ -388,13 +420,13 @@ func (s *Sandbox) bindModelKey(key string) error {
 
 // dropModelProvider takes the binding away; the rule that names it must be
 // gone or the sandbox deleted.
-func (s *Sandbox) dropModelProvider() {
+func (s *Sandbox) dropModelProvider() error {
 	if s.read("models.provider") == "" {
-		return
+		return nil
 	}
-	rt.DetachCredential(s.Name, s.modelProvider())
+	rt.DetachCredential(s.Name, s.modelProvider()) // fails when the sandbox is gone
 	rt.UnbindCredential(s.modelProvider())
-	os.Remove(s.path("models.provider"))
+	return os.Remove(s.path("models.provider"))
 }
 
 func conns() []byte {

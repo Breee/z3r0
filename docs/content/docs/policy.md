@@ -149,9 +149,10 @@ models: 64 through the model proxy (github_copilot/*)
 
 Once, connect your Copilot account to the proxy: open `http://127.0.0.1:18096/ui/`, user `admin`, password in `~/.local/state/zero/parts/models.key`, then Models + Endpoints, LLM Credentials, Connect. Until then `zero up` says that no answer will come.
 
-- The proxy runs under Docker (`docker compose`); `zero doctor` checks it. Another compose command can be named in `ZERO_COMPOSE`. Sandboxes stay on podman.
+- The proxy runs under Docker (`docker compose`); `zero doctor` checks that this command runs. Another compose command can be named in `ZERO_COMPOSE`. Sandboxes stay on podman.
 - The sandbox holds a placeholder for its proxy key, not the key. The placeholder is swapped for the key only on the way to the proxy.
-- From the sandbox only the proxy is reachable for models; the model hosts are not.
+- From the sandbox only the proxy is reachable for models; the model hosts are not, also not opencode's free models and not Copilot inside VS Code.
+- Of the proxy the sandbox reaches the model list and the model calls only. Its keys, users, credentials and settings are refused.
 - `zero pause` and `zero rm` delete the key at the proxy; `zero up` makes a new one.
 - `zero copilot` needs a model here: `zero copilot --model github_copilot/claude-haiku-4.5`.
 - A workspace without `models` works as before.

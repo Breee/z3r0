@@ -124,7 +124,19 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	if !fileExists(s.path("zen.done")) {
+	if len(s.Models) > 0 {
+		// Models come through the proxy only: no other model host stays open.
+		if fileExists(s.path("zen.done")) || fileExists(s.path("copilot.done")) {
+			if err := rt.SetRule(s.Name, "zen", nil); err != nil {
+				return 0, err
+			}
+			if err := rt.SetRule(s.Name, "copilot", nil); err != nil {
+				return 0, err
+			}
+			os.Remove(s.path("zen.done"))
+			os.Remove(s.path("copilot.done"))
+		}
+	} else if !fileExists(s.path("zen.done")) {
 		if err := s.applyZenPolicy(); err != nil {
 			return 0, err
 		}
@@ -709,15 +721,17 @@ func (s *Sandbox) Pause(out io.Writer) error {
 	if err := s.stopForward(io.Discard); err != nil {
 		return err
 	}
+	// The model key goes first: with the proxy down the pause stops here and
+	// no key outlives a sandbox that was stopped.
+	if err := s.revokeModelKey(); err != nil {
+		return err
+	}
 	if !rt.Stopped(s.Name) {
 		if err := rt.Stop(s.Name); err != nil {
 			return fmt.Errorf("stop sandbox: %w", err)
 		}
 	}
 	if err := s.pauseForge(); err != nil {
-		return err
-	}
-	if err := s.revokeModelKey(); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "paused %s\n", s.Name)
@@ -750,11 +764,16 @@ func (s *Sandbox) Rm(out io.Writer, yes bool) error {
 	if err := s.revokeForge(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
-	if err := s.revokeModelKey(); err != nil {
+	rt.UnbindCredential(s.copilotProvider())
+	// The binding holds the only copy of the model key. Once it is gone the
+	// key cannot be used, also when the proxy is down and cannot delete it.
+	if err := s.dropModelProvider(); err != nil {
 		return fmt.Errorf("%w (state kept for retry)", err)
 	}
-	rt.UnbindCredential(s.copilotProvider())
-	s.dropModelProvider()
+	if err := s.revokeModelKey(); err != nil {
+		fmt.Fprintf(out, "models: %v; its only copy is deleted, the proxy drops the key when it ends (7 days)\n", err)
+		os.Remove(s.path("models.key"))
+	}
 	if err := os.RemoveAll(s.stage()); err != nil {
 		return fmt.Errorf("remove input copy: %w", err)
 	}
@@ -770,7 +789,9 @@ func (s *Sandbox) Code(out io.Writer) error {
 	if _, err := s.Up(out); err != nil {
 		return err
 	}
-	if !fileExists(s.path("copilot.done")) {
+	if len(s.Models) > 0 {
+		fmt.Fprintln(out, "models: this workspace uses the model proxy; Copilot inside VS Code has no login and no way out here")
+	} else if !fileExists(s.path("copilot.done")) {
 		if err := rt.AllowEgress(s.Name, "copilot", "/go/.vscode-server/**", "read-write", copilotEndpoints); err != nil {
 			return fmt.Errorf("copilot policy: %w", err)
 		}
