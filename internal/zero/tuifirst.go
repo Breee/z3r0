@@ -2,6 +2,7 @@ package zero
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,6 +25,8 @@ type firstView struct {
 	items        []firstItem
 	cur          int
 	preview      bool
+	top          int
+	more         bool // the preview has lines below the window
 	files        map[string][]byte
 	shown        *Policy
 	err          string
@@ -85,19 +88,37 @@ func (m home) firstKey(k string) (tea.Model, tea.Cmd) {
 		switch k {
 		case "esc":
 			m.fr.preview = false
+		case "up", "k":
+			m.fr.top = max(f.top-1, 0)
+		case "down", "j":
+			m.fr.top = f.top + 1
 		case "enter":
+			if f.more {
+				m.fr.top = f.top + 5
+				return m, nil
+			}
+			// what was shown must still be what gets written
+			if dirs, _, _ := firstRunPlan(f.repos); !slices.Equal(dirs, f.dirs) {
+				m.mode, m.fr = homeList, nil
+				m.msg = "first run: the directories changed meanwhile; nothing more written, start again"
+				return m, nil
+			}
 			if err := writeFirstRun(f.dirs, f.files); err != nil {
 				m.fr.err = err.Error()
 				return m, nil
 			}
-			if err := m.firstSandbox(f.name).saveShown(f.shown); err != nil {
-				m.fr.err = err.Error()
-				return m, nil
-			}
+			sb := m.firstSandbox(f.name).Name
 			m.mode, m.fr = homeList, nil
+			(&m).selectName(f.name)
 			if f.action == "up" {
-				return m, m.exec(f.name, "up")
+				v, err := shownValue(f.shown)
+				if err != nil {
+					m.msg = err.Error()
+					return m, nil
+				}
+				return m, m.subEnv("up "+f.name, []string{shownEnv + "=" + sb + "\n" + v}, "-c", f.name, "up")
 			}
+			screenShown[sb] = f.shown
 			m.cmd = f.action
 			return m, tea.Quit
 		}
@@ -125,7 +146,7 @@ func (m home) firstKey(k string) (tea.Model, tea.Cmd) {
 			m.fr.err = err.Error()
 			return m, nil
 		}
-		m.fr.files, m.fr.shown, m.fr.preview = files, shown, true
+		m.fr.files, m.fr.shown, m.fr.preview, m.fr.top, m.fr.more = files, shown, true, 0, false
 	}
 	return m, nil
 }
@@ -161,19 +182,29 @@ func (m home) firstLines(w, h int) []string {
 		}
 	}
 	foot := "space toggle · enter next · esc back"
+	code := func(s string) {
+		for _, l := range strings.Split(strings.TrimRight(s, "\n"), "\n") {
+			for lipgloss.Width(l) > tw-3 {
+				r := []rune(l)
+				n := len(r)
+				for lipgloss.Width(string(r[:n])) > tw-3 {
+					n--
+				}
+				lines = append(lines, "   "+string(r[:n]))
+				l = "  " + string(r[n:])
+			}
+			lines = append(lines, "   "+l)
+		}
+	}
 	if f.preview {
 		foot = "enter write and start · esc back"
 		for _, d := range f.dirs {
 			lines = append(lines, " "+cTitle.Render(filepath.Join(d, ".zero", "policy.yaml")))
-			for _, l := range strings.Split(strings.TrimRight(string(f.files[d]), "\n"), "\n") {
-				lines = append(lines, "   "+l)
-			}
+			code(string(f.files[d]))
 		}
 		if len(f.repos) > 1 {
 			lines = append(lines, " "+cTitle.Render("the workspace policy (every directory together)"))
-			for _, l := range strings.Split(strings.TrimRight(string(renderPolicy(f.shown)), "\n"), "\n") {
-				lines = append(lines, "   "+l)
-			}
+			code(string(renderPolicy(f.shown)))
 		}
 	} else {
 		head := func(host bool) {
@@ -217,6 +248,13 @@ func (m home) firstLines(w, h int) []string {
 	}
 	if len(lines) > body {
 		top := min(max(at-body/2, 0), len(lines)-body)
+		if f.preview {
+			top = min(f.top, len(lines)-body)
+			f.top = top
+			if f.more = top+body < len(lines); f.more {
+				foot = "enter more · esc back"
+			}
+		}
 		lines = lines[top : top+body]
 	}
 	for len(lines) < body {

@@ -164,7 +164,7 @@ func writeFirstRun(dirs []string, files map[string][]byte) error {
 			if len(written) > 0 {
 				done = "already written: " + strings.Join(written, ", ")
 			}
-			return fmt.Errorf("first run: %w (%s); make the directory writable, or answer no, or use --approve for the default", err, done)
+			return fmt.Errorf("first run: %w (%s); make the directory writable, or go on without the file: the default applies", err, done)
 		}
 		written = append(written, f)
 	}
@@ -195,7 +195,7 @@ func (s *Sandbox) firstRun() error {
 		}
 		groups = append(groups, huh.NewGroup(huh.NewMultiSelect[string]().
 			Title(hostsTitle).Description(hostsText).
-			Options(opts...).Height(len(opts)+5).Value(&chosen)))
+			Options(opts...).Height(2*len(opts)+5).Value(&chosen)))
 	}
 	var opts []huh.Option[string]
 	for _, c := range defaultCaps {
@@ -206,7 +206,7 @@ func (s *Sandbox) firstRun() error {
 	}
 	groups = append(groups, huh.NewGroup(huh.NewMultiSelect[string]().
 		Title(capsTitle).Description(capsText).
-		Options(opts...).Height(len(opts)+4).Value(&caps).Validate(checkChosenCaps)))
+		Options(opts...).Height(2*len(opts)+4).Value(&caps).Validate(checkChosenCaps)))
 	fmt.Fprintf(os.Stderr, "first run: %s has no .zero/policy.yaml yet\n", strings.Join(dirs, ", "))
 	if err := huh.NewForm(groups...).WithOutput(os.Stderr).Run(); err != nil {
 		return firstRunEnd(err)

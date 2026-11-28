@@ -2444,14 +2444,43 @@ func TestHomeFirstRun(t *testing.T) {
 	if s.takeShown() != nil {
 		t.Error("policy.shown was not used up")
 	}
-	s = m.firstSandbox("new")
-	if err := s.saveShown(pol); err != nil {
-		t.Fatal(err)
-	}
 	wider := &Policy{Capabilities: defaultCaps}
 	wider.Network.Allow = []string{"evil.example.com"}
+	s = m.firstSandbox("new")
+	screenShown[s.Name] = pol
 	if _, err := s.approvePolicy(wider); err == nil {
 		t.Error("a policy wider than the shown one passed")
+	}
+	// a child gets it through its environment, by name, once
+	v, _ := shownValue(wider)
+	t.Setenv(shownEnv, "zero-other\n"+v)
+	if m.firstSandbox("new").takeShown() != nil || os.Getenv(shownEnv) != "" {
+		t.Error("a yes for another sandbox was taken, or stayed in the environment")
+	}
+	t.Setenv(shownEnv, s.Name+"\n"+v)
+	s = m.firstSandbox("new")
+	if _, err := s.approvePolicy(wider); err != nil {
+		t.Errorf("the yes from the environment was not used: %v", err)
+	}
+	if m.firstSandbox("new").takeShown() != nil {
+		t.Error("the yes can be used twice")
+	}
+
+	// a small window: enter pages through the preview before it writes
+	os.RemoveAll(filepath.Dir(file))
+	sm, _ := m.Update(tea.WindowSizeMsg{Width: 50, Height: 12})
+	q, _ := press(sm.(home), tea.KeyEnter)
+	if !strings.Contains(plain(q), "enter more") {
+		t.Fatalf("cut preview does not say so:\n%s", plain(q))
+	}
+	for i := 0; i < 10 && !fileExists(file); i++ {
+		if !strings.Contains(plain(q), "enter more") && !strings.Contains(plain(q), "gitlab.pipeline.read") {
+			t.Errorf("enter would write without the end shown:\n%s", plain(q))
+		}
+		q, _ = press(q, tea.KeyEnter)
+	}
+	if !fileExists(file) {
+		t.Error("paged preview never wrote")
 	}
 
 	// with the file in place the screen starts at once

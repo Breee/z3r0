@@ -263,28 +263,31 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 	return ch, nil
 }
 
-// saveApproved records p as approved, once it is applied.
-// saveShown records the policy a person accepted on the workspace screen,
-// for the command the screen starts next. takeShown reads it once.
-func (s *Sandbox) saveShown(p *Policy) error {
+// The yes given in the workspace screen reaches exactly the command the screen
+// starts next: in this process through screenShown, in a child through its
+// environment. Nothing is stored, so no later run can use it.
+const shownEnv = "ZERO_SHOWN_POLICY"
+
+var screenShown = map[string]*Policy{}
+
+func shownValue(p *Policy) (string, error) {
 	out, err := yaml.Marshal(p)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(s.State, 0o700); err != nil {
-		return err
-	}
-	return s.write("policy.shown", string(out), 0o600)
+	return string(out), err
 }
 
 func (s *Sandbox) takeShown() *Policy {
-	b, err := os.ReadFile(s.path("policy.shown"))
-	if err != nil {
+	if p := screenShown[s.Name]; p != nil {
+		delete(screenShown, s.Name)
+		return p
+	}
+	v := os.Getenv(shownEnv)
+	os.Unsetenv(shownEnv)
+	name, body, ok := strings.Cut(v, "\n")
+	if !ok || name != s.Name {
 		return nil
 	}
-	os.Remove(s.path("policy.shown"))
 	var p Policy
-	if yaml.Unmarshal(b, &p) != nil {
+	if yaml.Unmarshal([]byte(body), &p) != nil {
 		return nil
 	}
 	return &p

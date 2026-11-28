@@ -91,7 +91,7 @@ zero up
 
 zero creates a workspace named after the directory, a sandbox `zero-api`, clones the repository into it and creates the token.
 
-The first time, when the repository has no `.zero/policy.yaml`, zero asks two things and offers defaults: which package hosts the sandbox may reach (found from files like `go.mod` or `package.json`) and what the agent may do (read, commit and push are on; `ci.run` and `gitlab.mr.create` are off). It shows the file, writes it when you say yes and starts. Every option says in one line what it allows. Enter three times keeps the defaults. Started from the workspace screen, the same questions show inside the screen. Without a terminal, or with `--approve`, it asks nothing and uses the default [policy](../policy).
+The first time, when the repository has no `.zero/policy.yaml`, zero asks two things and offers defaults: which package hosts the sandbox may reach (found from files like `go.mod` or `package.json`) and what the agent may do (read, commit and push are on; `ci.run` and `gitlab.mr.create` are off). It shows the file, writes it when you say yes and starts. Every option says in one line what it allows. Enter on every step keeps the defaults. Started from the workspace screen, the same questions show inside the screen. Without a terminal, or with `--approve`, it asks nothing and uses the default [policy](../policy).
 
 Then open the agent:
 

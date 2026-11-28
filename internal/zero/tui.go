@@ -347,8 +347,15 @@ func (m home) exec(name, cmd string) tea.Cmd {
 
 // sub runs zero with args, the terminal handed over, and reports under what.
 func (m home) sub(what string, args ...string) tea.Cmd {
+	return m.subEnv(what, nil, args...)
+}
+
+func (m home) subEnv(what string, env []string, args ...string) tea.Cmd {
 	var buf bytes.Buffer
 	c := exec.Command(m.exe, args...)
+	if env != nil {
+		c.Env = append(os.Environ(), env...)
+	}
 	c.Stderr = io.MultiWriter(os.Stderr, &buf)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		last := ""
@@ -566,7 +573,7 @@ func Home(exe string) ([]string, error) {
 		m.runtime = strings.TrimSpace(string(b))
 	}
 	for {
-		m.cmd, m.mode = "", homeList
+		m.cmd, m.mode, m.fr = "", homeList, nil
 		res, err := tea.NewProgram(m).Run()
 		if err != nil {
 			return nil, err

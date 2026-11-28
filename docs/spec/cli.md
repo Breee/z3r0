@@ -42,9 +42,9 @@ Enter on every question keeps the defaults.
 
 Not a terminal, or `--approve`: no questions, behaviour as before.
 
-Every option carries one line that says what it allows (the same text in the terminal form, in the workspace screen and in the guide's policy page).
+Every option carries one line that says what it allows (the same text in the terminal form and in the workspace screen; the guide's policy page describes each permission in more words).
 
-From the workspace screen (section 3) the questions are a view of the screen, titled `first run(NAME)`: one list of checkboxes (hosts, then permissions), `space` toggles, `enter` shows the files that will be written, `enter` again writes them and starts, `esc` goes back a step and writes nothing. The top block is hidden so that every option fits on an 80x24 window; smaller windows scroll. The yes is handed to the started command once (state file `policy.shown`, on the host) and covers only the policy shown.
+From the workspace screen (section 3) the questions are a view of the screen, titled `first run(NAME)`: one list of checkboxes (hosts, then permissions), `space` toggles, `enter` shows the files that will be written, `enter` again writes them and starts, `esc` goes back a step and writes nothing. The top block is hidden to make room: a repository with one package source fits an 80x24 window, longer lists and smaller windows scroll. A preview longer than the window is paged with `enter`; it is written only once its end was shown. The yes covers only the policy shown and reaches only the command the screen starts next (inside the process, or in the environment of the `up` it starts); nothing is stored. With the gateway unreachable (status `unknown`) the screen does not ask; the started command asks in the terminal form.
 
 The terminal form sets the height of each question itself (caveat C63).
 
