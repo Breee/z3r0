@@ -25,7 +25,8 @@ func (s *Sandbox) revokeModelKey() error {
 	if s.read("models.key") == "" {
 		return nil
 	}
-	if _, err := litellm.API("", "POST", "/key/delete", map[string]any{"key_aliases": []string{s.modelKeyAlias()}}); err != nil {
+	var mp core.ModelProvider = litellm.Proxy{Alias: s.modelKeyAlias()}
+	if err := mp.Revoke(s.Name); err != nil {
 		return fmt.Errorf("model key of %s not revoked: %w", s.Name, err)
 	}
 	return os.Remove(s.path("models.key"))

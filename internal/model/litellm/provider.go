@@ -33,11 +33,14 @@ var _ core.ModelProvider = Proxy{}
 func (Proxy) Name() string { return "litellm" }
 
 func (p Proxy) Check() []core.Check {
-	return []core.Check{
+	cs := []core.Check{
 		{Name: "model proxy runtime", Problem: ComposeProblem()},
 		{Name: "model proxy login", Problem: Login()},
-		{Name: "model provider keys", Problem: ProviderKeysProblem(p.KeyCmds)},
 	}
+	if len(p.KeyCmds) > 0 {
+		cs = append(cs, core.Check{Name: "model provider keys", Problem: ProviderKeysProblem(p.KeyCmds)})
+	}
+	return cs
 }
 
 func (p Proxy) Ensure(out io.Writer) error { return Start(out, p.Providers, p.KeyCmds) }

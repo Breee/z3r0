@@ -82,10 +82,9 @@ func Doctor(out io.Writer) error {
 		fmt.Fprintln(out, "na    model login: every workspace uses the model proxy")
 	}
 	if c != nil && c.Parts.Models != "" {
-		check("model proxy runtime", litellm.ComposeProblem())
-		check("model proxy login", litellm.Login())
-		if len(c.ProviderKeys) > 0 {
-			check("model provider keys", litellm.ProviderKeysProblem(c.ProviderKeys))
+		var mp core.ModelProvider = litellm.Proxy{KeyCmds: c.ProviderKeys}
+		for _, k := range mp.Check() {
+			check(k.Name, k.Problem)
 		}
 	}
 

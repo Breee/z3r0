@@ -284,9 +284,16 @@ Still in `internal/zero` (about 8600 lines):
   `*Sandbox` turned into the exported API of `up`.
 - The parts implement the interim interfaces `core.Runtime` and
   `core.ForgeHost` (the old shapes). The interfaces of section 2 are declared
-  in `core` and implemented by no part yet.
-- The model proxy is called as `litellm.X` directly, and its name is still in
-  `workspace.PartLiteLLM`, the opencode provider id and the web UI path.
+  in `core`. Of them only `ModelProvider` is implemented (`litellm.Proxy`).
+- `litellm.Proxy` is the `core.ModelProvider`: zero calls `Ensure`, `Grant`,
+  `Revoke` and `Check` through the interface. What `Grant` needs beyond the
+  workspace and its models are fields of the provider: the key's name, the
+  tool entry and tools, whether a new key is wanted, whether one existed.
+  `Grant` keeps the key when it can; the secret is then empty.
+- LiteLLM is still named outside its package: the egress rule, credential
+  type and key variable where zero binds the key, the opencode provider id
+  and tool entry, the base URL the agents get, the web UI path and login
+  note, the tool entries (`ToolProvider` not built), `workspace.PartLiteLLM`.
 - About 32 tests of moved code are still in `internal/zero/zero_test.go`.
 - `agent/vscode`, `model/copilot`, `tui`, `ui`, `up` do not exist yet.
 
