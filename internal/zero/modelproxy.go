@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/agent/claude"
+	"github.com/Breee/z3r0/internal/agent/copilot"
+	"github.com/Breee/z3r0/internal/agent/opencode"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/model/litellm"
 )
@@ -86,7 +89,7 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model
 	// A sandbox that used the Copilot CLI before the workspace got models
 	// still has the rule to GitHub's model host: it goes.
 	if core.FileExists(s.path("copilot-cli.rule")) {
-		if err := rt.SetRule(s.Name, copilotRule, nil); err != nil {
+		if err := rt.SetRule(s.Name, copilot.Rule, nil); err != nil {
 			return nil, err
 		}
 		os.Remove(s.path("copilot-cli.rule"))
@@ -154,4 +157,4 @@ func (s *Sandbox) dropModelProvider() error {
 }
 
 // modelClients are the programs in the sandbox that may reach the model proxy.
-var modelClients = []string{opencodeBin, copilotBin, claudeBin, "/usr/bin/curl"}
+var modelClients = []string{opencode.Bin, copilot.Bin, claude.Bin, "/usr/bin/curl"}

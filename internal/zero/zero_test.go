@@ -21,6 +21,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Breee/z3r0/internal/agent"
+	"github.com/Breee/z3r0/internal/agent/claude"
+	"github.com/Breee/z3r0/internal/agent/copilot"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/gate"
@@ -1388,7 +1391,7 @@ type noSandbox struct{ core.Runtime }
 func (noSandbox) Exists(string) bool { return false }
 
 func TestCopilotScript(t *testing.T) {
-	got := copilotScript("/tmp/zero/a b", []string{"-p", "it's; rm -rf /"})
+	got := copilot.Script("/tmp/zero/a b", []string{"-p", "it's; rm -rf /"})
 	want := `cd '/tmp/zero/a b' && COPILOT_AUTO_UPDATE=false COPILOT_GITHUB_TOKEN="$COPILOT_TOKEN" exec /usr/local/bin/copilot --no-auto-update '-p' 'it'\''s; rm -rf /'`
 	if got != want {
 		t.Fatalf("got  %s\nwant %s", got, want)
@@ -1410,7 +1413,7 @@ func TestModelRoutes(t *testing.T) {
 }
 
 func TestCopilotProxyScript(t *testing.T) {
-	got := copilotProxyScript("/tmp/zero/a", []string{"--model", "github_copilot/x", "-p", "it's"})
+	got := copilot.ProxyScript("/tmp/zero/a", "http://"+gateHost+":18096"+"/v1", litellm.KeyEnv, []string{"--model", "github_copilot/x", "-p", "it's"})
 	for _, w := range []string{
 		`cd '/tmp/zero/a' && [ -n "$LITELLM_API_KEY" ] || `,
 		"COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=http://host.openshell.internal:18096/v1 COPILOT_PROVIDER_API_KEY=\"$LITELLM_API_KEY\" exec /usr/local/bin/copilot --no-auto-update '--model' 'github_copilot/x' '-p' 'it'\\''s'",
@@ -1423,12 +1426,12 @@ func TestCopilotProxyScript(t *testing.T) {
 		t.Errorf("script passes a GitHub login: %s", got)
 	}
 	for args, want := range map[string]bool{"--model x": true, "--model=x": true, "-p hi": false, "--model": false, "--model=": false} {
-		if got := hasModelArg(strings.Fields(args)); got != want {
+		if got := agent.HasModelArg(strings.Fields(args)); got != want {
 			t.Errorf("hasModelArg(%q) = %v", args, got)
 		}
 	}
 	pol := fmt.Sprint(litellm.Policy("zero-a-models", modelClients))
-	if !strings.Contains(pol, copilotBin) {
+	if !strings.Contains(pol, copilot.Bin) {
 		t.Error("models rule does not name the Copilot CLI")
 	}
 	if !strings.Contains(pol, "credential_binding:map[provider:zero-a-models]") {
@@ -1541,8 +1544,8 @@ func TestCompose(t *testing.T) {
 }
 
 func TestClaudeScript(t *testing.T) {
-	got := claudeScript("/tmp/zero/a b", []string{"--model", "github_copilot/x", "-p", "it's"})
-	for _, want := range []string{"cd '/tmp/zero/a b' &&", `[ -n "$LITELLM_API_KEY" ]`, "ANTHROPIC_BASE_URL=http://host.openshell.internal:18096 ", `ANTHROPIC_AUTH_TOKEN="$LITELLM_API_KEY"`, "DISABLE_AUTOUPDATER=1", "exec " + claudeBin + " '--model' 'github_copilot/x' '-p' 'it'\\''s'"} {
+	got := claude.Script("/tmp/zero/a b", "http://"+gateHost+":18096", litellm.KeyEnv, []string{"--model", "github_copilot/x", "-p", "it's"})
+	for _, want := range []string{"cd '/tmp/zero/a b' &&", `[ -n "$LITELLM_API_KEY" ]`, "ANTHROPIC_BASE_URL=http://host.openshell.internal:18096 ", `ANTHROPIC_AUTH_TOKEN="$LITELLM_API_KEY"`, "DISABLE_AUTOUPDATER=1", "exec " + claude.Bin + " '--model' 'github_copilot/x' '-p' 'it'\\''s'"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("script %q lacks %q", got, want)
 		}
@@ -1550,7 +1553,7 @@ func TestClaudeScript(t *testing.T) {
 	if strings.Contains(got, "ANTHROPIC_API_KEY") || strings.Contains(got, "/v1") {
 		t.Errorf("script %q: x-api-key form or /v1 in the address", got)
 	}
-	if !strings.Contains(fmt.Sprint(litellm.Policy("p", modelClients)), claudeBin) {
+	if !strings.Contains(fmt.Sprint(litellm.Policy("p", modelClients)), claude.Bin) {
 		t.Error("models rule does not name Claude Code")
 	}
 }
@@ -1570,11 +1573,11 @@ func TestModelArg(t *testing.T) {
 		{[]string{"-p", "x", "--", "--model", "a/b"}, ""},
 		{[]string{"--model", "a/b", "--", "--model", "c/d"}, "a/b"},
 	} {
-		if got := modelArg(c.args); got != c.want {
+		if got := agent.ModelArg(c.args); got != c.want {
 			t.Errorf("modelArg(%q) = %q, want %q", c.args, got, c.want)
 		}
 	}
-	s := claudeScript("/tmp/zero/a", []string{"--model", "a/b", "-p", "x"})
+	s := claude.Script("/tmp/zero/a", "http://"+gateHost+":18096", litellm.KeyEnv, []string{"--model", "a/b", "-p", "x"})
 	for _, w := range []string{"ANTHROPIC_MODEL='a/b'", "ANTHROPIC_DEFAULT_HAIKU_MODEL='a/b'", "DISABLE_UPDATES=1", "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1"} {
 		if !strings.Contains(s, w) {
 			t.Errorf("claude script lacks %s: %s", w, s)

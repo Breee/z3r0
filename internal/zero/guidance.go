@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/agent/opencode"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/guidance/hostfiles"
 	"github.com/Breee/z3r0/internal/model/litellm"
@@ -18,9 +19,6 @@ import (
 // Instructions and skills of a workspace (ADR 0049): plain files on the host,
 // copied read-only into the sandbox next to the input directories and named in
 // the opencode user config of the sandbox.
-
-// opencodeConfig is the opencode user config inside the sandbox.
-const opencodeConfig = "$HOME/.config/opencode/opencode.json"
 
 // guidanceConfig is the opencode config that names the copied instructions
 // and skills; empty when the workspace has none.
@@ -65,7 +63,7 @@ func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
 	if want == "" && mine == "" {
 		return nil
 	}
-	cur, err := s.ssh("f=" + opencodeConfig + "; test -e \"$f\" && sha256sum \"$f\" | cut -d' ' -f1 || true")
+	cur, err := s.ssh("f=" + opencode.ConfigPath + "; test -e \"$f\" && sha256sum \"$f\" | cut -d' ' -f1 || true")
 	if err != nil {
 		return err
 	}
@@ -79,7 +77,7 @@ func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
 		return os.Remove(s.path("opencode.sha"))
 	}
 	if want == "" {
-		if _, err := s.ssh("rm -f " + opencodeConfig); err != nil {
+		if _, err := s.ssh("rm -f " + opencode.ConfigPath); err != nil {
 			return err
 		}
 		return os.Remove(s.path("opencode.sha"))
@@ -89,7 +87,7 @@ func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
 	if sha == cur {
 		return nil
 	}
-	if _, err := s.ssh("f=" + opencodeConfig + "; mkdir -p \"$(dirname \"$f\")\" && printf %s " + core.ShellQuote(want) + " > \"$f\""); err != nil {
+	if _, err := s.ssh("f=" + opencode.ConfigPath + "; mkdir -p \"$(dirname \"$f\")\" && printf %s " + core.ShellQuote(want) + " > \"$f\""); err != nil {
 		return err
 	}
 	return s.write("opencode.sha", sha, 0o600)

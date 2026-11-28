@@ -1,6 +1,7 @@
 package zero
 
 import (
+	"github.com/Breee/z3r0/internal/agent/opencode"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
@@ -8,7 +9,7 @@ import (
 const forgeRule = "forge"
 
 // forgeBinaries may reach the forge with the token.
-var forgeBinaries = []string{"/usr/bin/git", "/usr/lib/git-core/git-remote-https", "/usr/bin/curl", "/usr/local/bin/glab", opencodeBin}
+var forgeBinaries = []string{"/usr/bin/git", "/usr/lib/git-core/git-remote-https", "/usr/bin/curl", "/usr/local/bin/glab", opencode.Bin}
 
 // forgePolicy is the sandbox's network rule for its forge: only the
 // workspace's projects on the forge host, and the push gate. The token is

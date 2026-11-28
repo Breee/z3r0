@@ -13,6 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Breee/z3r0/internal/agent"
+	"github.com/Breee/z3r0/internal/agent/claude"
+	"github.com/Breee/z3r0/internal/agent/copilot"
+	"github.com/Breee/z3r0/internal/agent/opencode"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/gate"
 	"github.com/Breee/z3r0/internal/guidance/hostfiles"
@@ -315,14 +319,10 @@ func (s *Sandbox) create() error {
 	return s.recordPolicy()
 }
 
-// opencodeBin is the real executable; /usr/local/bin/opencode is a symlink and
-// policy update matches binaries by resolved path (C37).
-const opencodeBin = "/usr/local/libexec/opencode/node_modules/@opencode/cli/bin/opencode.exe"
-
 // applyZenPolicy allows opencode inside the sandbox to reach its API. Runs
 // until the zen.done marker exists, so a failed attempt is retried.
 func (s *Sandbox) applyZenPolicy() error {
-	if err := rt.AllowEgress(s.Name, "zen", opencodeBin, "read-write", []string{"opencode.ai", "models.opencode.ai"}); err != nil {
+	if err := rt.AllowEgress(s.Name, "zen", opencode.Bin, "read-write", []string{"opencode.ai", "models.opencode.ai"}); err != nil {
 		return fmt.Errorf("apply opencode policy: %w", err)
 	}
 	return nil
@@ -541,13 +541,8 @@ func (s *Sandbox) Attach(out io.Writer) error {
 	return core.Passthrough("ssh", "-t", "-F", s.path("ssh.conf"), s.Host, "cd "+core.ShellQuote(s.Dir)+" && exec opencode")
 }
 
-// copilotBin and copilotRule: the GitHub Copilot CLI of the image and the
-// egress rule that lets only that binary reach the Copilot API (ADR 0050).
-const (
-	copilotBin  = "/usr/local/bin/copilot"
-	copilotRule = "copilot-cli"
-	copilotHost = "api.githubcopilot.com"
-)
+// copilotHost is the Copilot API, reached only by the Copilot CLI (ADR 0050).
+const copilotHost = "api.githubcopilot.com"
 
 // CopilotNeedsTerminal is the check of `zero copilot` without arguments, for
 // main to refuse before a workspace is made.
@@ -571,7 +566,7 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	if proxy {
 		args = s.withModel(args)
 	}
-	if proxy && !hasModelArg(args) {
+	if proxy && !agent.HasModelArg(args) {
 		return fmt.Errorf("zero copilot in this workspace needs a model: zero copilot --model PROVIDER/MODEL ..., or model: for the workspace in zero's config (models of the workspace: %s)", strings.Join(s.Models, ", "))
 	}
 	if _, err := s.Up(out); err != nil {
@@ -580,36 +575,32 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	if !proxy && s.read("copilot") == "" {
 		return fmt.Errorf("%s", noModel)
 	}
-	if _, err := s.ssh("test -x " + copilotBin); err != nil {
+	if _, err := s.ssh("test -x " + copilot.Bin); err != nil {
 		return fmt.Errorf("the image of %s has no Copilot CLI; recreate it: zero rm && zero up", s.Name)
 	}
 	if proxy {
 		// The models rule of the sandbox names the binary (PoC 23).
-		ssh := []string{"-F", s.path("ssh.conf"), s.Host, copilotProxyScript(s.Dir, args)}
+		ssh := []string{"-F", s.path("ssh.conf"), s.Host, copilot.ProxyScript(s.Dir, fmt.Sprintf("http://%s:%d", gateHost, litellm.Port)+"/v1", litellm.KeyEnv, args)}
 		if tty {
 			ssh = append([]string{"-t"}, ssh...)
 		}
 		return core.Passthrough("ssh", ssh...)
 	}
 	if !core.FileExists(s.path("copilot-cli.rule")) {
-		if err := rt.AllowEgress(s.Name, copilotRule, copilotBin, "read-write", []string{copilotHost}); err != nil {
+		if err := rt.AllowEgress(s.Name, copilot.Rule, copilot.Bin, "read-write", []string{copilotHost}); err != nil {
 			return fmt.Errorf("%w; check: zero doctor, then run zero copilot again", err)
 		}
 		if err := s.write("copilot-cli.rule", copilotHost, 0o600); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
+		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilot.Bin, copilotHost)
 	}
-	ssh := []string{"-F", s.path("ssh.conf"), s.Host, copilotScript(s.Dir, args)}
+	ssh := []string{"-F", s.path("ssh.conf"), s.Host, copilot.Script(s.Dir, args)}
 	if tty {
 		ssh = append([]string{"-t"}, ssh...)
 	}
 	return core.Passthrough("ssh", ssh...)
 }
-
-// claudeBin is Claude Code in the image. /usr/local/bin/claude is a link to
-// it; the egress rule has to name the program itself.
-const claudeBin = "/usr/local/libexec/claude/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
 
 // ClaudeNeedsTerminal is the check of `zero claude` without arguments, for
 // main to refuse before a workspace is made.
@@ -623,7 +614,7 @@ func ClaudeNeedsTerminal(args []string) error {
 // withModel puts the workspace's default model in front of the arguments
 // when they name none (ADR 0054).
 func (s *Sandbox) withModel(args []string) []string {
-	if s.Model == "" || hasModelArg(args) {
+	if s.Model == "" || agent.HasModelArg(args) {
 		return args
 	}
 	return append([]string{"--model", s.Model}, args...)
@@ -640,79 +631,20 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 		return fmt.Errorf("zero claude needs the model proxy: set parts.models, providers and models for this workspace in zero's config")
 	}
 	args = s.withModel(args)
-	if !hasModelArg(args) {
+	if !agent.HasModelArg(args) {
 		return fmt.Errorf("zero claude needs a model: zero claude --model PROVIDER/MODEL ..., or model: for the workspace in zero's config (models of the workspace: %s)", strings.Join(s.Models, ", "))
 	}
 	if _, err := s.Up(out); err != nil {
 		return err
 	}
-	if _, err := s.ssh("test -x " + claudeBin); err != nil {
+	if _, err := s.ssh("test -x " + claude.Bin); err != nil {
 		return fmt.Errorf("the image of %s has no Claude Code; recreate it: zero rm && zero up", s.Name)
 	}
-	ssh := []string{"-F", s.path("ssh.conf"), s.Host, claudeScript(s.Dir, args)}
+	ssh := []string{"-F", s.path("ssh.conf"), s.Host, claude.Script(s.Dir, fmt.Sprintf("http://%s:%d", gateHost, litellm.Port), litellm.KeyEnv, args)}
 	if core.IsTerminal(os.Stdin) && core.IsTerminal(os.Stdout) {
 		ssh = append([]string{"-t"}, ssh...)
 	}
 	return core.Passthrough("ssh", ssh...)
-}
-
-// claudeScript is the command run in the sandbox (PoC 24): Claude Code talks
-// to the model proxy with the placeholder of the sandbox's environment as
-// its key and asks Anthropic for nothing; the image pins its version. The
-// model of --model is also the one for its background calls.
-func claudeScript(dir string, args []string) string {
-	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + litellm.KeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
-		fmt.Sprintf("http://%s:%d", gateHost, litellm.Port) + ` ANTHROPIC_AUTH_TOKEN="$` + litellm.KeyEnv + `" ANTHROPIC_MODEL=` + core.ShellQuote(modelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + core.ShellQuote(modelArg(args)) +
-		` CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1 DISABLE_UPDATES=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + claudeBin
-	for _, a := range args {
-		script += " " + core.ShellQuote(a)
-	}
-	return script
-}
-
-// modelArg is the model the arguments for the Copilot CLI or Claude Code
-// name with --model, or "". A value that starts with - is the next option,
-// not a model.
-func modelArg(args []string) string {
-	for i, a := range args {
-		if a == "--" {
-			break
-		}
-		v := ""
-		if a == "--model" && i+1 < len(args) {
-			v = args[i+1]
-		} else if strings.HasPrefix(a, "--model=") {
-			v = strings.TrimPrefix(a, "--model=")
-		}
-		if v != "" && !strings.HasPrefix(v, "-") {
-			return v
-		}
-	}
-	return ""
-}
-
-func hasModelArg(args []string) bool { return modelArg(args) != "" }
-
-// copilotProxyScript is the command run in a sandbox whose workspace uses the
-// model proxy (PoC 23): the CLI talks to the proxy and asks GitHub for
-// nothing. Its key is the placeholder of the sandbox's environment (PoC 20).
-func copilotProxyScript(dir string, args []string) string {
-	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + litellm.KeyEnv + `" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=` +
-		fmt.Sprintf("http://%s:%d/v1", gateHost, litellm.Port) + ` COPILOT_PROVIDER_API_KEY="$` + litellm.KeyEnv + `" exec ` + copilotBin + " --no-auto-update"
-	for _, a := range args {
-		script += " " + core.ShellQuote(a)
-	}
-	return script
-}
-
-// copilotScript is the command run in the sandbox. The CLI does not update
-// itself there: the image pins its version.
-func copilotScript(dir string, args []string) string {
-	script := "cd " + core.ShellQuote(dir) + " && COPILOT_AUTO_UPDATE=false COPILOT_GITHUB_TOKEN=\"$" + copilotEnv + "\" exec " + copilotBin + " --no-auto-update"
-	for _, a := range args {
-		script += " " + core.ShellQuote(a)
-	}
-	return script
 }
 
 // Run is up (silent) + a one-shot opencode run inside the sandbox.
@@ -781,10 +713,10 @@ func (s *Sandbox) Status(out io.Writer) error {
 		if s.Model != "" {
 			fmt.Fprintf(out, "model: %s (default; --model wins, and for opencode a repository's opencode.json)\n", s.Model)
 		}
-		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL, or the workspace's model)\n", copilotBin)
-		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL, or the workspace's model)\n", claudeBin)
+		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL, or the workspace's model)\n", copilot.Bin)
+		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL, or the workspace's model)\n", claude.Bin)
 	} else if core.FileExists(s.path("copilot-cli.rule")) {
-		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
+		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilot.Bin, copilotHost)
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {
