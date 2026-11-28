@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
@@ -152,9 +153,9 @@ func (s *Sandbox) policyState() string {
 	if err != nil {
 		return "changed"
 	}
-	old := &Policy{Capabilities: defaultCaps}
+	old := &policy.Policy{Capabilities: policy.DefaultCaps}
 	if b, err := os.ReadFile(s.path("policy.approved")); err == nil {
-		if old, err = parsePolicy(b); err != nil {
+		if old, err = policy.Parse(b); err != nil {
 			return "changed"
 		}
 	}

@@ -23,6 +23,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
+	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 	"go.yaml.in/yaml/v3"
 )
@@ -118,7 +119,7 @@ func TestForgeRule(t *testing.T) {
 		if strings.Contains(host, "example") {
 			forge = "git.example.com"
 		}
-		if err := checkForgeHost(forge, []string{host}); (err == nil) != want {
+		if err := policy.CheckForgeHost(forge, []string{host}); (err == nil) != want {
 			t.Errorf("network.allow %s with forge %s: %v", host, forge, err)
 		}
 	}
@@ -158,12 +159,12 @@ func TestForgeFor(t *testing.T) {
 }
 
 func TestParsePolicy(t *testing.T) {
-	p, err := parsePolicy([]byte("network:\n  allow: [proxy.golang.org]\ncapabilities: [git.read]\n"))
+	p, err := policy.Parse([]byte("network:\n  allow: [proxy.golang.org]\ncapabilities: [git.read]\n"))
 	if err != nil || p.Network.Allow[0] != "proxy.golang.org" || p.Capabilities[0] != "git.read" {
 		t.Fatalf("got %+v %v", p, err)
 	}
 	for _, bad := range []string{"bogus: 1\n", "network:\n  allow: [\"evil.com:22\"]\n", "network:\n  allow: [\"*\"]\n"} {
-		if _, err := parsePolicy([]byte(bad)); err == nil {
+		if _, err := policy.Parse([]byte(bad)); err == nil {
 			t.Errorf("accepted %q", bad)
 		}
 	}
@@ -215,19 +216,19 @@ func TestReadCommands(t *testing.T) {
 }
 
 func TestWidened(t *testing.T) {
-	pol := func(hosts, caps []string) *Policy {
-		p := &Policy{Capabilities: caps}
+	pol := func(hosts, caps []string) *policy.Policy {
+		p := &policy.Policy{Capabilities: caps}
 		p.Network.Allow = hosts
 		return p
 	}
 	old := pol([]string{"a.example"}, []string{"git.read", "git.push"})
-	if w := widened(old, pol(nil, []string{"git.read"})); len(w) != 0 {
+	if w := policy.Widened(old, pol(nil, []string{"git.read"})); len(w) != 0 {
 		t.Errorf("narrowing reported as widening: %v", w)
 	}
-	if w := widened(old, pol([]string{"a.example"}, []string{"git.push", "git.read"})); len(w) != 0 {
+	if w := policy.Widened(old, pol([]string{"a.example"}, []string{"git.push", "git.read"})); len(w) != 0 {
 		t.Errorf("same policy reported as widening: %v", w)
 	}
-	w := widened(old, pol([]string{"a.example", "b.example"}, []string{"git.read", "gitlab.mr.create"}))
+	w := policy.Widened(old, pol([]string{"a.example", "b.example"}, []string{"git.read", "gitlab.mr.create"}))
 	if fmt.Sprint(w) != "[network b.example capability gitlab.mr.create]" {
 		t.Errorf("widened = %v", w)
 	}
@@ -404,13 +405,13 @@ func TestLoadPolicyUnion(t *testing.T) {
 		t.Errorf("allow = %v", p.Network.Allow)
 	}
 	// a's file plus the default of b, which has no file
-	if want := append([]string{"git.read", "ci.run"}, defaultCaps[1:]...); !slices.Equal(p.Capabilities, want) {
+	if want := append([]string{"git.read", "ci.run"}, policy.DefaultCaps[1:]...); !slices.Equal(p.Capabilities, want) {
 		t.Errorf("caps = %v, want %v", p.Capabilities, want)
 	}
 }
 
 func TestMRCreateNeedsCIRun(t *testing.T) {
-	if slices.Contains(defaultCaps, core.CapMRCreate) {
+	if slices.Contains(policy.DefaultCaps, core.CapMRCreate) {
 		t.Error("gitlab.mr.create is in the default capabilities")
 	}
 	for caps, ok := range map[string]bool{
@@ -1189,16 +1190,16 @@ func TestClean(t *testing.T) {
 }
 
 func TestApprovePolicy(t *testing.T) {
-	pol := func(hosts []string, caps ...string) *Policy {
-		p := &Policy{Capabilities: append(slices.Clone(defaultCaps), caps...)}
+	pol := func(hosts []string, caps ...string) *policy.Policy {
+		p := &policy.Policy{Capabilities: append(slices.Clone(policy.DefaultCaps), caps...)}
 		p.Network.Allow = hosts
 		return p
 	}
 	for _, c := range []struct {
 		name     string
-		approved *Policy // nil: nothing approved yet
+		approved *policy.Policy // nil: nothing approved yet
 		damaged  bool
-		p        *Policy
+		p        *policy.Policy
 		approve  bool
 		err      string
 		want     policyChange
@@ -2115,31 +2116,31 @@ func TestFirstRunPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	found := detectPresets(d)
+	found := policy.DetectPresets(d)
 	if len(found) != 2 || found[0].Name != "Go modules" || found[1].Name != "npm" {
 		t.Fatalf("detectPresets = %v", found)
 	}
-	if got := detectPresets(t.TempDir()); len(got) != 0 {
+	if got := policy.DetectPresets(t.TempDir()); len(got) != 0 {
 		t.Fatalf("empty directory: %v", got)
 	}
-	p := firstRunPolicy(found, []string{"Go modules"}, defaultCaps)
+	p := policy.FirstRunPolicy(found, []string{"Go modules"}, policy.DefaultCaps)
 	if !slices.Equal(p.Network.Allow, []string{"proxy.golang.org", "sum.golang.org"}) {
 		t.Fatalf("hosts = %v", p.Network.Allow)
 	}
-	back, err := parsePolicy(renderPolicy(p))
+	back, err := policy.Parse(policy.Render(p))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(back.Network.Allow, p.Network.Allow) || !slices.Equal(back.Capabilities, p.Capabilities) {
 		t.Fatalf("round trip: %+v != %+v", back, p)
 	}
-	if strings.Contains(string(renderPolicy(firstRunPolicy(nil, nil, defaultCaps))), "network") {
+	if strings.Contains(string(policy.Render(policy.FirstRunPolicy(nil, nil, policy.DefaultCaps))), "network") {
 		t.Fatal("network block without hosts")
 	}
-	if checkChosenCaps(nil) == nil || checkChosenCaps([]string{core.CapMRCreate}) == nil {
+	if policy.CheckChosenCaps(nil) == nil || policy.CheckChosenCaps([]string{core.CapMRCreate}) == nil {
 		t.Fatal("empty set or mr.create without ci.run accepted")
 	}
-	if err := checkChosenCaps([]string{"git.read", core.CapMRCreate, core.CapCIRun}); err != nil {
+	if err := policy.CheckChosenCaps([]string{"git.read", core.CapMRCreate, core.CapCIRun}); err != nil {
 		t.Fatal(err)
 	}
 	for f, want := range map[string]string{"requirements.txt": "Python", "pyproject.toml": "Python", "Cargo.toml": "Rust"} {
@@ -2147,16 +2148,16 @@ func TestFirstRunPolicy(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(d, f), nil, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if got := detectPresets(d); len(got) != 1 || got[0].Name != want {
+		if got := policy.DetectPresets(d); len(got) != 1 || got[0].Name != want {
 			t.Errorf("%s: %v", f, got)
 		}
 	}
-	caps := append(slices.Clone(defaultCaps), core.CapCIRun, core.CapMRCreate)
-	if p := firstRunPolicy(nil, nil, caps); !slices.Equal(p.Capabilities, caps) {
+	caps := append(slices.Clone(policy.DefaultCaps), core.CapCIRun, core.CapMRCreate)
+	if p := policy.FirstRunPolicy(nil, nil, caps); !slices.Equal(p.Capabilities, caps) {
 		t.Fatalf("caps = %v", p.Capabilities)
 	}
-	u := unionPolicy(&Policy{Capabilities: []string{"git.read"}}, p, p)
-	if !slices.Equal(u.Network.Allow, p.Network.Allow) || len(u.Capabilities) != len(defaultCaps) {
+	u := policy.Union(&policy.Policy{Capabilities: []string{"git.read"}}, p, p)
+	if !slices.Equal(u.Network.Allow, p.Network.Allow) || len(u.Capabilities) != len(policy.DefaultCaps) {
 		t.Fatalf("union = %+v", u)
 	}
 }
@@ -2164,13 +2165,13 @@ func TestFirstRunPolicy(t *testing.T) {
 // The yes at the first run covers the policy shown, not a wider one that a
 // directory of the workspace brings along unseen.
 func TestFirstRunApproval(t *testing.T) {
-	shown := &Policy{Capabilities: defaultCaps}
+	shown := &policy.Policy{Capabilities: policy.DefaultCaps}
 	shown.Network.Allow = []string{"proxy.golang.org"}
 	s := &Sandbox{Name: "zero-t", State: t.TempDir(), shown: shown}
 	if _, err := s.approvePolicy(shown); err != nil {
 		t.Fatalf("the shown policy asked again: %v", err)
 	}
-	wider := &Policy{Capabilities: append(slices.Clone(defaultCaps), core.CapCIRun)}
+	wider := &policy.Policy{Capabilities: append(slices.Clone(policy.DefaultCaps), core.CapCIRun)}
 	wider.Network.Allow = []string{"proxy.golang.org", "evil.example.com"}
 	if _, err := s.approvePolicy(wider); err == nil {
 		t.Fatal("a policy wider than the shown one passed without approval")
@@ -2397,7 +2398,7 @@ func TestHomeFirstRun(t *testing.T) {
 	}
 	m.w, m.h, m.fr.cur = 80, 24, 0
 	out := plain(m)
-	for _, want := range []string{"first run(new)", hostsTitle, capsTitle, "[x] Go modules: proxy.golang.org", "[x] git.push: push, only to its own branch", "[ ] ci.run:", "[ ] gitlab.mr.create:"} {
+	for _, want := range []string{"first run(new)", policy.HostsTitle, policy.CapsTitle, "[x] Go modules: proxy.golang.org", "[x] git.push: push, only to its own branch", "[ ] ci.run:", "[ ] gitlab.mr.create:"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("no %q in\n%s", want, out)
 		}
@@ -2435,8 +2436,8 @@ func TestHomeFirstRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pol, err := parsePolicy(b)
-	if err != nil || len(pol.Network.Allow) != 0 || !slices.Equal(pol.Capabilities, defaultCaps) {
+	pol, err := policy.Parse(b)
+	if err != nil || len(pol.Network.Allow) != 0 || !slices.Equal(pol.Capabilities, policy.DefaultCaps) {
 		t.Errorf("written policy: %v %+v", err, pol)
 	}
 
@@ -2448,7 +2449,7 @@ func TestHomeFirstRun(t *testing.T) {
 	if s.takeShown() != nil {
 		t.Error("policy.shown was not used up")
 	}
-	wider := &Policy{Capabilities: defaultCaps}
+	wider := &policy.Policy{Capabilities: policy.DefaultCaps}
 	wider.Network.Allow = []string{"evil.example.com"}
 	s = m.firstSandbox("new")
 	screenShown[s.Name] = pol

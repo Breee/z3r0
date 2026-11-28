@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/policy"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -23,14 +24,14 @@ type firstItem struct {
 type firstView struct {
 	name, action string
 	repos, dirs  []string
-	found        map[string][]preset
+	found        map[string][]policy.Preset
 	items        []firstItem
 	cur          int
 	preview      bool
 	top          int
 	more         bool // the preview has lines below the window
 	files        map[string][]byte
-	shown        *Policy
+	shown        *policy.Policy
 	err          string
 }
 
@@ -48,23 +49,23 @@ func (m home) first(r *wsRow, action string) *firstView {
 		return nil
 	}
 	repos := m.firstSandbox(r.Name).repos()
-	dirs, found, names := firstRunPlan(repos)
+	dirs, found, names := policy.FirstRunPlan(repos)
 	if len(dirs) == 0 {
 		return nil
 	}
 	f := &firstView{name: r.Name, action: action, repos: repos, dirs: dirs, found: found}
-	for _, p := range presets {
+	for _, p := range policy.Presets {
 		for _, n := range names {
 			if n == p.Name {
-				f.items = append(f.items, firstItem{true, p.Name, presetLabel(p), true})
+				f.items = append(f.items, firstItem{true, p.Name, policy.PresetLabel(p), true})
 			}
 		}
 	}
-	for _, c := range defaultCaps {
-		f.items = append(f.items, firstItem{false, c, capLabel(c), true})
+	for _, c := range policy.DefaultCaps {
+		f.items = append(f.items, firstItem{false, c, policy.CapLabel(c), true})
 	}
-	for _, c := range optionalCaps {
-		f.items = append(f.items, firstItem{false, c, capLabel(c), false})
+	for _, c := range policy.OptionalCaps {
+		f.items = append(f.items, firstItem{false, c, policy.CapLabel(c), false})
 	}
 	return f
 }
@@ -100,12 +101,12 @@ func (m home) firstKey(k string) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			// what was shown must still be what gets written
-			if dirs, _, _ := firstRunPlan(f.repos); !slices.Equal(dirs, f.dirs) {
+			if dirs, _, _ := policy.FirstRunPlan(f.repos); !slices.Equal(dirs, f.dirs) {
 				m.mode, m.fr = homeList, nil
 				m.msg = "first run: the directories changed meanwhile; nothing more written, start again"
 				return m, nil
 			}
-			if err := writeFirstRun(f.dirs, f.files); err != nil {
+			if err := policy.WriteFirstRun(f.dirs, f.files); err != nil {
 				m.fr.err = err.Error()
 				return m, nil
 			}
@@ -139,11 +140,11 @@ func (m home) firstKey(k string) (tea.Model, tea.Cmd) {
 		m.fr.items = items
 	case "enter":
 		hosts, caps := m.fr.chosen()
-		if err := checkChosenCaps(caps); err != nil {
+		if err := policy.CheckChosenCaps(caps); err != nil {
 			m.fr.err = err.Error()
 			return m, nil
 		}
-		files, shown, err := firstRunFiles(f.repos, f.dirs, f.found, hosts, caps)
+		files, shown, err := policy.FirstRunFiles(f.repos, f.dirs, f.found, hosts, caps)
 		if err != nil {
 			m.fr.err = err.Error()
 			return m, nil
@@ -206,7 +207,7 @@ func (m home) firstLines(w, h int) []string {
 		}
 		if len(f.repos) > 1 {
 			lines = append(lines, " "+cTitle.Render("the workspace policy (every directory together)"))
-			code(string(renderPolicy(f.shown)))
+			code(string(policy.Render(f.shown)))
 		}
 	} else {
 		head := func(host bool) {
@@ -214,11 +215,11 @@ func (m home) firstLines(w, h int) []string {
 				lines = append(lines, "")
 			}
 			if host {
-				lines = append(lines, " "+cTitle.Render(hostsTitle))
-				text(hostsText)
+				lines = append(lines, " "+cTitle.Render(policy.HostsTitle))
+				text(policy.HostsText)
 			} else {
-				lines = append(lines, " "+cTitle.Render(capsTitle))
-				text(capsText)
+				lines = append(lines, " "+cTitle.Render(policy.CapsTitle))
+				text(policy.CapsText)
 			}
 		}
 		for i, it := range f.items {

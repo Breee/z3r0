@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
@@ -50,7 +51,7 @@ type Sandbox struct {
 
 	Approve bool
 	// shown is the workspace policy the human said yes to at the first run.
-	shown *Policy
+	shown *policy.Policy
 	// MaxInput is the size limit for input directories in bytes; 0 means the default.
 	MaxInput int64 // --approve: accept a wider policy without asking
 }

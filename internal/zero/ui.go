@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/policy"
 )
 
 // The read-only API and web UI of zero-cp (ADR 0053). They have a listener of
@@ -189,7 +190,7 @@ func uiDetail(c *Config, row wsRow) uiWorkspace {
 	}
 	w.Capabilities = cleanAll(strings.Fields(s.read("caps")))
 	if b, err := os.ReadFile(s.path("policy.approved")); err == nil {
-		if p, err := parsePolicy(b); err == nil {
+		if p, err := policy.Parse(b); err == nil {
 			w.Hosts = cleanAll(p.Network.Allow)
 		}
 	}

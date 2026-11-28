@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/policy"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
@@ -483,16 +484,16 @@ func (m home) describe(r *wsRow) []string {
 			out = append(out, " "+cLabel.Render("Model:   ")+w.Model)
 		}
 		list("Directories", w.Folders)
-		var ps []*Policy
+		var ps []*policy.Policy
 		for _, d := range w.Folders {
-			p, err := loadFolderPolicy(d)
+			p, err := policy.LoadDir(d)
 			if err != nil {
 				out = append(out, "", " "+cLabel.Render("Policy file: ")+err.Error())
 				continue
 			}
 			ps = append(ps, p)
 		}
-		u := unionPolicy(ps...)
+		u := policy.Union(ps...)
 		list("Permissions (.zero/policy.yaml of the directories)", u.Capabilities)
 		list("Hosts allowed besides the forge", u.Network.Allow)
 		list("Tools", w.Tools)

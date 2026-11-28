@@ -2,123 +2,45 @@ package zero
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/policy"
 
 	"go.yaml.in/yaml/v3"
 )
-
-// Policy is the project policy (docs/architecture/07a-policy-sources-and-lifecycle.md).
-type Policy struct {
-	Network struct {
-		Allow []string `yaml:"allow"`
-	} `yaml:"network"`
-	Capabilities []string `yaml:"capabilities"`
-}
-
-var defaultCaps = []string{
-	"git.read", "git.commit", "git.push",
-	"gitlab.issue.read", "gitlab.mr.read", "gitlab.pipeline.read",
-}
-
-var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
 // loadPolicy reads .zero/policy.yaml from the host directories, never from the
 // sandbox, so the agent cannot change its own policy. Missing file → default.
 // Several directories give the union: the token has one permission set for all
 // projects. Any error refuses; there is no fallback to something broader.
-func (s *Sandbox) loadPolicy() (*Policy, error) {
-	var ps []*Policy
+func (s *Sandbox) loadPolicy() (*policy.Policy, error) {
+	var ps []*policy.Policy
 	// Input directories are no policy source (spec §6).
 	for _, top := range s.repos() {
-		p, err := loadFolderPolicy(top)
+		p, err := policy.LoadDir(top)
 		if err != nil {
 			return nil, err
 		}
 		ps = append(ps, p)
 	}
-	u := unionPolicy(ps...)
+	u := policy.Union(ps...)
 	if slices.Contains(u.Capabilities, core.CapMRCreate) && !slices.Contains(u.Capabilities, core.CapCIRun) {
 		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline; add %s or take %s out", core.CapMRCreate, core.CapCIRun, core.CapCIRun, core.CapMRCreate)
 	}
 	if f, _, err := s.folderForge(); err != nil {
 		return nil, err
 	} else if f != nil {
-		if err := checkForgeHost(f.Host(), u.Network.Allow); err != nil {
+		if err := policy.CheckForgeHost(f.Host(), u.Network.Allow); err != nil {
 			return nil, err
 		}
 	}
 	return u, nil
-}
-
-// unionPolicy: every host and every capability of ps, each once, in order.
-func unionPolicy(ps ...*Policy) *Policy {
-	u := &Policy{}
-	for _, p := range ps {
-		for _, h := range p.Network.Allow {
-			if !slices.Contains(u.Network.Allow, h) {
-				u.Network.Allow = append(u.Network.Allow, h)
-			}
-		}
-		for _, c := range p.Capabilities {
-			if !slices.Contains(u.Capabilities, c) {
-				u.Capabilities = append(u.Capabilities, c)
-			}
-		}
-	}
-	return u
-}
-
-// checkForgeHost refuses a network.allow entry for the forge host: it would
-// add up with the forge rule and open every project on the host again
-// (ADR 0046).
-func checkForgeHost(host string, allow []string) error {
-	for _, h := range allow {
-		if h == host || strings.HasPrefix(h, "*.") && strings.HasSuffix(host, h[1:]) {
-			return fmt.Errorf(".zero/policy.yaml: network.allow: %s covers the forge host; zero limits that host to the workspace's projects; take the entry out", h)
-		}
-	}
-	return nil
-}
-
-func loadFolderPolicy(top string) (*Policy, error) {
-	file := filepath.Join(top, ".zero", "policy.yaml")
-	b, err := os.ReadFile(file)
-	if errors.Is(err, os.ErrNotExist) {
-		return &Policy{Capabilities: defaultCaps}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	p, err := parsePolicy(b)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", file, err)
-	}
-	return p, nil
-}
-
-func parsePolicy(b []byte) (*Policy, error) {
-	var p Policy
-	dec := yaml.NewDecoder(bytes.NewReader(b))
-	dec.KnownFields(true)
-	if err := dec.Decode(&p); err != nil && !errors.Is(err, io.EOF) {
-		return nil, err
-	}
-	for _, h := range p.Network.Allow {
-		if !hostRe.MatchString(h) {
-			return nil, fmt.Errorf("network.allow: invalid host %q", h)
-		}
-	}
-	return &p, nil
 }
 
 // recordPolicy stores which policy the sandbox was created with: one line
@@ -168,14 +90,14 @@ func projectPolicy(hosts []string) map[string]any {
 
 // syncProjectPolicy replaces the rule of a running sandbox, so a host taken
 // out of network.allow is no longer reachable.
-func (s *Sandbox) syncProjectPolicy(p *Policy) error {
+func (s *Sandbox) syncProjectPolicy(p *policy.Policy) error {
 	if err := rt.SetRule(s.Name, projectRule, projectPolicy(p.Network.Allow)); err != nil {
 		return fmt.Errorf("apply .zero/policy.yaml: %w", err)
 	}
 	return nil
 }
 
-func (s *Sandbox) applyProjectPolicy(p *Policy) error {
+func (s *Sandbox) applyProjectPolicy(p *policy.Policy) error {
 	if len(p.Network.Allow) == 0 {
 		return nil
 	}
@@ -192,34 +114,18 @@ type policyChange struct {
 	goneHosts bool     // hosts removed
 }
 
-// widened returns the entries of p that old does not grant, as "kind value".
-func widened(old, p *Policy) []string {
-	var w []string
-	for _, h := range p.Network.Allow {
-		if !slices.Contains(old.Network.Allow, h) {
-			w = append(w, "network "+h)
-		}
-	}
-	for _, c := range p.Capabilities {
-		if !slices.Contains(old.Capabilities, c) {
-			w = append(w, "capability "+c)
-		}
-	}
-	return w
-}
-
 // approvePolicy compares p with the policy last approved for this sandbox
 // (state policy.approved; none yet = the default). A wider policy needs a yes
 // from the human at the terminal, or --approve. Narrowing needs nothing.
 // The yes at the first run covers what was shown there and nothing beyond.
-func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
-	old := &Policy{Capabilities: defaultCaps}
+func (s *Sandbox) approvePolicy(p *policy.Policy) (policyChange, error) {
+	old := &policy.Policy{Capabilities: policy.DefaultCaps}
 	if b, err := os.ReadFile(s.path("policy.approved")); err == nil {
-		if old, err = parsePolicy(b); err != nil {
+		if old, err = policy.Parse(b); err != nil {
 			return policyChange{}, fmt.Errorf("policy.approved: %w", err)
 		}
 	}
-	w := widened(old, p)
+	w := policy.Widened(old, p)
 	if len(w) > 0 {
 		fmt.Fprintf(os.Stderr, "policy widens for %s:\n", s.Name)
 		for _, l := range w {
@@ -229,7 +135,7 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 	if s.shown == nil {
 		s.shown = s.takeShown()
 	}
-	seen := s.shown != nil && len(widened(s.shown, p)) == 0
+	seen := s.shown != nil && len(policy.Widened(s.shown, p)) == 0
 	if len(w) > 0 && !s.Approve && !seen {
 		if !core.IsTerminal(os.Stdin) {
 			return policyChange{}, errors.New("policy widening not approved: no terminal to ask at; to accept the lines above: zero up --approve")
@@ -261,14 +167,14 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 // environment. Nothing is stored, so no later run can use it.
 const shownEnv = "ZERO_SHOWN_POLICY"
 
-var screenShown = map[string]*Policy{}
+var screenShown = map[string]*policy.Policy{}
 
-func shownValue(p *Policy) (string, error) {
+func shownValue(p *policy.Policy) (string, error) {
 	out, err := yaml.Marshal(p)
 	return string(out), err
 }
 
-func (s *Sandbox) takeShown() *Policy {
+func (s *Sandbox) takeShown() *policy.Policy {
 	if p := screenShown[s.Name]; p != nil {
 		delete(screenShown, s.Name)
 		return p
@@ -279,14 +185,14 @@ func (s *Sandbox) takeShown() *Policy {
 	if !ok || name != s.Name {
 		return nil
 	}
-	var p Policy
+	var p policy.Policy
 	if yaml.Unmarshal([]byte(body), &p) != nil {
 		return nil
 	}
 	return &p
 }
 
-func (s *Sandbox) saveApproved(p *Policy) error {
+func (s *Sandbox) saveApproved(p *policy.Policy) error {
 	out, err := yaml.Marshal(p)
 	if err != nil {
 		return err
