@@ -2246,6 +2246,12 @@ func TestHomeKeys(t *testing.T) {
 	if d, _ := press(m, 'd'); !strings.Contains(plain(d), "describe(dev)") || !strings.Contains(plain(d), "/src/two") {
 		t.Errorf("describe:\n%s", plain(d))
 	}
+	if d, _ := press(m, 'd'); !strings.Contains(plain(d), "Permissions") || !strings.Contains(plain(d), "git.push") {
+		t.Errorf("describe without permissions:\n%s", plain(d))
+	}
+	if c := m.sub("switch dev", "switch", "dev"); c == nil {
+		t.Error("no switch command")
+	}
 	if h, _ := press(m, '?'); !strings.Contains(plain(h), "help") {
 		t.Error("no help")
 	}
@@ -2295,7 +2301,7 @@ func TestHomeKeys(t *testing.T) {
 		t.Error("no command")
 	}
 	src, _ := os.ReadFile("tui.go")
-	if !bytes.Contains(src, []byte(`exec.Command(m.exe, "-c", name, cmd)`)) {
+	if !bytes.Contains(src, []byte(`m.sub(cmd+" "+name, "-c", name, cmd)`)) || bytes.Contains(src, []byte(`"-y"`)) || bytes.Contains(src, []byte(`--approve`)) {
 		t.Error("the screen must run zero -c NAME CMD and nothing more")
 	}
 	// long and wide names stay within the window; many rows keep the selection in sight

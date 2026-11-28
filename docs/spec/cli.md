@@ -61,10 +61,11 @@ The table loads in the background and reloads every 5 seconds and after each act
 | `s` | `zero -c NAME stop`, back to the screen |
 | `r` | `zero -c NAME rm` (asks as `zero rm` does), back to the screen |
 | `n` | New workspace: name and directory, then back to the screen |
-| `d` | Describe: status, token, policy, model, directories, tools, models |
+| `d` | Describe: status, token, policy, model, directories, permissions, allowed hosts, tools, models |
 | `/` | Filter by name; `esc` clears it |
 | `:` | Command: `q`, `help`, `all`, `new`, or a workspace name to jump to |
 | `?` | Help |
+| `w` | Switch to the workspace: it becomes the current one (`zero switch NAME`) |
 | `ctrl-r` | Reload now |
 | `q`, `ctrl+c` | Quit |
 | `esc` | Leaves a view or a prompt; on the table it clears the filter, it does not quit |

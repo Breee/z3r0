@@ -37,7 +37,7 @@ type keyHint struct{ key, what string }
 
 var homeHints = []keyHint{
 	{"enter", "opencode"}, {"v", "vscode"}, {"u", "up"}, {"s", "stop"}, {"r", "remove"}, {"n", "new"},
-	{"d", "describe"}, {"/", "filter"}, {":", "command"}, {"?", "help"}, {"ctrl-r", "refresh"}, {"q", "quit"},
+	{"d", "describe"}, {"/", "filter"}, {":", "command"}, {"?", "help"}, {"w", "switch to"}, {"q", "quit"},
 }
 
 var (
@@ -321,6 +321,8 @@ func (m home) key(k string) (tea.Model, tea.Cmd) {
 	case "v":
 		m.cmd = "vscode"
 		return m, tea.Quit
+	case "w":
+		return m, m.sub("switch "+c.Name, "switch", c.Name)
 	case "u", "s", "r":
 		cmd := map[string]string{"u": "up", "s": "stop", "r": "rm"}[k]
 		return m, m.exec(c.Name, cmd)
@@ -331,8 +333,13 @@ func (m home) key(k string) (tea.Model, tea.Cmd) {
 // exec runs `zero -c NAME CMD` with the terminal handed over, so the command
 // asks and prints as it always does, and comes back to the screen.
 func (m home) exec(name, cmd string) tea.Cmd {
+	return m.sub(cmd+" "+name, "-c", name, cmd)
+}
+
+// sub runs zero with args, the terminal handed over, and reports under what.
+func (m home) sub(what string, args ...string) tea.Cmd {
 	var buf bytes.Buffer
-	c := exec.Command(m.exe, "-c", name, cmd)
+	c := exec.Command(m.exe, args...)
 	c.Stderr = io.MultiWriter(os.Stderr, &buf)
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		last := ""
@@ -341,7 +348,7 @@ func (m home) exec(name, cmd string) tea.Cmd {
 				last = l
 			}
 		}
-		return homeRan{cmd + " " + name, last, err}
+		return homeRan{what, last, err}
 	})
 }
 
@@ -359,7 +366,7 @@ func (m home) header() []string {
 			current = r.Name
 		}
 	}
-	info := [][2]string{{"Workspace", current}, {"Runtime", m.runtime}, {"Gateway", m.gateway}, {"Zero", Version()}}
+	info := [][2]string{{"Workspace", current}, {"Runtime", m.runtime}, {"Gateway", m.gateway}, {"Zero", strings.Fields(Version() + " -")[0]}}
 	lines := make([]string, 6)
 	for i := range lines {
 		if i < len(info) {
@@ -458,6 +465,18 @@ func (m home) describe(r *wsRow) []string {
 			out = append(out, " "+cLabel.Render("Model:   ")+w.Model)
 		}
 		list("Directories", w.Folders)
+		var ps []*Policy
+		for _, d := range w.Folders {
+			p, err := loadFolderPolicy(d)
+			if err != nil {
+				out = append(out, "", " "+cLabel.Render("Policy file: ")+err.Error())
+				continue
+			}
+			ps = append(ps, p)
+		}
+		u := unionPolicy(ps...)
+		list("Permissions (.zero/policy.yaml of the directories)", u.Capabilities)
+		list("Hosts allowed besides the forge", u.Network.Allow)
 		list("Tools", w.Tools)
 		list("Models", w.Models)
 	}
@@ -500,7 +519,7 @@ func (m home) frame() string {
 			lines = append(lines, l)
 		}
 		lines = append(lines, " "+pad(cKey.Render("<j/k>"), 10)+"move, g first, G last",
-			" :NAME goes there, :all, :new, :q", "", cFaint.Render(" esc back"))
+			" :NAME goes there, :all, :new, :q", " "+pad(cKey.Render("<ctrl-r>"), 10)+"reload now", "", cFaint.Render(" esc back"))
 		out = append(out, box("help", lines, m.w, bh))
 	default:
 		scope := "all"
