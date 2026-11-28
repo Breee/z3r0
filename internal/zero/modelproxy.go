@@ -70,12 +70,21 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model
 		entry = litellm.MCPName(s.Name)
 	}
 	lap("  proxy up")
+	// A sandbox that used the Copilot CLI before the workspace got models
+	// still has the rule to GitHub's model host: it goes.
+	if core.FileExists(s.path("copilot-cli.rule")) {
+		if err := rt.SetRule(s.Name, copilot.Rule, nil); err != nil {
+			return nil, err
+		}
+		os.Remove(s.path("copilot-cli.rule"))
+	}
 	// Nothing changed: the key stays, and with it the sandbox's credential
 	// and opencode's service. A sandbox made or started in this run is
 	// set up again.
+	s.keptKey = false
 	if !s.fresh && s.read("models.key") != "" && s.read("models.provider") != "" {
 		left, allows, err := litellm.KeyLeft(alias)
-		if err == nil && keepModelKey(left, allows, litellm.KeyAllows(s.Models, entry, s.Tools)) {
+		if err == nil && keepModelKey(left, allows, litellm.KeyAllows(s.Models, entry, s.Tools)) && rt.CredentialReady(s.Name, s.modelCredential()) == nil {
 			list, err := litellm.API("", "GET", "/v1/models", nil)
 			if err != nil {
 				return nil, err
@@ -90,8 +99,10 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model
 					ids = append(ids, m)
 				}
 			}
+			s.keptKey = true
+			err = s.modelNotes(out, ids)
 			lap("  key kept")
-			return ids, s.modelNotes(out, ids)
+			return ids, err
 		}
 	}
 	if _, err := litellm.API("", "POST", "/key/delete", map[string]any{"key_aliases": []string{alias}}); err != nil && s.read("models.key") != "" {
@@ -113,14 +124,6 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model
 	lap("  key renewed")
 	if err := s.bindModelKey(k.Key); err != nil {
 		return nil, err
-	}
-	// A sandbox that used the Copilot CLI before the workspace got models
-	// still has the rule to GitHub's model host: it goes.
-	if core.FileExists(s.path("copilot-cli.rule")) {
-		if err := rt.SetRule(s.Name, copilot.Rule, nil); err != nil {
-			return nil, err
-		}
-		os.Remove(s.path("copilot-cli.rule"))
 	}
 	// A new session has the placeholder in its environment; that is what
 	// opencode's service keeps, not the key.

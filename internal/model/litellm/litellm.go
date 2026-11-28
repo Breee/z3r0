@@ -256,35 +256,70 @@ func KeyLeft(alias string) (time.Duration, string, error) {
 }
 
 // keyState reads the answer of /key/list: the time left and what the one
-// key allows. Zero time: no single usable key.
+// key allows. Zero time: no single usable key, or a key that is not as zero
+// makes it (another owner, a team, or a permission zero never asks for).
 func keyState(b []byte) (time.Duration, string) {
 	var v struct {
 		Keys []struct {
-			Expires time.Time `json:"expires"`
-			Blocked bool      `json:"blocked"`
-			Models  []string  `json:"models"`
-			Perm    struct {
-				Servers []string            `json:"mcp_servers"`
-				Tools   map[string][]string `json:"mcp_tool_permissions"`
-			} `json:"object_permission"`
+			Expires time.Time                  `json:"expires"`
+			Blocked bool                       `json:"blocked"`
+			Models  []string                   `json:"models"`
+			User    string                     `json:"user_id"`
+			Team    *string                    `json:"team_id"`
+			Routes  []string                   `json:"allowed_routes"`
+			Perm    map[string]json.RawMessage `json:"object_permission"`
 		} `json:"keys"`
 	}
-	if json.Unmarshal(b, &v) != nil || len(v.Keys) != 1 || v.Keys[0].Blocked {
+	if json.Unmarshal(b, &v) != nil || len(v.Keys) != 1 {
 		return 0, ""
 	}
 	k := v.Keys[0]
-	allows, _ := json.Marshal([]any{k.Models, k.Perm.Servers, k.Perm.Tools})
-	return time.Until(k.Expires), string(allows)
+	if k.Blocked || k.User != User || k.Team != nil || len(k.Routes) > 0 || k.Expires.IsZero() {
+		return 0, ""
+	}
+	var servers []string
+	var tools map[string][]string
+	for name, raw := range k.Perm {
+		switch name {
+		case "object_permission_id":
+		case "mcp_servers":
+			if json.Unmarshal(raw, &servers) != nil {
+				return 0, ""
+			}
+		case "mcp_tool_permissions":
+			if json.Unmarshal(raw, &tools) != nil {
+				return 0, ""
+			}
+		default:
+			if t := strings.TrimSpace(string(raw)); t != "null" && t != "[]" && t != "{}" && t != "false" {
+				return 0, ""
+			}
+		}
+	}
+	return time.Until(k.Expires), allowSum(k.Models, servers, tools)
+}
+
+// allowSum is one text for what a key allows, the same for every order.
+func allowSum(models, servers []string, tools map[string][]string) string {
+	models, servers = slices.Clone(models), slices.Clone(servers)
+	slices.Sort(models)
+	slices.Sort(servers)
+	perm := map[string][]string{}
+	for e, t := range tools {
+		t = slices.Clone(t)
+		slices.Sort(t)
+		perm[e] = t
+	}
+	b, _ := json.Marshal([]any{append([]string{}, models...), append([]string{}, servers...), perm})
+	return string(b)
 }
 
 // KeyAllows is the sum KeyLeft gives for a key made from this request.
 func KeyAllows(models []string, entry string, tools []string) string {
-	servers, perm := []string{"no-mcp-servers"}, map[string][]string(nil)
 	if entry != "" && len(tools) > 0 {
-		servers, perm = []string{entry}, map[string][]string{entry: tools}
+		return allowSum(models, []string{entry}, map[string][]string{entry: tools})
 	}
-	b, _ := json.Marshal([]any{models, servers, perm})
-	return string(b)
+	return allowSum(models, []string{"no-mcp-servers"}, nil)
 }
 
 // Models reads the model list a key sees. Wildcard entries are dropped,

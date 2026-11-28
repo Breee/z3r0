@@ -46,6 +46,7 @@ func (s *Sandbox) Up(out io.Writer) (int, error) {
 func (s *Sandbox) up(out io.Writer) (int, error) {
 	out = stepWriter{out}
 	lap("")
+	s.fresh = false
 	if err := s.syncInputs(out); err != nil {
 		return 0, err
 	}

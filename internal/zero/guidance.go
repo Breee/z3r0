@@ -87,7 +87,13 @@ func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
 	if sha == cur {
 		return nil
 	}
-	if _, err := s.ssh("f=" + opencode.ConfigPath + "; mkdir -p \"$(dirname \"$f\")\" && printf %s " + core.ShellQuote(want) + " > \"$f\""); err != nil {
+	// With a kept model key nothing else restarts opencode's service, and
+	// it reads its config at start.
+	restart := ""
+	if s.keptKey {
+		restart = " && opencode service restart >/dev/null"
+	}
+	if _, err := s.ssh("f=" + opencode.ConfigPath + "; mkdir -p \"$(dirname \"$f\")\" && printf %s " + core.ShellQuote(want) + " > \"$f\"" + restart); err != nil {
 		return err
 	}
 	return s.write("opencode.sha", sha, 0o600)
