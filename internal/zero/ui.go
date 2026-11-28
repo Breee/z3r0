@@ -23,6 +23,7 @@ import (
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/gate"
 	"github.com/Breee/z3r0/internal/policy"
+	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // The read-only API and web UI of zero-cp (ADR 0053). They have a listener of
@@ -174,13 +175,13 @@ func uiWorkspaces() ([]uiWorkspace, string, error) {
 }
 
 // uiDetail is what `zero status` shows, as data. No token id, no key.
-func uiDetail(c *Config, row wsRow) uiWorkspace {
+func uiDetail(c *workspace.Config, row wsRow) uiWorkspace {
 	w := uiWorkspace{Name: row.Name, Current: row.Current, Status: row.Status, Token: row.Token, Policy: row.Policy}
 	ws := c.Workspaces[row.Name]
 	if ws == nil {
 		return w
 	}
-	s := c.sandbox(row.Name)
+	s := sandboxOf(c, row.Name)
 	w.Folders = cleanAll(ws.Folders)
 	w.Tools = cleanAll(strings.Fields(s.read("tools")))
 	w.Models = cleanAll(ws.Models)
@@ -205,11 +206,11 @@ func uiDetail(c *Config, row wsRow) uiWorkspace {
 var uiLogFields = []string{"time", "decision", "ref", "reason", "method", "path", "old", "new"}
 
 // uiDecisions gives the last lines of a workspace's gate log, newest first.
-func uiDecisions(c *Config, name string) []map[string]string {
+func uiDecisions(c *workspace.Config, name string) []map[string]string {
 	if c.Workspaces[name] == nil {
 		return nil
 	}
-	f, err := os.Open(c.sandbox(name).path("gate.log"))
+	f, err := os.Open(sandboxOf(c, name).path("gate.log"))
 	if err != nil {
 		return nil
 	}
@@ -239,7 +240,7 @@ func uiDecisions(c *Config, name string) []map[string]string {
 	return all
 }
 
-func uiParts(c *Config) []uiPart {
+func uiParts(c *workspace.Config) []uiPart {
 	gate := uiPart{Name: "push gate", On: true, State: "running"}
 	models := uiPart{Name: "model proxy", On: c.Parts.Models != ""}
 	if models.On {

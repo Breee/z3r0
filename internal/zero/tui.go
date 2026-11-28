@@ -12,6 +12,7 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/policy"
+	"github.com/Breee/z3r0/internal/workspace"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
@@ -76,7 +77,7 @@ type (
 type home struct {
 	exe              string
 	rows             []wsRow
-	ws               map[string]*Workspace
+	ws               map[string]*workspace.Workspace
 	runtime, gateway string
 	warn             []string
 	ready            bool

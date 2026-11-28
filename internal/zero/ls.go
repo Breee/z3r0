@@ -15,6 +15,7 @@ import (
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
+	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // wsRow is one workspace with its live state.
@@ -26,7 +27,7 @@ type wsRow struct {
 
 // overview is the live state behind `zero ls` and `zero switch`.
 type overview struct {
-	c          *Config
+	c          *workspace.Config
 	rows       []wsRow
 	tokens     map[string][]core.Token
 	liveTokens map[string]bool
@@ -137,7 +138,7 @@ func loadOverview() (*overview, error) {
 		}
 		policy := "-"
 		if core.FileExists(filepath.Join(dir, "policy.sha")) {
-			policy = c.sandbox(n).policyState()
+			policy = sandboxOf(c, n).policyState()
 		}
 		rows = append(rows, wsRow{Name: n, Status: status, Token: token, Policy: policy,
 			Folders: len(c.Workspaces[n].Folders), Current: n == c.Current})

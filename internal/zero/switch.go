@@ -98,7 +98,7 @@ func Switch(in, out *os.File, args []string) error {
 		return fmt.Errorf("no workspace %q (zero ls lists them)", name)
 	}
 	c.Current = name
-	if err := c.save(); err != nil {
+	if err := c.Save(); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "workspace: %s (switch)\n", name)

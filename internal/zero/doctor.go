@@ -16,6 +16,7 @@ import (
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
+	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // Doctor checks the host setup and, inside a git repo, the forge guardrails.
@@ -258,8 +259,8 @@ func clientKey() string {
 
 // hostLoginNeeded reports whether a workspace takes its model login from the
 // host's opencode: not when every workspace goes through the model proxy.
-func hostLoginNeeded(c *Config) bool {
-	if c == nil || c.Parts.Models != partLiteLLM || len(c.Workspaces) == 0 {
+func hostLoginNeeded(c *workspace.Config) bool {
+	if c == nil || c.Parts.Models != workspace.PartLiteLLM || len(c.Workspaces) == 0 {
 		return true
 	}
 	for _, w := range c.Workspaces {

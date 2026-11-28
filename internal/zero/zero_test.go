@@ -26,6 +26,7 @@ import (
 	"github.com/Breee/z3r0/internal/gate"
 	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
+	"github.com/Breee/z3r0/internal/workspace"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -38,7 +39,7 @@ func TestSandboxName(t *testing.T) {
 		"UPPER CASE": "zero-upper-case",
 	}
 	for in, want := range cases {
-		if got := SandboxName(in); got != want {
+		if got := workspace.SandboxName(in); got != want {
 			t.Errorf("SandboxName(%q) = %q, want %q", in, got, want)
 		}
 	}
@@ -209,7 +210,7 @@ func TestLinkPlainWhenNotTerminal(t *testing.T) {
 }
 
 func TestResolveContext(t *testing.T) {
-	c := &Config{Current: "team", Workspaces: map[string]*Workspace{
+	c := &workspace.Config{Current: "team", Workspaces: map[string]*workspace.Workspace{
 		"api":    {Folders: []string{"/src/api"}},
 		"team":   {Folders: []string{"/src/web", "/src/shared"}},
 		"hotfix": {Folders: []string{"/src/shared"}},
@@ -224,24 +225,24 @@ func TestResolveContext(t *testing.T) {
 		{"", "", "/elsewhere", "team", "current"},
 	}
 	for _, tc := range cases {
-		name, source, err := c.resolve(tc.flag, tc.env, tc.cwd)
+		name, source, err := c.Resolve(tc.flag, tc.env, tc.cwd)
 		if err != nil || name != tc.name || source != tc.source {
 			t.Errorf("resolve(%q,%q,%q) = %q %q %v, want %q %q", tc.flag, tc.env, tc.cwd, name, source, err, tc.name, tc.source)
 		}
 	}
-	if _, _, err := c.resolve("nope", "", "/src/api"); err == nil {
+	if _, _, err := c.Resolve("nope", "", "/src/api"); err == nil {
 		t.Error("unknown -c accepted")
 	}
 	c.Current = "api"
-	if _, _, err := c.resolve("", "", "/src/shared"); err == nil || !strings.Contains(err.Error(), "hotfix, team") {
+	if _, _, err := c.Resolve("", "", "/src/shared"); err == nil || !strings.Contains(err.Error(), "hotfix, team") {
 		t.Errorf("ambiguous cwd: %v", err)
 	}
 	c.Current = ""
-	if name, _, err := c.resolve("", "", "/elsewhere"); name != "" || err != nil {
+	if name, _, err := c.Resolve("", "", "/elsewhere"); name != "" || err != nil {
 		t.Errorf("no context: %q %v", name, err)
 	}
 	for in, want := range map[string]string{"developer": "developer", "My_Repo.go": "my-repo-go", "---": ""} {
-		if got := wsName(in); got != want {
+		if got := workspace.Name(in); got != want {
 			t.Errorf("wsName(%q) = %q, want %q", in, got, want)
 		}
 	}
@@ -707,9 +708,9 @@ func TestNextKey(t *testing.T) {
 func TestSwitchByName(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	c := &Config{Current: "api", Workspaces: map[string]*Workspace{
+	c := &workspace.Config{Current: "api", Workspaces: map[string]*workspace.Workspace{
 		"api": {Folders: []string{dir}}, "web": {Folders: []string{dir}}}}
-	if err := c.save(); err != nil {
+	if err := c.Save(); err != nil {
 		t.Fatal(err)
 	}
 	current := func() string {
@@ -794,7 +795,7 @@ func TestWorkspaceTools(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", dir)
 	write := func(tools string) {
 		os.MkdirAll(filepath.Join(dir, "zero"), 0o700)
-		os.WriteFile(configPath(), []byte("workspaces:\n    a:\n        folders: ["+dir+"]\n"+tools), 0o600)
+		os.WriteFile(workspace.Path(), []byte("workspaces:\n    a:\n        folders: ["+dir+"]\n"+tools), 0o600)
 	}
 	write("        tools: [default, nope]\n")
 	if _, err := loadConfig(); err == nil || !strings.Contains(err.Error(), `"nope"`) {
@@ -802,14 +803,14 @@ func TestWorkspaceTools(t *testing.T) {
 	}
 	write("")
 	c, err := loadConfig()
-	if err != nil || c.sandbox("a").Tools != nil {
+	if err != nil || sandboxOf(c, "a").Tools != nil {
 		t.Fatalf("config without tools: %v", err)
 	}
 	write("        tools: [list_branches, get_project]\n")
 	if c, err = loadConfig(); err != nil {
 		t.Fatal(err)
 	}
-	s := c.sandbox("a")
+	s := sandboxOf(c, "a")
 	s.State = filepath.Join(dir, "state")
 	os.MkdirAll(s.State, 0o700)
 	if ch, err := s.syncTools(); err != nil || !ch || s.read("tools") != "list_branches get_project" {
@@ -826,7 +827,7 @@ func TestWorkspaceTools(t *testing.T) {
 	if ch, _ := s.syncTools(); !ch || s.read("tools") != "" {
 		t.Fatal("removed list not recorded")
 	}
-	if err := c.save(); err != nil {
+	if err := c.Save(); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ = loadConfig(); len(c.Workspaces["a"].Tools) != 2 {
@@ -1133,7 +1134,7 @@ func TestCtxRemoveMissingFolder(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	root, err := realPath(t.TempDir())
+	root, err := workspace.RealPath(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1314,19 +1315,19 @@ func TestGuidance(t *testing.T) {
 	os.WriteFile(filepath.Join(d, "other", "review.md"), []byte("x"), 0o644)
 	p := func(n string) string { return filepath.Join(d, n) }
 
-	instr, skills, err := guidance(&Workspace{Instructions: []string{p("review.md")}, Skills: []string{p("go-review")}})
+	instr, skills, err := guidance(&workspace.Workspace{Instructions: []string{p("review.md")}, Skills: []string{p("go-review")}})
 	if err != nil || len(instr) != 1 || len(skills) != 1 {
 		t.Fatalf("guidance = %v %v %v", instr, skills, err)
 	}
 	for _, c := range []struct {
-		w    Workspace
+		w    workspace.Workspace
 		want string
 	}{
-		{Workspace{Instructions: []string{p("gone.md")}}, "not found"},
-		{Workspace{Instructions: []string{p("go-review")}}, "not a file"},
-		{Workspace{Instructions: []string{p("review.md"), p("other/review.md")}}, "listed twice"},
-		{Workspace{Skills: []string{p("empty")}}, "SKILL.md"},
-		{Workspace{Skills: []string{p("review.md")}}, "SKILL.md"},
+		{workspace.Workspace{Instructions: []string{p("gone.md")}}, "not found"},
+		{workspace.Workspace{Instructions: []string{p("go-review")}}, "not a file"},
+		{workspace.Workspace{Instructions: []string{p("review.md"), p("other/review.md")}}, "listed twice"},
+		{workspace.Workspace{Skills: []string{p("empty")}}, "SKILL.md"},
+		{workspace.Workspace{Skills: []string{p("review.md")}}, "SKILL.md"},
 	} {
 		if _, _, err := guidance(&c.w); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("guidance(%v) = %v, want %q", c.w, err, c.want)
@@ -1437,31 +1438,31 @@ func TestCopilotProxyScript(t *testing.T) {
 }
 
 func TestCheckModels(t *testing.T) {
-	ws := func(m ...string) map[string]*Workspace {
-		return map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: m}}
+	ws := func(m ...string) map[string]*workspace.Workspace {
+		return map[string]*workspace.Workspace{"a": {Folders: []string{"/x"}, Models: m}}
 	}
-	ok := []Config{
+	ok := []workspace.Config{
 		{Workspaces: ws()},
-		{Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws()},
-		{Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/*", "github_copilot/claude-haiku-4.5")},
+		{Parts: workspace.Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws()},
+		{Parts: workspace.Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/*", "github_copilot/claude-haiku-4.5")},
 	}
 	for i, c := range ok {
-		if err := c.checkModels(); err != nil {
+		if err := c.CheckModels(); err != nil {
 			t.Errorf("ok %d: %v", i, err)
 		}
 	}
-	bad := map[string]Config{
-		"unknown value":    {Parts: Parts{Models: "other"}},
-		"unknown provider": {Parts: Parts{Models: "litellm"}, Providers: []string{"nope"}},
+	bad := map[string]workspace.Config{
+		"unknown value":    {Parts: workspace.Parts{Models: "other"}},
+		"unknown provider": {Parts: workspace.Parts{Models: "litellm"}, Providers: []string{"nope"}},
 		"needs parts":      {Providers: []string{"github_copilot"}},
-		"needs providers":  {Parts: Parts{Models: "litellm"}},
+		"needs providers":  {Parts: workspace.Parts{Models: "litellm"}},
 		"models needs":     {Workspaces: ws("github_copilot/*")},
-		"want PROVIDER":    {Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("openai/gpt")},
-		"not usable":       {Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/a b")},
-		"listed twice":     {Parts: Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/*", "github_copilot/*")},
+		"want PROVIDER":    {Parts: workspace.Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("openai/gpt")},
+		"not usable":       {Parts: workspace.Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/a b")},
+		"listed twice":     {Parts: workspace.Parts{Models: "litellm"}, Providers: []string{"github_copilot"}, Workspaces: ws("github_copilot/*", "github_copilot/*")},
 	}
 	for want, c := range bad {
-		if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), want) {
+		if err := c.CheckModels(); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: got %v", want, err)
 		}
 	}
@@ -1646,7 +1647,7 @@ func TestUI(t *testing.T) {
 	}
 
 	// What a workspace shows: no token id, no key; text from the sandbox cleaned.
-	cfg := &Config{Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x/a"}, Models: []string{"github_copilot/*"}}}}
+	cfg := &workspace.Config{Workspaces: map[string]*workspace.Workspace{"a": {Folders: []string{"/x/a"}, Models: []string{"github_copilot/*"}}}}
 	st := filepath.Join(core.StateRoot(), "zero-a")
 	os.MkdirAll(st, 0o700)
 	for name, val := range map[string]string{
@@ -1673,19 +1674,19 @@ func TestUI(t *testing.T) {
 }
 
 func TestHostLoginNeeded(t *testing.T) {
-	proxy := &Workspace{Folders: []string{"/a"}, Models: []string{"github_copilot/*"}}
-	plain := &Workspace{Folders: []string{"/b"}}
-	on := Parts{Models: partLiteLLM}
+	proxy := &workspace.Workspace{Folders: []string{"/a"}, Models: []string{"github_copilot/*"}}
+	plain := &workspace.Workspace{Folders: []string{"/b"}}
+	on := workspace.Parts{Models: workspace.PartLiteLLM}
 	for _, tc := range []struct {
 		name string
-		c    *Config
+		c    *workspace.Config
 		want bool
 	}{
 		{"no config", nil, true},
-		{"no proxy", &Config{Workspaces: map[string]*Workspace{"a": plain}}, true},
-		{"proxy, no workspace", &Config{Parts: on}, true},
-		{"proxy, one workspace without models", &Config{Parts: on, Workspaces: map[string]*Workspace{"a": proxy, "b": plain}}, true},
-		{"proxy, every workspace with models", &Config{Parts: on, Workspaces: map[string]*Workspace{"a": proxy}}, false},
+		{"no proxy", &workspace.Config{Workspaces: map[string]*workspace.Workspace{"a": plain}}, true},
+		{"proxy, no workspace", &workspace.Config{Parts: on}, true},
+		{"proxy, one workspace without models", &workspace.Config{Parts: on, Workspaces: map[string]*workspace.Workspace{"a": proxy, "b": plain}}, true},
+		{"proxy, every workspace with models", &workspace.Config{Parts: on, Workspaces: map[string]*workspace.Workspace{"a": proxy}}, false},
 	} {
 		if got := hostLoginNeeded(tc.c); got != tc.want {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
@@ -1699,24 +1700,24 @@ func TestDefaultModel(t *testing.T) {
 		"github_copilot/claude-haiku-4.5": true, "github_copilot/a": true,
 		"github_copilot/*": false, "other/x": false, "nomodel": false, "github_copilot/": false,
 	} {
-		if got := modelListed(m, list); got != want {
+		if got := workspace.ModelListed(m, list); got != want {
 			t.Errorf("modelListed(%q) = %v", m, got)
 		}
 	}
-	if modelListed("github_copilot/b", []string{"github_copilot/a"}) {
+	if workspace.ModelListed("github_copilot/b", []string{"github_copilot/a"}) {
 		t.Error("a model outside a list without wildcard counts")
 	}
-	c := &Config{Parts: Parts{Models: partLiteLLM}, Providers: []string{"github_copilot"},
-		Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: []string{"github_copilot/a"}, Model: "github_copilot/b"}}}
-	if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), "is not one of its models") {
+	c := &workspace.Config{Parts: workspace.Parts{Models: workspace.PartLiteLLM}, Providers: []string{"github_copilot"},
+		Workspaces: map[string]*workspace.Workspace{"a": {Folders: []string{"/x"}, Models: []string{"github_copilot/a"}, Model: "github_copilot/b"}}}
+	if err := c.CheckModels(); err == nil || !strings.Contains(err.Error(), "is not one of its models") {
 		t.Errorf("default model outside the list: %v", err)
 	}
 	c.Workspaces["a"].Model = "github_copilot/a"
-	if err := c.checkModels(); err != nil {
+	if err := c.CheckModels(); err != nil {
 		t.Errorf("default model in the list: %v", err)
 	}
 	c.Workspaces["a"].Models = nil
-	if err := c.checkModels(); err == nil {
+	if err := c.CheckModels(); err == nil {
 		t.Error("default model without models accepted")
 	}
 	ms := []proxyModel{{ID: "github_copilot/a"}}
@@ -1842,22 +1843,22 @@ func TestMCPProxy(t *testing.T) {
 }
 
 func TestProviderKeys(t *testing.T) {
-	c := &Config{Parts: Parts{Models: partLiteLLM}, Providers: []string{"openrouter"},
-		Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x"}, Models: []string{"openrouter/*"}}}}
-	if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), "provider_keys.openrouter") {
+	c := &workspace.Config{Parts: workspace.Parts{Models: workspace.PartLiteLLM}, Providers: []string{"openrouter"},
+		Workspaces: map[string]*workspace.Workspace{"a": {Folders: []string{"/x"}, Models: []string{"openrouter/*"}}}}
+	if err := c.CheckModels(); err == nil || !strings.Contains(err.Error(), "provider_keys.openrouter") {
 		t.Errorf("key provider without a command: %v", err)
 	}
 	c.ProviderKeys = map[string]string{"openrouter": "echo k"}
-	if err := c.checkModels(); err != nil {
+	if err := c.CheckModels(); err != nil {
 		t.Errorf("key provider with a command: %v", err)
 	}
 	c.ProviderKeys["github_copilot"] = "echo k"
-	if err := c.checkModels(); err == nil {
+	if err := c.CheckModels(); err == nil {
 		t.Error("a key command for a provider without key is accepted")
 	}
 	delete(c.ProviderKeys, "github_copilot")
 	c.ProviderKeys["openai"] = "echo k"
-	if err := c.checkModels(); err == nil {
+	if err := c.CheckModels(); err == nil {
 		t.Error("a key command for a provider that is not listed is accepted")
 	}
 
@@ -1897,11 +1898,11 @@ func TestProviderKeys(t *testing.T) {
 		t.Errorf("failing key command leaks: %v", err)
 	}
 	c.ProviderKeys = map[string]string{"openrouter": "sh -c 'echo k'"}
-	if err := c.checkModels(); err == nil || !strings.Contains(err.Error(), "without a shell") {
+	if err := c.CheckModels(); err == nil || !strings.Contains(err.Error(), "without a shell") {
 		t.Errorf("command with quotes: %v", err)
 	}
 	// Every key provider's variable is handed to the proxy container.
-	for p, env := range keyProviders {
+	for p, env := range workspace.KeyProviders {
 		if !strings.Contains(string(partsCompose), env+": ${ZERO_KEY_"+strings.ToUpper(p)+"-}") {
 			t.Errorf("compose file lacks %s for %s", env, p)
 		}
@@ -2058,7 +2059,7 @@ func TestHomeKeys(t *testing.T) {
 	plain := func(m home) string {
 		return regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(m.frame(), "")
 	}
-	o := &overview{c: &Config{Workspaces: map[string]*Workspace{
+	o := &overview{c: &workspace.Config{Workspaces: map[string]*workspace.Workspace{
 		"apps": {Folders: []string{"/src/apps"}},
 		"dev":  {Folders: []string{"/src/one", "/src/two"}, Model: "m1"},
 	}}, rows: []wsRow{
@@ -2171,7 +2172,7 @@ func TestHomeKeys(t *testing.T) {
 		t.Error("the screen must run zero -c NAME CMD and nothing more")
 	}
 	// long and wide names stay within the window; many rows keep the selection in sight
-	big := &overview{c: &Config{Workspaces: map[string]*Workspace{}}}
+	big := &overview{c: &workspace.Config{Workspaces: map[string]*workspace.Workspace{}}}
 	for i := 0; i < 40; i++ {
 		big.rows = append(big.rows, wsRow{Name: fmt.Sprintf("ws%02d", i), Status: "none", Token: "-", Policy: "-"})
 	}
@@ -2230,7 +2231,7 @@ func TestHomeFirstRun(t *testing.T) {
 	plain := func(m home) string {
 		return regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(m.frame(), "")
 	}
-	o := &overview{c: &Config{Workspaces: map[string]*Workspace{"new": {Folders: []string{repo}}}},
+	o := &overview{c: &workspace.Config{Workspaces: map[string]*workspace.Workspace{"new": {Folders: []string{repo}}}},
 		rows: []wsRow{{Name: "new", Status: "none", Token: "-", Policy: "-", Folders: 1, Current: true}}}
 	n, _ := home{w: 80, h: 24}.Update(homeLoaded{o: o})
 	file := filepath.Join(repo, ".zero", "policy.yaml")

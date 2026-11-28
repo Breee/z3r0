@@ -1,192 +1,42 @@
 package zero
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
-
-	"go.yaml.in/yaml/v3"
+	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // Workspaces (docs/spec/workspaces.md): a workspace is one sandbox with its
 // directories. The config holds names and directory paths only, never secrets.
 
-type Workspace struct {
-	Folders []string `yaml:"folders"`
-	// Tools are the forge MCP tools of the workspace: "default" or tool
-	// names. Empty means none (ADR 0043).
-	Tools []string `yaml:"tools,omitempty"`
-	// Instructions are files and Skills are directories holding a SKILL.md; both
-	// are copied read-only into the sandbox (ADR 0049).
-	Instructions []string `yaml:"instructions,omitempty"`
-	Skills       []string `yaml:"skills,omitempty"`
-	// Models are the models the workspace's agents may use through the
-	// model proxy: "provider/model" or "provider/*" (ADR 0049).
-	Models []string `yaml:"models,omitempty"`
-	// Model is the default model of the workspace: one of Models (ADR 0054).
-	Model string `yaml:"model,omitempty"`
-}
-
-// Parts are the opt-in services next to the sandbox (ADR 0049).
-type Parts struct {
-	Models string `yaml:"models,omitempty"`
-}
-
-type Config struct {
-	Current string `yaml:"current,omitempty"`
-	Parts   Parts  `yaml:"parts,omitempty"`
-	// Providers are the model providers behind the model proxy.
-	Providers []string `yaml:"providers,omitempty"`
-	// ProviderKeys names, per provider that takes a key, the command that
-	// prints it. The key itself is in no file of zero (ADR 0056).
-	ProviderKeys map[string]string     `yaml:"provider_keys,omitempty"`
-	Workspaces   map[string]*Workspace `yaml:"workspaces"`
-}
-
-var wsNameRe = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
-
-func configPath() string {
-	dir := os.Getenv("XDG_CONFIG_HOME")
-	if dir == "" {
-		dir = filepath.Join(os.Getenv("HOME"), ".config")
-	}
-	return filepath.Join(dir, "zero", "config.yaml")
-}
-
-func loadConfig() (*Config, error) {
-	c := &Config{}
-	b, err := os.ReadFile(configPath())
-	if err != nil && !os.IsNotExist(err) {
+// loadConfig reads the config and checks what only zero's parts can check.
+func loadConfig() (*workspace.Config, error) {
+	c, err := workspace.Load()
+	if err != nil {
 		return nil, err
 	}
-	if len(bytes.TrimSpace(b)) > 0 {
-		dec := yaml.NewDecoder(bytes.NewReader(b))
-		dec.KnownFields(true)
-		if err := dec.Decode(c); err != nil {
-			return nil, fmt.Errorf("%s: %w", configPath(), err)
-		}
-	}
-	if c.Workspaces == nil {
-		c.Workspaces = map[string]*Workspace{}
-	}
-	if err := c.checkModels(); err != nil {
-		return nil, fmt.Errorf("%s: %w", configPath(), err)
-	}
 	for name, w := range c.Workspaces {
-		if !wsNameRe.MatchString(name) || w == nil || len(w.Folders) == 0 {
-			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one directory", configPath(), name)
-		}
 		for _, f := range w.Folders {
 			if filepath.Base(f) == guidanceDir {
-				return nil, fmt.Errorf("%s: workspace %q: a directory cannot be named %s", configPath(), name, guidanceDir)
+				return nil, fmt.Errorf("%s: workspace %q: a directory cannot be named %s", workspace.Path(), name, guidanceDir)
 			}
 		}
 		if _, err := mcpTools(w.Tools); err != nil {
-			return nil, fmt.Errorf("%s: workspace %q: %w", configPath(), name, err)
+			return nil, fmt.Errorf("%s: workspace %q: %w", workspace.Path(), name, err)
 		}
 		if _, _, err := guidance(w); err != nil {
-			return nil, fmt.Errorf("%s: workspace %q: %w", configPath(), name, err)
+			return nil, fmt.Errorf("%s: workspace %q: %w", workspace.Path(), name, err)
 		}
 	}
 	return c, nil
-}
-
-func (c *Config) save() error {
-	b, err := yaml.Marshal(c)
-	if err != nil {
-		return err
-	}
-	p := configPath()
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-		return err
-	}
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, p)
-}
-
-// realPath returns p absolute with symlinks resolved.
-func realPath(p string) (string, error) {
-	abs, err := filepath.Abs(p)
-	if err != nil {
-		return "", err
-	}
-	return filepath.EvalSymlinks(abs)
-}
-
-// wsName turns a directory name into a workspace name.
-func wsName(base string) string {
-	n := strings.Trim(strings.TrimPrefix(SandboxName(base), "zero-"), "-")
-	if len(n) > 40 {
-		n = strings.Trim(n[:40], "-")
-	}
-	return n
-}
-
-// at lists the workspaces that have a directory containing dir.
-func (c *Config) at(dir string) []string {
-	var names []string
-	for name, w := range c.Workspaces {
-		for _, f := range w.Folders {
-			if dir == f || strings.HasPrefix(dir, f+string(filepath.Separator)) {
-				names = append(names, name)
-				break
-			}
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-// resolve picks the workspace: -c, ZERO_CONTEXT, cwd, current. An empty name
-// without error means there is none.
-func (c *Config) resolve(flag, env, cwd string) (name, source string, err error) {
-	for _, pick := range []struct{ name, source string }{{flag, "flag"}, {env, "env"}} {
-		if pick.name == "" {
-			continue
-		}
-		if c.Workspaces[pick.name] == nil {
-			return "", "", fmt.Errorf("no workspace %q (zero ctx lists them)", pick.name)
-		}
-		return pick.name, pick.source, nil
-	}
-	switch here := c.at(cwd); {
-	case len(here) == 1:
-		return here[0], "cwd", nil
-	case slices.Contains(here, c.Current):
-		return c.Current, "current", nil
-	case len(here) > 1:
-		return "", "", fmt.Errorf("%s is in workspaces %s; use -c or zero ctx use", cwd, strings.Join(here, ", "))
-	}
-	if c.Workspaces[c.Current] != nil {
-		return c.Current, "current", nil
-	}
-	return "", "", nil
-}
-
-// adopt registers a sandbox made before workspaces existed: state for the
-// repo around cwd, but no config entry.
-func (c *Config) adopt(top string) bool {
-	name := wsName(filepath.Base(top))
-	if top == "" || name == "" || c.Workspaces[name] != nil || len(c.at(top)) > 0 {
-		return false
-	}
-	if _, err := os.Stat(filepath.Join(core.StateRoot(), "zero-"+name)); err != nil {
-		return false
-	}
-	c.Workspaces[name] = &Workspace{Folders: []string{top}}
-	return true
 }
 
 func gitTop() string {
@@ -194,7 +44,7 @@ func gitTop() string {
 	if err != nil || top == "" {
 		return ""
 	}
-	if p, err := realPath(top); err == nil {
+	if p, err := workspace.RealPath(top); err == nil {
 		return p
 	}
 	return top
@@ -211,18 +61,18 @@ func Open(flag string, create bool) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p, err := realPath(cwd); err == nil {
+	if p, err := workspace.RealPath(cwd); err == nil {
 		cwd = p
 	}
 	top := gitTop()
-	changed := c.adopt(top)
-	name, source, err := c.resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd)
+	changed := c.Adopt(top)
+	name, source, err := c.Resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd)
 	if err != nil {
 		return nil, err
 	}
 	// zero up in a repo that is in no workspace starts a new one; it does
 	// not act on the current workspace somewhere else.
-	if create && source == "current" && top != "" && len(c.at(top)) == 0 {
+	if create && source == "current" && top != "" && len(c.At(top)) == 0 {
 		name = ""
 	}
 	if name == "" {
@@ -232,23 +82,23 @@ func Open(flag string, create bool) (*Sandbox, error) {
 		if top == "" {
 			return nil, fmt.Errorf("not inside a git repository (run zero up from a repo, or zero ctx new NAME PATH)")
 		}
-		name = wsName(filepath.Base(top))
+		name = workspace.Name(filepath.Base(top))
 		if name == "" {
 			return nil, fmt.Errorf("cannot derive a workspace name from %s; use zero ctx new NAME", top)
 		}
 		if c.Workspaces[name] != nil {
 			return nil, fmt.Errorf("workspace %s exists with other directories; use zero ctx new NAME here", name)
 		}
-		c.Workspaces[name] = &Workspace{Folders: []string{top}}
+		c.Workspaces[name] = &workspace.Workspace{Folders: []string{top}}
 		c.Current, source, changed = name, "new", true
 	}
 	if changed {
-		if err := c.save(); err != nil {
+		if err := c.Save(); err != nil {
 			return nil, err
 		}
 	}
 	fmt.Fprintf(os.Stderr, "workspace: %s (%s)\n", name, source)
-	s := c.sandbox(name)
+	s := sandboxOf(c, name)
 	seen := map[string]string{}
 	for _, f := range s.Folders {
 		if _, err := os.Stat(f); err != nil {
@@ -262,7 +112,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 	return s, nil
 }
 
-func (c *Config) sandbox(name string) *Sandbox {
+func sandboxOf(c *workspace.Config, name string) *Sandbox {
 	top := c.Workspaces[name].Folders[0]
 	repo := filepath.Base(top)
 	// The agent works in the first repo; a workspace of input directories only
@@ -311,7 +161,7 @@ func paths(args []string) ([]string, error) {
 	}
 	var out []string
 	for _, a := range args {
-		p, err := realPath(a)
+		p, err := workspace.RealPath(a)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +187,7 @@ func listed(folders, args []string) ([]string, error) {
 			return nil, err
 		}
 		if !slices.Contains(folders, abs) {
-			if p, err := realPath(a); err == nil {
+			if p, err := workspace.RealPath(a); err == nil {
 				abs = p
 			}
 		}
@@ -353,7 +203,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		return err
 	}
 	cwd, _ := os.Getwd()
-	if p, err := realPath(cwd); err == nil {
+	if p, err := workspace.RealPath(cwd); err == nil {
 		cwd = p
 	}
 	sub := ""
@@ -367,7 +217,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			names = append(names, n)
 		}
 		sort.Strings(names)
-		here := c.at(cwd)
+		here := c.At(cwd)
 		for _, n := range names {
 			mark := " "
 			if n == c.Current {
@@ -380,7 +230,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		fmt.Fprintln(os.Stderr, "legend: * current workspace, + workspace of this directory")
 		return nil
 	case "--prompt":
-		if name, _, err := c.resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd); err == nil {
+		if name, _, err := c.Resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd); err == nil {
 			fmt.Fprintln(out, name)
 		}
 		return nil
@@ -390,7 +240,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		}
 		c.Current = args[0]
 	case "new":
-		if len(args) == 0 || !wsNameRe.MatchString(args[0]) {
+		if len(args) == 0 || !workspace.NameRe.MatchString(args[0]) {
 			return fmt.Errorf("usage: zero ctx new NAME [PATH...]; NAME is [a-z0-9-]{1,40}")
 		}
 		if c.Workspaces[args[0]] != nil {
@@ -400,10 +250,10 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		if err != nil {
 			return err
 		}
-		c.Workspaces[args[0]] = &Workspace{Folders: ps}
+		c.Workspaces[args[0]] = &workspace.Workspace{Folders: ps}
 		c.Current = args[0]
 	case "add", "remove":
-		name, _, err := c.resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd)
+		name, _, err := c.Resolve(flag, os.Getenv("ZERO_CONTEXT"), cwd)
 		if err != nil {
 			return err
 		}
@@ -427,7 +277,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 				return fmt.Errorf("%s is not in workspace %s (directories: %s); name one of them: zero -c %s ctx remove PATH", p, name, strings.Join(w.Folders, " "), name)
 			case sub == "remove":
 				if !isInput(p) || !core.FileExists(p) {
-					if s := c.sandbox(name); s.exists() {
+					if s := sandboxOf(c, name); s.exists() {
 						fmt.Fprintf(out, "%s: unpushed: %s -> kept in sandbox, not reachable via token\n", sandboxDir(p), s.unpushedIn(p))
 					}
 				}
@@ -447,7 +297,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		if c.Workspaces[args[0]] == nil {
 			return rmLeftover(out, args[0], yes)
 		}
-		s := c.sandbox(args[0])
+		s := sandboxOf(c, args[0])
 		if err := s.Rm(out, yes); err != nil {
 			return err
 		}
@@ -459,7 +309,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 	default:
 		return fmt.Errorf("usage: zero ctx [use NAME | new NAME [PATH...] | add [PATH...] | remove [PATH...] | rm [-y] NAME | --prompt]")
 	}
-	return c.save()
+	return c.Save()
 }
 
 // rmLeftover removes what a workspace that is no longer in the config left
@@ -467,7 +317,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 func rmLeftover(out io.Writer, name string, yes bool) error {
 	sb := "zero-" + name
 	s := &Sandbox{Name: sb, State: filepath.Join(core.StateRoot(), sb), Host: rt.HostAlias(sb)}
-	if !wsNameRe.MatchString(name) {
+	if !workspace.NameRe.MatchString(name) {
 		return fmt.Errorf("no workspace %q (zero ls lists them)", name)
 	}
 	s.setGateway(s.read("gateway"))

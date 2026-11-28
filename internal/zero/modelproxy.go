@@ -22,6 +22,7 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
+	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // The model proxy (ADR 0049, #162): LiteLLM in a container next to the
@@ -74,7 +75,7 @@ func modelConfig(providers []string, entries []mcpEntry) string {
 			b.WriteString("  - model_name: \"github_copilot/*\"\n    litellm_params:\n      model: \"github_copilot/*\"\n      litellm_credential_name: github-copilot\n      github_copilot_auth_type: per_user_oauth\n")
 			creds += "  - credential_name: github-copilot\n    credential_values:\n      github_copilot_auth_type: per_user_oauth\n    credential_info:\n      custom_llm_provider: github_copilot\n"
 		}
-		if env, ok := keyProviders[p]; ok {
+		if env, ok := workspace.KeyProviders[p]; ok {
 			fmt.Fprintf(&b, "  - model_name: \"%s/*\"\n    litellm_params:\n      model: \"%s/*\"\n      api_key: os.environ/%s\n", p, p, env)
 		}
 	}

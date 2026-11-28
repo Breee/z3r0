@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // Instructions and skills of a workspace (ADR 0049): plain files on the host,
@@ -25,13 +26,13 @@ const opencodeConfig = "$HOME/.config/opencode/opencode.json"
 
 // guidance checks the instructions and skills of a workspace and returns
 // them as absolute paths.
-func guidance(w *Workspace) (instr, skills []string, err error) {
+func guidance(w *workspace.Workspace) (instr, skills []string, err error) {
 	resolve := func(kind, p string, seen map[string]bool) (string, os.FileInfo, error) {
 		q := p
 		if strings.HasPrefix(q, "~/") {
 			q = filepath.Join(os.Getenv("HOME"), q[2:])
 		}
-		q, err := realPath(q)
+		q, err := workspace.RealPath(q)
 		if err != nil {
 			return "", nil, fmt.Errorf("%s %s: not found", kind, p)
 		}
