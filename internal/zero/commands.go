@@ -45,10 +45,13 @@ func (s *Sandbox) Up(out io.Writer) (int, error) {
 
 func (s *Sandbox) up(out io.Writer) (int, error) {
 	out = stepWriter{out}
+	lap("")
 	if err := s.syncInputs(out); err != nil {
 		return 0, err
 	}
+	lap("inputs")
 	if !s.exists() {
+		s.fresh = true
 		if err := s.create(); err != nil {
 			return 0, err
 		}
@@ -92,6 +95,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 				repaths, retools = false, false
 			}
 			done := step("starting the sandbox")
+			s.fresh = true
 			err := rt.Start(s.Name)
 			done(err)
 			if err != nil {
@@ -136,6 +140,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
+	lap("policy, forge token")
 	if len(s.Models) > 0 {
 		// Models come through the proxy only: no other model host stays open.
 		if core.FileExists(s.path("zen.done")) || core.FileExists(s.path("copilot.done")) {
@@ -156,6 +161,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
+	lap("model host rules")
 	done := step("connecting to the sandbox")
 	err := s.writeSSHConfig()
 	if err == nil && s.read("forge") != "" {
@@ -165,17 +171,21 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	lap("ssh config, zero-cp")
 	done = step("copying the repositories in")
 	err = s.ensureCheckout(out)
 	done(err)
 	if err != nil {
 		return 0, err
 	}
+	lap("checkout")
 	done = step("setting up models and instructions")
 	models, err := s.syncModels(out, s.Providers)
+	lap("models")
 	if err == nil {
 		err = s.syncGuidance(out, models)
 	}
+	lap("instructions")
 	done(err)
 	if err != nil {
 		return 0, err
@@ -200,10 +210,12 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			return 0, err
 		}
 	}
+	lap("forward")
 	running, err := s.serveRunning()
 	if err != nil {
 		return 0, err
 	}
+	lap("serve running?")
 	done = step("starting opencode in the sandbox")
 	var startErr error
 	if !running {
@@ -211,6 +223,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	}
 	err = s.waitReady(port, startErr)
 	done(err)
+	lap("serve ready")
 	if err != nil {
 		return 0, err
 	}

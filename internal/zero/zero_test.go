@@ -2360,3 +2360,23 @@ func TestHomeFirstRun(t *testing.T) {
 		t.Errorf("second run: mode %v cmd %q", g.mode, g.cmd)
 	}
 }
+
+func TestKeepModelKey(t *testing.T) {
+	want := litellm.KeyAllows([]string{"a/b"}, "", nil)
+	for _, c := range []struct {
+		name   string
+		left   time.Duration
+		allows string
+		keep   bool
+	}{
+		{"unchanged", 48 * time.Hour, want, true},
+		{"expires soon", renewBefore - time.Minute, want, false},
+		{"no key", 0, "", false},
+		{"models changed", 48 * time.Hour, litellm.KeyAllows([]string{"a/b", "c/d"}, "", nil), false},
+		{"tools changed", 48 * time.Hour, litellm.KeyAllows([]string{"a/b"}, "zero-x", []string{"t"}), false},
+	} {
+		if got := keepModelKey(c.left, c.allows, want); got != c.keep {
+			t.Errorf("%s: keep %v, want %v", c.name, got, c.keep)
+		}
+	}
+}

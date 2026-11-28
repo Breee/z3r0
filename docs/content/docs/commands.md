@@ -63,6 +63,8 @@ Other lines you can see there:
 | `gitlab token: none; zero up makes a new one` | the token was revoked |
 | `forge: none, the agent cannot push ...` | no repository of the workspace is on GitLab, or the sandbox was created without a `glab` login for a self-hosted GitLab |
 
+`ZERO_TIMING=1 zero up` prints how long each part of the start took, as `timing:` lines on the error output.
+
 `zero up` ends with `next: zero opencode`. `zero rm` ends with `workspace NAME is kept; to delete it: zero ctx rm NAME`.
 
 ## Working with the agent

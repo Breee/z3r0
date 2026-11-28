@@ -52,6 +52,7 @@ type Sandbox struct {
 	Approve bool
 	// shown is the workspace policy the human said yes to at the first run.
 	shown *policy.Policy
+	fresh bool // the sandbox was made or started in this run
 	// MaxInput is the size limit for input directories in bytes; 0 means the default.
 	MaxInput int64 // --approve: accept a wider policy without asking
 }

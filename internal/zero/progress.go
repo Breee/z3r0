@@ -109,3 +109,18 @@ func (s stepWriter) Write(b []byte) (int, error) {
 	}
 	return s.w.Write(b)
 }
+
+var lapLast time.Time
+
+// lap prints the time since the previous lap when ZERO_TIMING is set: where
+// the time of a command goes, phase by phase. An empty name starts the clock.
+func lap(name string) {
+	if os.Getenv("ZERO_TIMING") == "" {
+		return
+	}
+	now := time.Now()
+	if name != "" && !lapLast.IsZero() {
+		fmt.Fprintf(os.Stderr, "timing: %-22s %s\n", name, now.Sub(lapLast).Round(time.Millisecond))
+	}
+	lapLast = now
+}
