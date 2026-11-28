@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/gate"
 	"github.com/Breee/z3r0/internal/policy"
 )
 
@@ -195,7 +196,7 @@ func uiDetail(c *Config, row wsRow) uiWorkspace {
 		}
 	}
 	if s.read("gate.key") != "" {
-		w.Branch = strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/")
+		w.Branch = strings.TrimPrefix(gate.SessionBranch(s.Name), "refs/heads/")
 	}
 	return w
 }

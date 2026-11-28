@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/gate"
 )
 
 // copilotEndpoints are added to the sandbox policy on first `zero vscode` use;
@@ -414,7 +415,7 @@ func (s *Sandbox) noteSessionBranch(out io.Writer, dir, path string) {
 	if path == "" {
 		return
 	}
-	branch := strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/")
+	branch := strings.TrimPrefix(gate.SessionBranch(s.Name), "refs/heads/")
 	n, err := s.ssh("cd " + core.ShellQuote(dir) + " && git fetch -q origin " + core.ShellQuote(branch) +
 		" 2>/dev/null && git rev-list --count HEAD..FETCH_HEAD")
 	if err != nil || n == "" || n == "0" {
@@ -785,7 +786,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 	}
 	if s.read("gate.key") != "" {
 		if gateUp() {
-			fmt.Fprintf(out, "push gate: on (%s and below)\n", strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/"))
+			fmt.Fprintf(out, "push gate: on (%s and below)\n", strings.TrimPrefix(gate.SessionBranch(s.Name), "refs/heads/"))
 		} else {
 			fmt.Fprintln(out, "push gate: off (zero-cp not running; pushes fail until the next zero up)")
 		}
