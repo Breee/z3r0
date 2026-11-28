@@ -2340,3 +2340,123 @@ func TestHomeKeys(t *testing.T) {
 		t.Error("fresh answer not used")
 	}
 }
+
+func TestHomeFirstRun(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	press := func(m tea.Model, keys ...rune) (home, bool) {
+		var cmd tea.Cmd
+		for _, k := range keys {
+			msg := tea.KeyPressMsg{Code: k}
+			if k >= ' ' && k < 0x7f {
+				msg.Text = string(k)
+			}
+			m, cmd = m.Update(msg)
+		}
+		return m.(home), cmd != nil
+	}
+	plain := func(m home) string {
+		return regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(m.frame(), "")
+	}
+	o := &overview{c: &Config{Workspaces: map[string]*Workspace{"new": {Folders: []string{repo}}}},
+		rows: []wsRow{{Name: "new", Status: "none", Token: "-", Policy: "-", Folders: 1, Current: true}}}
+	n, _ := home{w: 80, h: 24}.Update(homeLoaded{o: o})
+	file := filepath.Join(repo, ".zero", "policy.yaml")
+
+	m, _ := press(n, tea.KeyEnter)
+	if m.mode != homeFirst || m.cmd != "" {
+		t.Fatalf("enter on a new workspace did not open the first run: mode %v cmd %q", m.mode, m.cmd)
+	}
+	for _, size := range [][2]int{{80, 24}, {50, 18}} {
+		m.w, m.h = size[0], size[1]
+		for i := range m.fr.items {
+			m.fr.cur = i
+			out := plain(m)
+			for _, l := range strings.Split(out, "\n") {
+				if lipgloss.Width(l) > m.w {
+					t.Errorf("%dx%d: line wider than the window: %q", m.w, m.h, l)
+				}
+			}
+			if !strings.Contains(out, m.fr.items[i].key) {
+				t.Errorf("%dx%d: option %s not visible in\n%s", m.w, m.h, m.fr.items[i].key, out)
+			}
+			if !strings.Contains(out, "esc back") {
+				t.Errorf("%dx%d: no key line in\n%s", m.w, m.h, out)
+			}
+		}
+	}
+	m.w, m.h, m.fr.cur = 80, 24, 0
+	out := plain(m)
+	for _, want := range []string{"first run(new)", hostsTitle, capsTitle, "[x] Go modules: proxy.golang.org", "[x] git.push: push, only to its own branch", "[ ] ci.run:", "[ ] gitlab.mr.create:"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("no %q in\n%s", want, out)
+		}
+	}
+
+	// gitlab.mr.create alone is refused
+	last, fr := m, *m.fr
+	fr.items = slices.Clone(fr.items)
+	fr.cur = len(fr.items) - 1
+	last.fr = &fr
+	e, _ := press(last, ' ', tea.KeyEnter)
+	if e.fr == nil || e.fr.preview || !strings.Contains(plain(e), capMRCreate+" needs "+capCIRun) {
+		t.Errorf("gitlab.mr.create without ci.run got through:\n%s", plain(e))
+	}
+
+	// esc writes nothing
+	x, _ := press(m, tea.KeyEnter, tea.KeyEscape, tea.KeyEscape)
+	if x.mode != homeList || fileExists(file) {
+		t.Errorf("esc: mode %v, file written %v", x.mode, fileExists(file))
+	}
+
+	// space unticks the host; the preview shows the file; enter writes and starts
+	p, _ := press(m, ' ', tea.KeyEnter)
+	if !p.fr.preview || !strings.Contains(plain(p), file) || strings.Contains(plain(p), "proxy.golang.org") {
+		t.Fatalf("preview:\n%s", plain(p))
+	}
+	if fileExists(file) {
+		t.Fatal("file written before the yes")
+	}
+	d, quit := press(p, tea.KeyEnter)
+	if d.cmd != "opencode" || !quit {
+		t.Fatalf("after yes: cmd %q quit %v msg %q", d.cmd, quit, d.msg)
+	}
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pol, err := parsePolicy(b)
+	if err != nil || len(pol.Network.Allow) != 0 || !slices.Equal(pol.Capabilities, defaultCaps) {
+		t.Errorf("written policy: %v %+v", err, pol)
+	}
+
+	// the yes is handed to the child once, and covers only what was shown
+	s := d.firstSandbox("new")
+	if _, err := s.approvePolicy(pol); err != nil {
+		t.Errorf("the shown policy asked again: %v", err)
+	}
+	if s.takeShown() != nil {
+		t.Error("policy.shown was not used up")
+	}
+	s = m.firstSandbox("new")
+	if err := s.saveShown(pol); err != nil {
+		t.Fatal(err)
+	}
+	wider := &Policy{Capabilities: defaultCaps}
+	wider.Network.Allow = []string{"evil.example.com"}
+	if _, err := s.approvePolicy(wider); err == nil {
+		t.Error("a policy wider than the shown one passed")
+	}
+
+	// with the file in place the screen starts at once
+	g, quit := press(n, 'v')
+	if g.mode == homeFirst || g.cmd != "vscode" || !quit {
+		t.Errorf("second run: mode %v cmd %q", g.mode, g.cmd)
+	}
+}

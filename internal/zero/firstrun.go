@@ -25,11 +25,32 @@ var presets = []preset{
 	{"Rust", []string{"Cargo.toml"}, []string{"crates.io", "index.crates.io", "static.crates.io"}},
 }
 
-// optionalCaps are off by default; the text says what switching one on means.
-var optionalCaps = []struct{ Cap, Text string }{
-	{capCIRun, "pipelines run on the agent's pushes (default: skipped, you start them)"},
-	{capMRCreate, "the agent opens merge requests (needs ci.run)"},
+// capText says in plain words what each permission lets the agent do. The
+// first-run questions, the workspace screen and the guide use these texts.
+var capText = map[string]string{
+	"git.read":             "read the repositories of this workspace",
+	"git.commit":           "commit inside the sandbox",
+	"git.push":             "push, only to its own branch zero/...",
+	"gitlab.issue.read":    "read issues",
+	"gitlab.mr.read":       "read merge requests and their comments",
+	"gitlab.pipeline.read": "read pipelines and job logs",
+	capCIRun:               "pipelines run on the agent's pushes (off: skipped, you start them)",
+	capMRCreate:            "open merge requests (needs ci.run: a merge request starts a pipeline)",
 }
+
+const (
+	hostsTitle = "Hosts the sandbox may reach"
+	hostsText  = "Package sources found in this workspace. The forge and the model endpoint are always reachable; every other host is refused."
+	capsTitle  = "What the agent may do"
+	capsText   = "Ticked is the safe default. Enter keeps it."
+)
+
+// optionalCaps are off by default.
+var optionalCaps = []string{capCIRun, capMRCreate}
+
+func capLabel(c string) string { return c + ": " + capText[c] }
+
+func presetLabel(p preset) string { return p.Name + ": " + strings.Join(p.Hosts, ", ") }
 
 func detectPresets(dir string) []preset {
 	var found []preset
@@ -84,67 +105,38 @@ func renderPolicy(p *Policy) []byte {
 	return []byte(b.String())
 }
 
-// firstRun guides a new workspace whose directories have no policy file:
-// hosts, permissions, then the file. It asks only at a terminal; the answer
-// yes approves the workspace policy shown, and nothing beyond it (ADR 0058).
-func (s *Sandbox) firstRun() error {
-	if s.Approve || !isTerminal(os.Stdin) || !isTerminal(os.Stderr) {
-		return nil
-	}
-	found := map[string][]preset{}
-	var dirs, names []string
-	for _, top := range s.repos() {
+// firstRunPlan finds the directories without a policy file and the presets
+// in them.
+func firstRunPlan(repos []string) (dirs []string, found map[string][]preset, names []string) {
+	found = map[string][]preset{}
+	for _, top := range repos {
 		if fileExists(filepath.Join(top, ".zero", "policy.yaml")) {
 			continue
 		}
 		dirs = append(dirs, top)
 		found[top] = detectPresets(top)
-		for _, p := range found[top] {
-			if !slices.Contains(names, p.Name) {
+	}
+	for _, p := range presets {
+		for _, top := range dirs {
+			if slices.ContainsFunc(found[top], func(f preset) bool { return f.Name == p.Name }) {
 				names = append(names, p.Name)
+				break
 			}
 		}
 	}
-	if len(dirs) == 0 {
-		return nil
-	}
-	chosen := slices.Clone(names)
-	caps := slices.Clone(defaultCaps)
-	var groups []*huh.Group
-	if len(names) > 0 {
-		var opts []huh.Option[string]
-		for _, p := range presets {
-			if slices.Contains(names, p.Name) {
-				opts = append(opts, huh.NewOption(p.Name+": "+strings.Join(p.Hosts, ", "), p.Name).Selected(true))
-			}
-		}
-		groups = append(groups, huh.NewGroup(huh.NewMultiSelect[string]().
-			Title("Hosts the sandbox may reach").
-			Description("Found in this workspace. The forge and the model endpoint are always reachable.").
-			Options(opts...).Value(&chosen)))
-	}
-	var opts []huh.Option[string]
-	for _, c := range defaultCaps {
-		opts = append(opts, huh.NewOption(c, c).Selected(true))
-	}
-	for _, c := range optionalCaps {
-		opts = append(opts, huh.NewOption(c.Cap+": "+c.Text, c.Cap))
-	}
-	groups = append(groups, huh.NewGroup(huh.NewMultiSelect[string]().
-		Title("What the agent's token may do").
-		Description("Enter keeps the defaults.").
-		Options(opts...).Value(&caps).Validate(checkChosenCaps)))
-	fmt.Fprintf(os.Stderr, "first run: %s has no .zero/policy.yaml yet\n", strings.Join(dirs, ", "))
-	if err := huh.NewForm(groups...).WithOutput(os.Stderr).Run(); err != nil {
-		return firstRunEnd(err)
-	}
+	return dirs, found, names
+}
+
+// firstRunFiles makes the policy file of every directory in dirs and the
+// workspace policy: these files and the existing ones together.
+func firstRunFiles(repos, dirs []string, found map[string][]preset, chosen, caps []string) (map[string][]byte, *Policy, error) {
 	files := map[string][]byte{}
 	var all []*Policy
-	for _, top := range s.repos() {
+	for _, top := range repos {
 		if !slices.Contains(dirs, top) {
 			p, err := loadFolderPolicy(top)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 			all = append(all, p)
 			continue
@@ -152,25 +144,14 @@ func (s *Sandbox) firstRun() error {
 		files[top] = renderPolicy(firstRunPolicy(found[top], chosen, caps))
 		p, err := parsePolicy(files[top])
 		if err != nil {
-			return fmt.Errorf("first run: policy for %s: %w", top, err)
+			return nil, nil, fmt.Errorf("first run: policy for %s: %w", top, err)
 		}
 		all = append(all, p)
-		fmt.Fprintf(os.Stderr, "\n%s:\n%s", filepath.Join(top, ".zero", "policy.yaml"), files[top])
 	}
-	shown := unionPolicy(all...)
-	if len(all) > 1 {
-		fmt.Fprintf(os.Stderr, "\nthe workspace policy (every directory together):\n%s", renderPolicy(shown))
-	}
-	ok := true
-	if err := huh.NewForm(huh.NewGroup(huh.NewConfirm().
-		Title("Write and use this policy?").
-		Description("Enter: yes. No: nothing is written, the default applies.").
-		Value(&ok))).WithOutput(os.Stderr).Run(); err != nil {
-		return firstRunEnd(err)
-	}
-	if !ok {
-		return nil
-	}
+	return files, unionPolicy(all...), nil
+}
+
+func writeFirstRun(dirs []string, files map[string][]byte) error {
 	var written []string
 	for _, top := range dirs {
 		f := filepath.Join(top, ".zero", "policy.yaml")
@@ -186,6 +167,72 @@ func (s *Sandbox) firstRun() error {
 			return fmt.Errorf("first run: %w (%s); make the directory writable, or answer no, or use --approve for the default", err, done)
 		}
 		written = append(written, f)
+	}
+	return nil
+}
+
+// firstRun guides a new workspace whose directories have no policy file:
+// hosts, permissions, then the file. It asks only at a terminal; the answer
+// yes approves the workspace policy shown, and nothing beyond it (ADR 0058).
+func (s *Sandbox) firstRun() error {
+	if s.Approve || !isTerminal(os.Stdin) || !isTerminal(os.Stderr) {
+		return nil
+	}
+	dirs, found, names := firstRunPlan(s.repos())
+	if len(dirs) == 0 {
+		return nil
+	}
+	chosen := slices.Clone(names)
+	caps := slices.Clone(defaultCaps)
+	// The height is set by hand: without it huh hides options (caveat C63).
+	var groups []*huh.Group
+	if len(names) > 0 {
+		var opts []huh.Option[string]
+		for _, p := range presets {
+			if slices.Contains(names, p.Name) {
+				opts = append(opts, huh.NewOption(presetLabel(p), p.Name).Selected(true))
+			}
+		}
+		groups = append(groups, huh.NewGroup(huh.NewMultiSelect[string]().
+			Title(hostsTitle).Description(hostsText).
+			Options(opts...).Height(len(opts)+5).Value(&chosen)))
+	}
+	var opts []huh.Option[string]
+	for _, c := range defaultCaps {
+		opts = append(opts, huh.NewOption(capLabel(c), c).Selected(true))
+	}
+	for _, c := range optionalCaps {
+		opts = append(opts, huh.NewOption(capLabel(c), c))
+	}
+	groups = append(groups, huh.NewGroup(huh.NewMultiSelect[string]().
+		Title(capsTitle).Description(capsText).
+		Options(opts...).Height(len(opts)+4).Value(&caps).Validate(checkChosenCaps)))
+	fmt.Fprintf(os.Stderr, "first run: %s has no .zero/policy.yaml yet\n", strings.Join(dirs, ", "))
+	if err := huh.NewForm(groups...).WithOutput(os.Stderr).Run(); err != nil {
+		return firstRunEnd(err)
+	}
+	files, shown, err := firstRunFiles(s.repos(), dirs, found, chosen, caps)
+	if err != nil {
+		return err
+	}
+	for _, top := range dirs {
+		fmt.Fprintf(os.Stderr, "\n%s:\n%s", filepath.Join(top, ".zero", "policy.yaml"), files[top])
+	}
+	if len(s.repos()) > 1 {
+		fmt.Fprintf(os.Stderr, "\nthe workspace policy (every directory together):\n%s", renderPolicy(shown))
+	}
+	ok := true
+	if err := huh.NewForm(huh.NewGroup(huh.NewConfirm().
+		Title("Write and use this policy?").
+		Description("Enter: yes. No: nothing is written, the default applies.").
+		Value(&ok))).WithOutput(os.Stderr).Run(); err != nil {
+		return firstRunEnd(err)
+	}
+	if !ok {
+		return nil
+	}
+	if err := writeFirstRun(dirs, files); err != nil {
+		return err
 	}
 	s.shown = shown
 	return nil

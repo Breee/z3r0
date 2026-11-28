@@ -42,6 +42,12 @@ Enter on every question keeps the defaults.
 
 Not a terminal, or `--approve`: no questions, behaviour as before.
 
+Every option carries one line that says what it allows (the same text in the terminal form, in the workspace screen and in the guide's policy page).
+
+From the workspace screen (section 3) the questions are a view of the screen, titled `first run(NAME)`: one list of checkboxes (hosts, then permissions), `space` toggles, `enter` shows the files that will be written, `enter` again writes them and starts, `esc` goes back a step and writes nothing. The top block is hidden so that every option fits on an 80x24 window; smaller windows scroll. The yes is handed to the started command once (state file `policy.shown`, on the host) and covers only the policy shown.
+
+The terminal form sets the height of each question itself (caveat C63).
+
 ## 3. Workspace screen
 
 `zero` on a terminal opens a full-screen view in the style of k9s (ADR 0059). Without a terminal it prints the help and exits with 2.
@@ -58,6 +64,7 @@ The table loads in the background and reloads every 5 seconds and after each act
 | `enter`, `o` | Leaves the screen and runs `zero -c NAME opencode` |
 | `v` | Leaves the screen and runs `zero -c NAME vscode` |
 | `u` | `zero -c NAME up`, back to the screen |
+| `enter`, `o`, `v`, `u` on a new workspace | A workspace without a sandbox whose repo directory has no policy file: the first run (section 2) opens first |
 | `s` | `zero -c NAME stop`, back to the screen |
 | `r` | `zero -c NAME rm` (asks as `zero rm` does), back to the screen |
 | `n` | New workspace: name and directory, then back to the screen |

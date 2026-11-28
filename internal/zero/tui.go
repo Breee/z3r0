@@ -31,6 +31,7 @@ const (
 	homeCommand
 	homeDescribe
 	homeHelp
+	homeFirst
 )
 
 type keyHint struct{ key, what string }
@@ -80,9 +81,10 @@ type home struct {
 	mode             homeMode
 	input, filter    string
 	msg              string
-	cmd              string // opencode, vscode or new: what to do after the screen
-	want             string // the workspace to stay on while the filter changes
-	loading, again   bool   // one load at a time; again: one more after it
+	cmd              string     // opencode, vscode or new: what to do after the screen
+	want             string     // the workspace to stay on while the filter changes
+	loading, again   bool       // one load at a time; again: one more after it
+	fr               *firstView // the first run being asked (mode homeFirst)
 }
 
 func homeLoad() tea.Msg {
@@ -203,6 +205,8 @@ func (m home) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case m.mode == homeFilter || m.mode == homeCommand:
 			return m.typed(k, msg.Text)
+		case m.mode == homeFirst && m.fr != nil:
+			return m.firstKey(k)
 		case m.mode == homeDescribe || m.mode == homeHelp:
 			if k == "esc" || k == "q" || k == "enter" {
 				m.mode = homeList
@@ -315,16 +319,21 @@ func (m home) key(k string) (tea.Model, tea.Cmd) {
 	switch k {
 	case "d":
 		m.mode = homeDescribe
-	case "enter", "o":
-		m.cmd = "opencode"
-		return m, tea.Quit
-	case "v":
-		m.cmd = "vscode"
+	case "enter", "o", "v", "u":
+		action := map[string]string{"enter": "opencode", "o": "opencode", "v": "vscode", "u": "up"}[k]
+		if f := m.first(c, action); f != nil {
+			m.mode, m.fr = homeFirst, f
+			return m, nil
+		}
+		if action == "up" {
+			return m, m.exec(c.Name, "up")
+		}
+		m.cmd = action
 		return m, tea.Quit
 	case "w":
 		return m, m.sub("switch "+c.Name, "switch", c.Name)
-	case "u", "s", "r":
-		cmd := map[string]string{"u": "up", "s": "stop", "r": "rm"}[k]
+	case "s", "r":
+		cmd := map[string]string{"s": "stop", "r": "rm"}[k]
 		return m, m.exec(c.Name, cmd)
 	}
 	return m, nil
@@ -493,7 +502,8 @@ func (m home) frame() string {
 	}
 	var out []string
 	headH := 0
-	if m.h >= 16 {
+	// the first run needs the room: every option on one screen
+	if m.h >= 16 && m.mode != homeFirst {
 		out = append(out, m.header()...)
 		headH = 6
 	}
@@ -509,6 +519,8 @@ func (m home) frame() string {
 	switch c := m.cur(); {
 	case m.mode == homeDescribe && c != nil:
 		out = append(out, box("describe("+c.Name+")", m.describe(c), m.w, bh))
+	case m.mode == homeFirst && m.fr != nil:
+		out = append(out, box("first run("+m.fr.name+")", m.firstLines(m.w-2, bh-2), m.w, bh))
 	case m.mode == homeHelp:
 		lines := []string{""}
 		for i := 0; i < 6; i++ {

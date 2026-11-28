@@ -233,6 +233,9 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 			fmt.Fprintln(os.Stderr, "  + "+l)
 		}
 	}
+	if s.shown == nil {
+		s.shown = s.takeShown()
+	}
 	seen := s.shown != nil && len(widened(s.shown, p)) == 0
 	if len(w) > 0 && !s.Approve && !seen {
 		if !isTerminal(os.Stdin) {
@@ -261,6 +264,32 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 }
 
 // saveApproved records p as approved, once it is applied.
+// saveShown records the policy a person accepted on the workspace screen,
+// for the command the screen starts next. takeShown reads it once.
+func (s *Sandbox) saveShown(p *Policy) error {
+	out, err := yaml.Marshal(p)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(s.State, 0o700); err != nil {
+		return err
+	}
+	return s.write("policy.shown", string(out), 0o600)
+}
+
+func (s *Sandbox) takeShown() *Policy {
+	b, err := os.ReadFile(s.path("policy.shown"))
+	if err != nil {
+		return nil
+	}
+	os.Remove(s.path("policy.shown"))
+	var p Policy
+	if yaml.Unmarshal(b, &p) != nil {
+		return nil
+	}
+	return &p
+}
+
 func (s *Sandbox) saveApproved(p *Policy) error {
 	out, err := yaml.Marshal(p)
 	if err != nil {
