@@ -62,3 +62,4 @@ MADR format. One file per decision: `NNNN-<slug>.md`, front matter `status`, `da
 | [58](0058-guided-first-run-and-a-workspace-list-built-with-charm.md) | 2026-11-28 | Guided first run (hosts, permissions, defaults) and a workspace list on bare `zero`; agent is the verb; built with Charm v2 | Z-INV-1 |
 | [59](0059-k9s-style-workspace-screen.md) | 2026-11-28 | Bare `zero` opens a k9s-style workspace screen (top block with logo, table, filter, command, describe); actions run the normal commands; replaces the list of 0058 | Z-INV-1 |
 | [60](0060-provider-interfaces-and-packages-by-component.md) | 2026-11-28 | Provider interfaces by requirement; packages by component | Z-INV-1, Z-INV-2 |
+| [61](0061-a-runtime-per-workspace-one-gateway-per-runtime.md) | 2026-11-28 | Proposed: a runtime per workspace; one gateway per runtime | Z-OS-3 |
