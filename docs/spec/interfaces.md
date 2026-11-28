@@ -1,6 +1,6 @@
 # Interfaces
 
-Status: proposed (#190). No code is moved before this is read and agreed.
+Status: accepted 2026-11-28 (#190, ADR 0060).
 
 zero owns the workflow: workspaces, policy and its approval, the push gate,
 state, the order of steps in `zero up`. Everything else is a part that can be
