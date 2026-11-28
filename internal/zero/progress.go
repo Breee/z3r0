@@ -21,7 +21,13 @@ var progress = struct {
 }{out: os.Stderr, tty: fancy(os.Stderr)}
 
 func fancy(f *os.File) bool {
-	return core.IsTerminal(f) && os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
+	return colourWanted(core.IsTerminal(f), os.Getenv("NO_COLOR"), os.Getenv("TERM"))
+}
+
+// colourWanted is the plain rule: colour only on a terminal, and not with
+// NO_COLOR set or TERM=dumb.
+func colourWanted(terminal bool, noColor, term string) bool {
+	return terminal && noColor == "" && term != "dumb"
 }
 
 var spinner = []rune("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")

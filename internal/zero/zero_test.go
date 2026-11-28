@@ -2385,7 +2385,9 @@ func TestStyleRows(t *testing.T) {
 	rows := []wsRow{
 		{Name: "apps", Status: "none", Token: "-", Policy: "-", Folders: 1},
 		{Name: "running", Status: "running", Token: "gitlab 16h", Policy: "ok", Folders: 2, Current: true},
-		{Name: "old", Status: "stopped", Token: "-", Policy: "changed", Folders: 1},
+		{Name: "old", Status: "paused", Token: "-", Policy: "changed", Folders: 1},
+		{Name: "none", Status: "running", Token: "none", Policy: "-", Folders: 1},
+		{Name: "näme-ü", Status: "none", Token: "-", Policy: "-", Folders: 1},
 	}
 	var b bytes.Buffer
 	if err := writeRows(&b, rows); err != nil {
@@ -2399,12 +2401,35 @@ func TestStyleRows(t *testing.T) {
 	if got := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(styled, ""); got != plain {
 		t.Errorf("styled table differs from the plain one:\n%s\n%s", got, plain)
 	}
-	for _, want := range []string{"\x1b[1;32mrunning\x1b[0m", "\x1b[33mstopped\x1b[0m", "\x1b[2mnone\x1b[0m", "\x1b[1m* running"} {
+	for _, want := range []string{"\x1b[1;32mrunning\x1b[0m", "\x1b[33mpaused\x1b[0m", "  none       \x1b[32mrunning\x1b[0m", "\x1b[2mnone\x1b[0m", "\x1b[1m* running"} {
 		if !strings.Contains(styled, want) {
 			t.Errorf("styled table lacks %q:\n%q", want, styled)
 		}
 	}
 	if Fancy(&b) {
 		t.Error("a buffer is not a terminal")
+	}
+	f, err := os.CreateTemp(t.TempDir(), "out")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if Fancy(f) {
+		t.Error("a file is not a terminal")
+	}
+	for _, c := range []struct {
+		term        bool
+		noColor, tv string
+		want        bool
+	}{{true, "", "xterm", true}, {false, "", "xterm", false}, {true, "1", "xterm", false}, {true, "", "dumb", false}} {
+		if got := colourWanted(c.term, c.noColor, c.tv); got != c.want {
+			t.Errorf("colourWanted(%v, %q, %q) = %v", c.term, c.noColor, c.tv, got)
+		}
+	}
+	if got := styleRows("", nil); got != "" {
+		t.Errorf("empty table styled: %q", got)
+	}
+	if got := StyleHelp("zero\n\nExamples\n  zero up\n  \n"); strings.Contains(got, "\x1b[36m") {
+		t.Errorf("example coloured as a command: %q", got)
 	}
 }

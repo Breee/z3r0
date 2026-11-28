@@ -124,7 +124,7 @@ func TestStyledHelpSameText(t *testing.T) {
 	if got := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(styled, ""); got != usageText {
 		t.Errorf("styled help differs from the plain text:\n%s", got)
 	}
-	if !strings.Contains(styled, "\x1b[36mopencode\x1b[0m") || !strings.Contains(styled, "\x1b[1;36mWorkspaces\x1b[0m") {
+	if !strings.Contains(styled, "\x1b[36mopencode\x1b[0m") || !strings.Contains(styled, "\x1b[1mWorkspaces\x1b[0m") || !strings.Contains(styled, "\x1b[1mUsage:\x1b[0m") || strings.Contains(styled, "\x1b[36mcd\x1b[0m") {
 		t.Errorf("command or heading not coloured:\n%q", styled)
 	}
 }

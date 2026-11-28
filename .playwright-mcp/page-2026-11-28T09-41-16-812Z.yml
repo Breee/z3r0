@@ -1,0 +1,28 @@
+- generic [active] [ref=f5e1]:
+  - navigation [ref=f5e2]:
+    - link "Workspaces" [ref=f5e3] [cursor=pointer]:
+      - /url: /ui/
+    - link "Parts" [ref=f5e4] [cursor=pointer]:
+      - /url: /ui/parts
+  - heading "Parts" [level=1] [ref=f5e5]
+  - table [ref=f5e6]:
+    - rowgroup [ref=f5e7]:
+      - row [ref=f5e8]:
+        - columnheader "Part" [ref=f5e9]
+        - columnheader "On" [ref=f5e10]
+        - columnheader "State" [ref=f5e11]
+        - columnheader "Its own page" [ref=f5e12]
+      - row [ref=f5e13]:
+        - cell "push gate" [ref=f5e14]
+        - cell "yes" [ref=f5e15]
+        - cell "running" [ref=f5e16]
+        - cell [ref=f5e17]
+      - row [ref=f5e18]:
+        - cell "model proxy" [ref=f5e19]
+        - cell "yes" [ref=f5e20]
+        - cell "ready" [ref=f5e21]
+        - cell [ref=f5e22]:
+          - link "/litellm/ui/" [ref=f5e23] [cursor=pointer]:
+            - /url: /litellm/ui/
+          - text: "its own login: user admin, password in /home/bree/.local/state/zero/parts/models.key"
+  - paragraph [ref=f5e24]: Read-only. Changes are made in zero's config file and with the zero command.

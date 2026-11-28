@@ -56,6 +56,7 @@ var (
 	cLogo   = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
 	cStatus = map[string]lipgloss.Style{
 		"running": lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		"paused":  lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
 		"stopped": lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
 		"none":    cFaint,
 	}

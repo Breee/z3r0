@@ -420,21 +420,21 @@ var uiTmpl = template.Must(template.New("ui").Funcs(template.FuncMap{"join": str
 {{define "head"}}<!doctype html><html lang="en"><head><meta charset="utf-8"><title>zero: {{.Title}}</title>
 <style>body{font:15px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:60rem;padding:0 1rem;color:#222}
 nav a{margin-right:1rem}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:.3rem .6rem;border-bottom:1px solid #ddd;vertical-align:top}
-th{font-weight:600}code{background:#f3f3f3;padding:0 .2rem}.warn{color:#a40}.dim{color:#777}</style></head><body>
+th{font-weight:600}code{background:#f3f3f3;padding:0 .2rem}th,td{overflow-wrap:anywhere}.warn{color:#a40}.dim,.s-none,.s-unknown{color:#777}.s-running,.s-allow,.s-ready{color:#070}.s-paused{color:#a60}.s-deny,.s-refused,.s-error{color:#b00}</style></head><body>
 <nav><a href="/ui/">Workspaces</a><a href="/ui/parts">Parts</a></nav><h1>{{.Title}}</h1>{{end}}
 {{define "foot"}}<p class="dim">Read-only. Changes are made in zero's config file and with the zero command.</p></body></html>{{end}}
 
 {{define "Workspaces"}}{{template "head" .}}
 {{if .Warn}}<p class="warn">{{.Warn}}</p>{{end}}
 <table><tr><th>Workspace</th><th>Sandbox</th><th>Directories</th><th>Token</th><th>Policy</th></tr>
-{{range .List}}<tr><td><a href="/ui/workspace?workspace={{.Name}}">{{.Name}}</a>{{if .Current}} (current){{end}}</td><td>{{.Status}}</td><td>{{len .Folders}}</td><td>{{.Token}}</td><td>{{.Policy}}</td></tr>
+{{range .List}}<tr><td><a href="/ui/workspace?workspace={{.Name}}">{{.Name}}</a>{{if .Current}} (current){{end}}</td><td class="s-{{.Status}}">{{.Status}}</td><td>{{len .Folders}}</td><td>{{.Token}}</td><td>{{.Policy}}</td></tr>
 {{else}}<tr><td colspan="5">no workspace yet</td></tr>{{end}}</table>
 {{template "foot" .}}{{end}}
 
 {{define "Workspace"}}{{template "head" .}}{{with .W}}
 <h2>{{.Name}}</h2>
 <table>
-<tr><th>Sandbox</th><td>{{.Status}}</td></tr>
+<tr><th>Sandbox</th><td class="s-{{.Status}}">{{.Status}}</td></tr>
 <tr><th>Directories</th><td>{{range .Folders}}<code>{{.}}</code><br>{{end}}</td></tr>
 <tr><th>Forge token</th><td>{{if .Token}}{{.Token}}{{else}}none{{end}}</td></tr>
 <tr><th>Projects it reaches</th><td>{{if .Projects}}{{join .Projects ", "}}{{else}}none{{end}}</td></tr>
@@ -449,13 +449,13 @@ th{font-weight:600}code{background:#f3f3f3;padding:0 .2rem}.warn{color:#a40}.dim
 </table>{{end}}
 <h2>Decisions of the push gate</h2>
 <table><tr><th>Time</th><th>Decision</th><th>Ref</th><th>Reason</th></tr>
-{{range .Log}}<tr><td>{{index . "time"}}</td><td>{{index . "decision"}}</td><td>{{index . "ref"}}{{index . "path"}}</td><td>{{index . "reason"}}</td></tr>
+{{range .Log}}<tr><td>{{index . "time"}}</td><td class="s-{{index . "decision"}}">{{index . "decision"}}</td><td>{{index . "ref"}}{{index . "path"}}</td><td>{{index . "reason"}}</td></tr>
 {{else}}<tr><td colspan="4">none recorded</td></tr>{{end}}</table>
 {{template "foot" .}}{{end}}
 
 {{define "Parts"}}{{template "head" .}}
 <table><tr><th>Part</th><th>On</th><th>State</th><th>Its own page</th></tr>
-{{range .Parts}}<tr><td>{{.Name}}</td><td>{{if .On}}yes{{else}}no{{end}}</td><td>{{.State}}</td><td>{{if .URL}}<a href="{{.URL}}" rel="noreferrer">{{.URL}}</a><br><span class="dim">{{.Note}}</span>{{end}}</td></tr>{{end}}</table>
+{{range .Parts}}<tr><td>{{.Name}}</td><td>{{if .On}}yes{{else}}no{{end}}</td><td class="s-{{.State}}">{{.State}}</td><td>{{if .URL}}<a href="{{.URL}}" rel="noreferrer">{{.URL}}</a><br><span class="dim">{{.Note}}</span>{{end}}</td></tr>{{end}}</table>
 {{template "foot" .}}{{end}}
 `))
 

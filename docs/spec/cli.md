@@ -17,7 +17,7 @@ Rules:
 - The workspace comes from `-c`, else `ZERO_CONTEXT`, else the current directory, else the current context (workspaces spec, section 4).
 - A second run asks nothing.
 
-On a terminal the help, `zero ls` and the picker of `zero switch` are coloured: headings and the current workspace bold, command names cyan, the status green (running), yellow (stopped) or faint. Piped, with `NO_COLOR` set or with `TERM=dumb` the same text comes without colour; words, columns and exit codes are the same in both forms.
+On a terminal the help, `zero ls` and the picker of `zero switch` are coloured: headings and the current workspace bold, command names cyan, the status green (running), yellow (paused) or faint. The web UI colours the status the same way. Piped, with `NO_COLOR` set or with `TERM=dumb` the same text comes without colour; words, columns and exit codes are the same in both forms.
 
 ## 2. First run
 
