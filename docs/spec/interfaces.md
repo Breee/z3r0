@@ -266,6 +266,30 @@ part never imports another part or `up`.
 Tests move with their component; `zero_test.go` (2500 lines) is split the
 same way.
 
+### State on 2026-11-28 (#190)
+
+Split and in use, each importing only `core`: `core`, `workspace` (config
+file, workspaces, model lists), `policy` (file, union, widening, first-run
+helpers), `gate` (push wire format and rules), `sandbox/openshell`,
+`forge/gitlab`, `model/litellm` (container, API, keys, tool entries),
+`guidance/hostfiles`, `agent/{opencode,copilot,claude}` (binaries, start
+scripts), `install` (host setup).
+
+Still in `internal/zero` (about 8600 lines):
+
+- The workflow on `*Sandbox` (up, stop, rm, forge token, model key, tools,
+  guidance, input, policy approval, first run, the gate's server), `Open` and
+  `ctx`, `ls`, `switch`, the workspace screen, progress, the web UI, doctor.
+  They hang on `*Sandbox` methods and unexported functions; moving them needs
+  `*Sandbox` turned into the exported API of `up`.
+- The parts implement the interim interfaces `core.Runtime` and
+  `core.ForgeHost` (the old shapes). The interfaces of section 2 are declared
+  in `core` and implemented by no part yet.
+- The model proxy is called as `litellm.X` directly, and its name is still in
+  `workspace.PartLiteLLM`, the opencode provider id and the web UI path.
+- About 32 tests of moved code are still in `internal/zero/zero_test.go`.
+- `agent/vscode`, `model/copilot`, `tui`, `ui`, `up` do not exist yet.
+
 ## 5. Not in this work
 
 - New implementations (GitHub #186, nono #180, tools without proxy #178).
