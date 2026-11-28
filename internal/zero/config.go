@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/guidance/hostfiles"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 	"github.com/Breee/z3r0/internal/workspace"
 )
@@ -25,14 +26,14 @@ func loadConfig() (*workspace.Config, error) {
 	}
 	for name, w := range c.Workspaces {
 		for _, f := range w.Folders {
-			if filepath.Base(f) == guidanceDir {
-				return nil, fmt.Errorf("%s: workspace %q: a directory cannot be named %s", workspace.Path(), name, guidanceDir)
+			if filepath.Base(f) == hostfiles.Dir {
+				return nil, fmt.Errorf("%s: workspace %q: a directory cannot be named %s", workspace.Path(), name, hostfiles.Dir)
 			}
 		}
 		if _, err := mcpTools(w.Tools); err != nil {
 			return nil, fmt.Errorf("%s: workspace %q: %w", workspace.Path(), name, err)
 		}
-		if _, _, err := guidance(w); err != nil {
+		if _, _, err := hostfiles.Resolve(w.Instructions, w.Skills); err != nil {
 			return nil, fmt.Errorf("%s: workspace %q: %w", workspace.Path(), name, err)
 		}
 	}
@@ -44,7 +45,7 @@ func gitTop() string {
 	if err != nil || top == "" {
 		return ""
 	}
-	if p, err := workspace.RealPath(top); err == nil {
+	if p, err := core.RealPath(top); err == nil {
 		return p
 	}
 	return top
@@ -61,7 +62,7 @@ func Open(flag string, create bool) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p, err := workspace.RealPath(cwd); err == nil {
+	if p, err := core.RealPath(cwd); err == nil {
 		cwd = p
 	}
 	top := gitTop()
@@ -125,7 +126,7 @@ func sandboxOf(c *workspace.Config, name string) *Sandbox {
 		}
 	}
 	tools, _ := mcpTools(c.Workspaces[name].Tools) // checked by loadConfig
-	instr, skills, _ := guidance(c.Workspaces[name])
+	instr, skills, _ := hostfiles.Resolve(c.Workspaces[name].Instructions, c.Workspaces[name].Skills)
 	s := &Sandbox{
 		Name:         "zero-" + name,
 		Folders:      c.Workspaces[name].Folders,
@@ -161,7 +162,7 @@ func paths(args []string) ([]string, error) {
 	}
 	var out []string
 	for _, a := range args {
-		p, err := workspace.RealPath(a)
+		p, err := core.RealPath(a)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +188,7 @@ func listed(folders, args []string) ([]string, error) {
 			return nil, err
 		}
 		if !slices.Contains(folders, abs) {
-			if p, err := workspace.RealPath(a); err == nil {
+			if p, err := core.RealPath(a); err == nil {
 				abs = p
 			}
 		}
@@ -203,7 +204,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 		return err
 	}
 	cwd, _ := os.Getwd()
-	if p, err := workspace.RealPath(cwd); err == nil {
+	if p, err := core.RealPath(cwd); err == nil {
 		cwd = p
 	}
 	sub := ""

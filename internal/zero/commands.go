@@ -15,6 +15,7 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/gate"
+	"github.com/Breee/z3r0/internal/guidance/hostfiles"
 	"github.com/Breee/z3r0/internal/model/litellm"
 )
 
@@ -771,10 +772,10 @@ func (s *Sandbox) Status(out io.Writer) error {
 		fmt.Fprintln(out, noForge)
 	}
 	if len(s.Instructions) > 0 {
-		fmt.Fprintf(out, "instructions: %s\n", baseNames(s.Instructions))
+		fmt.Fprintf(out, "instructions: %s\n", hostfiles.BaseNames(s.Instructions))
 	}
 	if len(s.Skills) > 0 {
-		fmt.Fprintf(out, "skills: %s\n", baseNames(s.Skills))
+		fmt.Fprintf(out, "skills: %s\n", hostfiles.BaseNames(s.Skills))
 	}
 	if len(s.Models) > 0 {
 		if s.Model != "" {

@@ -103,15 +103,6 @@ func (c *Config) Save() error {
 	return os.Rename(tmp, p)
 }
 
-// RealPath returns p absolute with symlinks resolved.
-func RealPath(p string) (string, error) {
-	abs, err := filepath.Abs(p)
-	if err != nil {
-		return "", err
-	}
-	return filepath.EvalSymlinks(abs)
-}
-
 // Name turns a directory name into a workspace name.
 func Name(base string) string {
 	n := strings.Trim(strings.TrimPrefix(SandboxName(base), "zero-"), "-")

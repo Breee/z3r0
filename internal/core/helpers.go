@@ -69,3 +69,12 @@ func IsTerminal(f *os.File) bool {
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), syscall.TCGETS, uintptr(unsafe.Pointer(&t)))
 	return e == 0
 }
+
+// RealPath returns p absolute with symlinks resolved.
+func RealPath(p string) (string, error) {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(abs)
+}

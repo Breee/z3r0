@@ -11,70 +11,16 @@ import (
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/guidance/hostfiles"
 	"github.com/Breee/z3r0/internal/model/litellm"
-	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // Instructions and skills of a workspace (ADR 0049): plain files on the host,
 // copied read-only into the sandbox next to the input directories and named in
 // the opencode user config of the sandbox.
 
-// guidanceDir is the entry of the staging directory that holds them.
-const guidanceDir = ".zero"
-
 // opencodeConfig is the opencode user config inside the sandbox.
 const opencodeConfig = "$HOME/.config/opencode/opencode.json"
-
-// guidance checks the instructions and skills of a workspace and returns
-// them as absolute paths.
-func guidance(w *workspace.Workspace) (instr, skills []string, err error) {
-	resolve := func(kind, p string, seen map[string]bool) (string, os.FileInfo, error) {
-		q := p
-		if strings.HasPrefix(q, "~/") {
-			q = filepath.Join(os.Getenv("HOME"), q[2:])
-		}
-		q, err := workspace.RealPath(q)
-		if err != nil {
-			return "", nil, fmt.Errorf("%s %s: not found", kind, p)
-		}
-		st, err := os.Stat(q)
-		if err != nil {
-			return "", nil, fmt.Errorf("%s %s: %w", kind, p, err)
-		}
-		base := filepath.Base(q)
-		if strings.HasPrefix(base, ".") || base != core.Clean(base) {
-			return "", nil, fmt.Errorf("%s %s: the name %q is not usable", kind, p, base)
-		}
-		if seen[base] {
-			return "", nil, fmt.Errorf("%s %s: the name %s is listed twice", kind, p, base)
-		}
-		seen[base] = true
-		return q, st, nil
-	}
-	seen := map[string]bool{}
-	for _, p := range w.Instructions {
-		q, st, err := resolve("instruction", p, seen)
-		if err != nil {
-			return nil, nil, err
-		}
-		if !st.Mode().IsRegular() {
-			return nil, nil, fmt.Errorf("instruction %s: not a file", p)
-		}
-		instr = append(instr, q)
-	}
-	seen = map[string]bool{}
-	for _, p := range w.Skills {
-		q, st, err := resolve("skill", p, seen)
-		if err != nil {
-			return nil, nil, err
-		}
-		if !st.IsDir() || !core.FileExists(filepath.Join(q, "SKILL.md")) {
-			return nil, nil, fmt.Errorf("skill %s: not a directory with a SKILL.md", p)
-		}
-		skills = append(skills, q)
-	}
-	return instr, skills, nil
-}
 
 // guidanceConfig is the opencode config that names the copied instructions
 // and skills; empty when the workspace has none.
@@ -82,7 +28,7 @@ func guidanceConfig(instr, skills []string, models []litellm.Model, model string
 	if len(instr)+len(skills)+len(models) == 0 {
 		return ""
 	}
-	root := inputMount + "/" + guidanceDir
+	root := inputMount + "/" + hostfiles.Dir
 	c := map[string]any{"$schema": "https://opencode.ai/config.json"}
 	if len(instr) > 0 {
 		var l []string
@@ -147,13 +93,4 @@ func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
 		return err
 	}
 	return s.write("opencode.sha", sha, 0o600)
-}
-
-// base names for messages.
-func baseNames(paths []string) string {
-	var l []string
-	for _, p := range paths {
-		l = append(l, filepath.Base(p))
-	}
-	return strings.Join(l, ", ")
 }

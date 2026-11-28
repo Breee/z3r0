@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/guidance/hostfiles"
 )
 
 // Input directories (ADR 0039): a workspace directory that is no git repo is copied,
@@ -331,8 +332,8 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 		}
 	}
 	if len(instr)+len(skills) > 0 {
-		keep[guidanceDir] = true
-		tmp := filepath.Join(stage, "."+guidanceDir+".new")
+		keep[hostfiles.Dir] = true
+		tmp := filepath.Join(stage, "."+hostfiles.Dir+".new")
 		os.RemoveAll(tmp)
 		fail := func(err error) error {
 			os.RemoveAll(tmp)
@@ -363,7 +364,7 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 		if len(names) > 0 {
 			fmt.Fprintf(out, "skills: %s, read-only\n", strings.Join(names, ", "))
 		}
-		if err := swap(guidanceDir, tmp); err != nil {
+		if err := swap(hostfiles.Dir, tmp); err != nil {
 			return err
 		}
 	}

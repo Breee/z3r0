@@ -24,6 +24,7 @@ import (
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/gate"
+	"github.com/Breee/z3r0/internal/guidance/hostfiles"
 	"github.com/Breee/z3r0/internal/model/litellm"
 	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
@@ -1135,7 +1136,7 @@ func TestCtxRemoveMissingFolder(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	root, err := workspace.RealPath(t.TempDir())
+	root, err := core.RealPath(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1316,7 +1317,7 @@ func TestGuidance(t *testing.T) {
 	os.WriteFile(filepath.Join(d, "other", "review.md"), []byte("x"), 0o644)
 	p := func(n string) string { return filepath.Join(d, n) }
 
-	instr, skills, err := guidance(&workspace.Workspace{Instructions: []string{p("review.md")}, Skills: []string{p("go-review")}})
+	instr, skills, err := hostfiles.Resolve([]string{p("review.md")}, []string{p("go-review")})
 	if err != nil || len(instr) != 1 || len(skills) != 1 {
 		t.Fatalf("guidance = %v %v %v", instr, skills, err)
 	}
@@ -1330,7 +1331,7 @@ func TestGuidance(t *testing.T) {
 		{workspace.Workspace{Skills: []string{p("empty")}}, "SKILL.md"},
 		{workspace.Workspace{Skills: []string{p("review.md")}}, "SKILL.md"},
 	} {
-		if _, _, err := guidance(&c.w); err == nil || !strings.Contains(err.Error(), c.want) {
+		if _, _, err := hostfiles.Resolve(c.w.Instructions, c.w.Skills); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("guidance(%v) = %v, want %q", c.w, err, c.want)
 		}
 	}
