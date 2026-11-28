@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Breee/z3r0/internal/core"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
@@ -563,7 +565,7 @@ func (m home) View() tea.View {
 }
 
 // Interactive reports whether zero talks to a person at a terminal.
-func Interactive() bool { return isTerminal(os.Stdin) && isTerminal(os.Stdout) }
+func Interactive() bool { return core.IsTerminal(os.Stdin) && core.IsTerminal(os.Stdout) }
 
 // Home shows the workspace screen until the person picks something to run
 // outside it; it returns the arguments for zero, nil to leave.

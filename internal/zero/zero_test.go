@@ -3,12 +3,9 @@ package zero
 import (
 	"bufio"
 	"bytes"
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"go.yaml.in/yaml/v3"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +18,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/Breee/z3r0/internal/core"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestSandboxName(t *testing.T) {
@@ -40,12 +42,12 @@ func TestSandboxName(t *testing.T) {
 
 func TestStateRoot(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", "/tmp/xdg")
-	if got, want := stateRoot(), "/tmp/xdg/zero"; got != want {
+	if got, want := core.StateRoot(), "/tmp/xdg/zero"; got != want {
 		t.Errorf("stateRoot() = %q, want %q", got, want)
 	}
 	t.Setenv("XDG_STATE_HOME", "")
 	t.Setenv("HOME", "/home/u")
-	if got, want := stateRoot(), "/home/u/.local/state/zero"; got != want {
+	if got, want := core.StateRoot(), "/home/u/.local/state/zero"; got != want {
 		t.Errorf("stateRoot() = %q, want %q", got, want)
 	}
 }
@@ -57,7 +59,7 @@ func TestShellQuote(t *testing.T) {
 		"/tmp/zero/My Repo": `'/tmp/zero/My Repo'`,
 	}
 	for in, want := range cases {
-		if got := shellQuote(in); got != want {
+		if got := core.ShellQuote(in); got != want {
 			t.Errorf("shellQuote(%q) = %s, want %s", in, got, want)
 		}
 	}
@@ -427,7 +429,7 @@ func TestMRCreateNeedsCIRun(t *testing.T) {
 
 func TestGateSeveralRepos(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	dir := filepath.Join(stateRoot(), "zero-team")
+	dir := filepath.Join(core.StateRoot(), "zero-team")
 	os.MkdirAll(dir, 0o700)
 	key := strings.Repeat("ab", 16)
 	for k, v := range map[string]string{"gate.key": key, "forge": "gitlab", "forge.path": "g/api\ng/web\n"} {
@@ -449,7 +451,7 @@ func TestGateSeveralRepos(t *testing.T) {
 
 func TestGateLimits(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	dir := filepath.Join(stateRoot(), "zero-team")
+	dir := filepath.Join(core.StateRoot(), "zero-team")
 	os.MkdirAll(dir, 0o700)
 	key := strings.Repeat("ab", 16)
 	for k, v := range map[string]string{"gate.key": key, "forge": "gitlab", "forge.path": "g/api\n"} {
@@ -581,7 +583,7 @@ func TestBundleRepoWithoutStash(t *testing.T) {
 	top := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
-		out, err := sh("git", append([]string{"-C", top, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		out, err := core.Sh("git", append([]string{"-C", top, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
 		if err != nil {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}
@@ -670,7 +672,7 @@ func TestSyncInputs(t *testing.T) {
 		t.Fatalf("summary: %q", out.String())
 	}
 	stage := filepath.Join(inputRoot, "zero-t", "specs")
-	if fileExists(filepath.Join(stage, ".env")) {
+	if core.FileExists(filepath.Join(stage, ".env")) {
 		t.Fatal(".env was copied")
 	}
 	for name, mode := range map[string]os.FileMode{"openapi.yaml": 0o644, "bin/run.sh": 0o755, "bin": 0o755} {
@@ -685,7 +687,7 @@ func TestSyncInputs(t *testing.T) {
 	if err := s.syncInputs(&out); err != nil {
 		t.Fatal(err)
 	}
-	if fileExists(filepath.Join(stage, "openapi.yaml")) {
+	if core.FileExists(filepath.Join(stage, "openapi.yaml")) {
 		t.Fatal("deleted file still staged")
 	}
 
@@ -695,7 +697,7 @@ func TestSyncInputs(t *testing.T) {
 	if err := s.syncInputs(&out); err == nil || !strings.Contains(err.Error(), "limit is 1 KiB") {
 		t.Fatalf("limit: %v", err)
 	}
-	if fileExists(filepath.Join(stage, "big.bin")) {
+	if core.FileExists(filepath.Join(stage, "big.bin")) {
 		t.Fatal("copied despite the limit")
 	}
 
@@ -704,7 +706,7 @@ func TestSyncInputs(t *testing.T) {
 	if err := s.syncInputs(&out); err != nil {
 		t.Fatal(err)
 	}
-	if fileExists(stage) {
+	if core.FileExists(stage) {
 		t.Fatal("copy of a removed directory kept")
 	}
 }
@@ -713,7 +715,7 @@ func TestUnpushedScript(t *testing.T) {
 	dir := t.TempDir()
 	run := func(script string) string {
 		t.Helper()
-		out, err := sh("sh", "-c", "cd "+shellQuote(dir)+" && "+script)
+		out, err := core.Sh("sh", "-c", "cd "+core.ShellQuote(dir)+" && "+script)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -752,7 +754,7 @@ func TestUncommitted(t *testing.T) {
 	top := t.TempDir()
 	git := func(args ...string) {
 		t.Helper()
-		if out, err := sh("git", append([]string{"-C", top, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...); err != nil {
+		if out, err := core.Sh("git", append([]string{"-C", top, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...); err != nil {
 			t.Fatal(out, err)
 		}
 	}
@@ -1079,7 +1081,7 @@ func TestRevokeForgeByLabel(t *testing.T) {
 	if err := s.revokeForge(); err == nil {
 		t.Error("token id without a recorded forge: no error")
 	}
-	if !fileExists(s.path("forge.id")) {
+	if !core.FileExists(s.path("forge.id")) {
 		t.Error("state dropped although nothing was revoked")
 	}
 
@@ -1095,7 +1097,7 @@ func TestRevokeForgeByLabel(t *testing.T) {
 	if err := s.pauseForge(); err != nil {
 		t.Fatal(err)
 	}
-	if fileExists(s.path("forge.minting")) {
+	if core.FileExists(s.path("forge.minting")) {
 		t.Error("marker kept after the revoke")
 	}
 	b, _ := os.ReadFile(calls)
@@ -1123,7 +1125,7 @@ func TestSyncForgePathsRevokes(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "its token is revoked") || !strings.Contains(err.Error(), "was g/p, now none") {
 		t.Fatalf("err = %v", err)
 	}
-	if fileExists(s.path("forge.id")) {
+	if core.FileExists(s.path("forge.id")) {
 		t.Error("forge.id kept: zero-cp would renew the token")
 	}
 	if b, _ := os.ReadFile(calls); !strings.Contains(string(b), "/personal_access_tokens/9") {
@@ -1142,7 +1144,7 @@ func TestSyncForgePathsRevokes(t *testing.T) {
 	if _, err := s.syncForgePaths(); err == nil || !strings.Contains(err.Error(), "could not be revoked") {
 		t.Fatalf("err = %v", err)
 	}
-	if fileExists(s.path("forge.id")) {
+	if core.FileExists(s.path("forge.id")) {
 		t.Error("forge.id kept after a failed revoke")
 	}
 
@@ -1167,13 +1169,13 @@ func TestClean(t *testing.T) {
 		"a\x9b2J\xffb\xc0\x9bc":                "a2Jbc",             // bytes that are not UTF-8
 		"zero-api\u202eipa-orez\u2066x\u2069":  "zero-apiipa-orezx", // writing direction
 	} {
-		if got := clean(in); got != want {
+		if got := core.Clean(in); got != want {
 			t.Errorf("clean(%q) = %q, want %q", in, got, want)
 		}
 	}
 	// a C1 character split across two writes is removed all the same
 	var b bytes.Buffer
-	w := &cleanWriter{w: &b}
+	w := &core.CleanWriter{W: &b}
 	for _, p := range []string{"a\xc2", "\x9b31mb\xc2", "\xa9\x1b"} {
 		if n, err := w.Write([]byte(p)); n != len(p) || err != nil {
 			t.Fatalf("Write(%q) = %d, %v", p, n, err)
@@ -1412,12 +1414,12 @@ func TestRmLeftover(t *testing.T) {
 	if err := Ctx(&out, "", []string{"rm", "-y", "../x"}); err == nil {
 		t.Error("name with a path accepted")
 	}
-	state := filepath.Join(stateRoot(), "zero-gone")
+	state := filepath.Join(core.StateRoot(), "zero-gone")
 	os.MkdirAll(state, 0o700)
 	if err := Ctx(&out, "", []string{"rm", "-y", "gone"}); err != nil {
 		t.Fatal(err)
 	}
-	if fileExists(state) || !strings.Contains(out.String(), "removed sandbox zero-gone") {
+	if core.FileExists(state) || !strings.Contains(out.String(), "removed sandbox zero-gone") {
 		t.Errorf("state left or no message: %q", out.String())
 	}
 }
@@ -1493,7 +1495,7 @@ func TestGuidance(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range []string{".zero/instructions/review.md", ".zero/skills/go-review/SKILL.md"} {
-		if !fileExists(filepath.Join(s.stage(), f)) {
+		if !core.FileExists(filepath.Join(s.stage(), f)) {
 			t.Errorf("%s not staged", f)
 		}
 	}
@@ -1504,7 +1506,7 @@ func TestGuidance(t *testing.T) {
 	if err := s.syncInputs(&out); err != nil {
 		t.Fatal(err)
 	}
-	if fileExists(filepath.Join(s.stage(), ".zero")) {
+	if core.FileExists(filepath.Join(s.stage(), ".zero")) {
 		t.Error(".zero kept after the entries left")
 	}
 	s.Instructions, s.MaxInput = instr, 1
@@ -1742,13 +1744,13 @@ func TestUI(t *testing.T) {
 	want("write", get("POST", uiAddr(), "/api/workspaces", nil), 405)
 	want("no code", get("GET", uiAddr(), "/ui/enter?code=", nil), 401)
 
-	code := filepath.Join(stateRoot(), uiCodeFile)
-	if err := os.MkdirAll(stateRoot(), 0o700); err != nil {
+	code := filepath.Join(core.StateRoot(), uiCodeFile)
+	if err := os.MkdirAll(core.StateRoot(), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(code, []byte("abc"), 0o600)
 	want("wrong code", get("GET", uiAddr(), "/ui/enter?code=abd", nil), 401)
-	if fileExists(code) {
+	if core.FileExists(code) {
 		t.Fatal("a wrong code must use the link up")
 	}
 	os.WriteFile(code, []byte("abc"), 0o600)
@@ -1781,7 +1783,7 @@ func TestUI(t *testing.T) {
 
 	// What a workspace shows: no token id, no key; text from the sandbox cleaned.
 	cfg := &Config{Workspaces: map[string]*Workspace{"a": {Folders: []string{"/x/a"}, Models: []string{"github_copilot/*"}}}}
-	st := filepath.Join(stateRoot(), "zero-a")
+	st := filepath.Join(core.StateRoot(), "zero-a")
 	os.MkdirAll(st, 0o700)
 	for name, val := range map[string]string{
 		"caps": "git.read git.push", "forge.id": "123456", "gate.key": "SECRETKEY", "tools": "get_project",
@@ -1949,11 +1951,11 @@ func TestMCPProxy(t *testing.T) {
 	}
 
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	d := filepath.Join(stateRoot(), "zero-b")
+	d := filepath.Join(core.StateRoot(), "zero-b")
 	os.MkdirAll(d, 0o700)
 	os.WriteFile(filepath.Join(d, "mcp.token"), []byte("T"), 0o600)
 	os.WriteFile(filepath.Join(d, "forge.host"), []byte("gitlab.example"), 0o600)
-	os.MkdirAll(filepath.Join(stateRoot(), "zero-c"), 0o700)
+	os.MkdirAll(filepath.Join(core.StateRoot(), "zero-c"), 0o700)
 	got, err := mcpEntries()
 	if err != nil {
 		t.Fatal(err)
@@ -1962,7 +1964,7 @@ func TestMCPProxy(t *testing.T) {
 		t.Errorf("mcpEntries = %+v", got)
 	}
 	// A host that would break out of its line in the proxy's config is refused.
-	bad := filepath.Join(stateRoot(), "zero-bad")
+	bad := filepath.Join(core.StateRoot(), "zero-bad")
 	os.MkdirAll(bad, 0o700)
 	os.WriteFile(filepath.Join(bad, "mcp.token"), []byte("tok"), 0o600)
 	os.WriteFile(filepath.Join(bad, "forge.host"), []byte("a\"b"), 0o600)
@@ -2411,8 +2413,8 @@ func TestHomeFirstRun(t *testing.T) {
 
 	// esc writes nothing
 	x, _ := press(m, tea.KeyEnter, tea.KeyEscape, tea.KeyEscape)
-	if x.mode != homeList || fileExists(file) {
-		t.Errorf("esc: mode %v, file written %v", x.mode, fileExists(file))
+	if x.mode != homeList || core.FileExists(file) {
+		t.Errorf("esc: mode %v, file written %v", x.mode, core.FileExists(file))
 	}
 
 	// space unticks the host; the preview shows the file; enter writes and starts
@@ -2420,7 +2422,7 @@ func TestHomeFirstRun(t *testing.T) {
 	if !p.fr.preview || !strings.Contains(plain(p), file) || strings.Contains(plain(p), "proxy.golang.org") {
 		t.Fatalf("preview:\n%s", plain(p))
 	}
-	if fileExists(file) {
+	if core.FileExists(file) {
 		t.Fatal("file written before the yes")
 	}
 	d, quit := press(p, tea.KeyEnter)
@@ -2473,13 +2475,13 @@ func TestHomeFirstRun(t *testing.T) {
 	if !strings.Contains(plain(q), "enter more") {
 		t.Fatalf("cut preview does not say so:\n%s", plain(q))
 	}
-	for i := 0; i < 10 && !fileExists(file); i++ {
+	for i := 0; i < 10 && !core.FileExists(file); i++ {
 		if !strings.Contains(plain(q), "enter more") && !strings.Contains(plain(q), "gitlab.pipeline.read") {
 			t.Errorf("enter would write without the end shown:\n%s", plain(q))
 		}
 		q, _ = press(q, tea.KeyEnter)
 	}
-	if !fileExists(file) {
+	if !core.FileExists(file) {
 		t.Error("paged preview never wrote")
 	}
 

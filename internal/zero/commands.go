@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // copilotEndpoints are added to the sandbox policy on first `zero vscode` use;
@@ -118,7 +120,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 				fmt.Fprintf(out, "%s token: rotated (%s%s)\n", f.Name(), strings.Join(s.forgePaths(), ", "), tools)
 			}
 		}
-		if s.forge() != nil && !fileExists(s.path("forge.rule")) {
+		if s.forge() != nil && !core.FileExists(s.path("forge.rule")) {
 			fmt.Fprintln(out, "forge: this sandbox reaches the whole forge host, not only its projects, until `zero rm` + `zero up`")
 		}
 		if err := s.saveApproved(pol); err != nil {
@@ -130,7 +132,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	}
 	if len(s.Models) > 0 {
 		// Models come through the proxy only: no other model host stays open.
-		if fileExists(s.path("zen.done")) || fileExists(s.path("copilot.done")) {
+		if core.FileExists(s.path("zen.done")) || core.FileExists(s.path("copilot.done")) {
 			if err := rt.SetRule(s.Name, "zen", nil); err != nil {
 				return 0, err
 			}
@@ -140,7 +142,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 			os.Remove(s.path("zen.done"))
 			os.Remove(s.path("copilot.done"))
 		}
-	} else if !fileExists(s.path("zen.done")) {
+	} else if !core.FileExists(s.path("zen.done")) {
 		if err := s.applyZenPolicy(); err != nil {
 			return 0, err
 		}
@@ -172,7 +174,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if s.read("copilot") != "" && len(s.Models) == 0 && !fileExists(s.path("copilot-auth.done")) {
+	if s.read("copilot") != "" && len(s.Models) == 0 && !core.FileExists(s.path("copilot-auth.done")) {
 		if err := s.importCopilotAuth(); err != nil {
 			return 0, err
 		}
@@ -287,7 +289,7 @@ func (s *Sandbox) create() error {
 	// directories can be added later without a new sandbox. The VM driver has
 	// no input mount (ADR 0039).
 	mount := ""
-	if s.gw == "" && fileExists(s.stage()) {
+	if s.gw == "" && core.FileExists(s.stage()) {
 		mount = s.stage()
 	}
 	done := step("creating the sandbox (the first time pulls the image)")
@@ -345,7 +347,7 @@ func (s *Sandbox) dirs() []string {
 // A directory removed from the workspace keeps its checkout in the sandbox.
 // uncommitted counts changed and untracked files of a host repo; ignored files do not count.
 func uncommitted(top string) int {
-	out, err := sh("git", "-C", top, "status", "--porcelain")
+	out, err := core.Sh("git", "-C", top, "status", "--porcelain")
 	if err != nil || out == "" {
 		return 0
 	}
@@ -356,7 +358,7 @@ func (s *Sandbox) ensureCheckout(w io.Writer) error {
 	var paths map[string]string
 	for _, top := range s.repos() {
 		dir := sandboxDir(top)
-		out, err := s.ssh("if test -d " + shellQuote(dir) + "; then echo yes; else echo no; fi")
+		out, err := s.ssh("if test -d " + core.ShellQuote(dir) + "; then echo yes; else echo no; fi")
 		if err != nil {
 			return fmt.Errorf("sandbox unreachable: %w", err)
 		}
@@ -383,7 +385,7 @@ func (s *Sandbox) ensureCheckout(w io.Writer) error {
 // Not --all: that would also carry refs/stash, which can hold untracked
 // files, and other private refs.
 func bundleRepo(top, file string) error {
-	if _, err := sh("git", "-C", top, "bundle", "create", file, "--branches", "--tags", "HEAD"); err != nil {
+	if _, err := core.Sh("git", "-C", top, "bundle", "create", file, "--branches", "--tags", "HEAD"); err != nil {
 		return fmt.Errorf("git bundle %s: %w", top, err)
 	}
 	return nil
@@ -398,7 +400,7 @@ func (s *Sandbox) checkout(top, dir, path string) error {
 	if err := rt.Upload(s.Name, bundle, "/tmp/.zero.bundle"); err != nil {
 		return fmt.Errorf("upload bundle: %w", err)
 	}
-	script := "mkdir -p /tmp/zero && git clone -q /tmp/.zero.bundle " + shellQuote(dir) + " && rm -f /tmp/.zero.bundle"
+	script := "mkdir -p /tmp/zero && git clone -q /tmp/.zero.bundle " + core.ShellQuote(dir) + " && rm -f /tmp/.zero.bundle"
 	if _, err := s.ssh(script); err != nil {
 		return fmt.Errorf("clone in sandbox: %w", err)
 	}
@@ -413,7 +415,7 @@ func (s *Sandbox) noteSessionBranch(out io.Writer, dir, path string) {
 		return
 	}
 	branch := strings.TrimPrefix(sessionBranch(s.Name), "refs/heads/")
-	n, err := s.ssh("cd " + shellQuote(dir) + " && git fetch -q origin " + shellQuote(branch) +
+	n, err := s.ssh("cd " + core.ShellQuote(dir) + " && git fetch -q origin " + core.ShellQuote(branch) +
 		" 2>/dev/null && git rev-list --count HEAD..FETCH_HEAD")
 	if err != nil || n == "" || n == "0" {
 		return
@@ -436,7 +438,7 @@ func (s *Sandbox) serveRunning() (bool, error) {
 // the forwarded port. It has no password: browsers get in with a one-time
 // pairing link (zero web). A leftover password-mode serve is stopped first.
 func (s *Sandbox) startServe() error {
-	_, err := s.ssh("pkill -f '[s]erve --hostname' ; mkdir -p /tmp/zero; cd " + shellQuote(s.Dir) + " || exit 1; " +
+	_, err := s.ssh("pkill -f '[s]erve --hostname' ; mkdir -p /tmp/zero; cd " + core.ShellQuote(s.Dir) + " || exit 1; " +
 		"opencode service set hostname 127.0.0.1 >/dev/null && " +
 		"opencode service set port " + fmt.Sprint(servePort) + " >/dev/null && " +
 		"{ opencode service stop >/dev/null 2>&1; opencode service start >/dev/null; }")
@@ -472,9 +474,9 @@ func (s *Sandbox) Web(out io.Writer) error {
 		return err
 	}
 	if err := s.webSession(); err != nil {
-		fmt.Fprintf(out, "web: no session prepared (%v); in the browser: Add project, %s\n", err, clean(s.Dir))
+		fmt.Fprintf(out, "web: no session prepared (%v); in the browser: Add project, %s\n", err, core.Clean(s.Dir))
 	}
-	text, err := s.ssh("opencode pair --url " + shellQuote(s.url(port)))
+	text, err := s.ssh("opencode pair --url " + core.ShellQuote(s.url(port)))
 	if err != nil {
 		return fmt.Errorf("pairing link: %w", err)
 	}
@@ -490,7 +492,7 @@ func (s *Sandbox) Web(out io.Writer) error {
 // directory. The web UI opens on a page that lists sessions, and a pairing link
 // cannot name a directory (C56).
 func (s *Sandbox) webSession() error {
-	list, err := s.ssh("opencode api get " + shellQuote("/api/session?limit=1&directory="+url.QueryEscape(s.Dir)))
+	list, err := s.ssh("opencode api get " + core.ShellQuote("/api/session?limit=1&directory="+url.QueryEscape(s.Dir)))
 	if err != nil {
 		return err
 	}
@@ -499,7 +501,7 @@ func (s *Sandbox) webSession() error {
 		return err
 	}
 	body, _ := json.Marshal(map[string]any{"location": map[string]string{"directory": s.Dir}})
-	_, err = s.ssh("opencode api post /api/session --data " + shellQuote(string(body)))
+	_, err = s.ssh("opencode api post /api/session --data " + core.ShellQuote(string(body)))
 	return err
 }
 
@@ -520,7 +522,7 @@ func hasSession(list string) (bool, error) {
 // NeedTerminal is the check of `zero opencode`, exported so that the command
 // can refuse before a workspace is made.
 func NeedTerminal() error {
-	if !isTerminal(os.Stdin) || !isTerminal(os.Stdout) {
+	if !core.IsTerminal(os.Stdin) || !core.IsTerminal(os.Stdout) {
 		return fmt.Errorf("zero opencode needs a terminal; without one: zero run PROMPT, or zero opencode --web")
 	}
 	return nil
@@ -533,7 +535,7 @@ func (s *Sandbox) Attach(out io.Writer) error {
 	if _, err := s.Up(out); err != nil {
 		return err
 	}
-	return passthrough("ssh", "-t", "-F", s.path("ssh.conf"), s.Host, "cd "+shellQuote(s.Dir)+" && exec opencode")
+	return core.Passthrough("ssh", "-t", "-F", s.path("ssh.conf"), s.Host, "cd "+core.ShellQuote(s.Dir)+" && exec opencode")
 }
 
 // copilotBin and copilotRule: the GitHub Copilot CLI of the image and the
@@ -547,7 +549,7 @@ const (
 // CopilotNeedsTerminal is the check of `zero copilot` without arguments, for
 // main to refuse before a workspace is made.
 func CopilotNeedsTerminal(args []string) error {
-	if len(args) == 0 && (!isTerminal(os.Stdin) || !isTerminal(os.Stdout)) {
+	if len(args) == 0 && (!core.IsTerminal(os.Stdin) || !core.IsTerminal(os.Stdout)) {
 		return fmt.Errorf("zero copilot needs a terminal; without one: zero copilot -p PROMPT")
 	}
 	return nil
@@ -558,7 +560,7 @@ func CopilotNeedsTerminal(args []string) error {
 // sandbox holds a placeholder, the token is put in outside of it. Arguments
 // go to the tool; without arguments it needs a terminal.
 func (s *Sandbox) Copilot(out io.Writer, args []string) error {
-	tty := isTerminal(os.Stdin) && isTerminal(os.Stdout)
+	tty := core.IsTerminal(os.Stdin) && core.IsTerminal(os.Stdout)
 	if err := CopilotNeedsTerminal(args); err != nil {
 		return err
 	}
@@ -584,9 +586,9 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 		if tty {
 			ssh = append([]string{"-t"}, ssh...)
 		}
-		return passthrough("ssh", ssh...)
+		return core.Passthrough("ssh", ssh...)
 	}
-	if !fileExists(s.path("copilot-cli.rule")) {
+	if !core.FileExists(s.path("copilot-cli.rule")) {
 		if err := rt.AllowEgress(s.Name, copilotRule, copilotBin, "read-write", []string{copilotHost}); err != nil {
 			return fmt.Errorf("%w; check: zero doctor, then run zero copilot again", err)
 		}
@@ -599,7 +601,7 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	if tty {
 		ssh = append([]string{"-t"}, ssh...)
 	}
-	return passthrough("ssh", ssh...)
+	return core.Passthrough("ssh", ssh...)
 }
 
 // claudeBin is Claude Code in the image. /usr/local/bin/claude is a link to
@@ -609,7 +611,7 @@ const claudeBin = "/usr/local/libexec/claude/node_modules/@anthropic-ai/claude-c
 // ClaudeNeedsTerminal is the check of `zero claude` without arguments, for
 // main to refuse before a workspace is made.
 func ClaudeNeedsTerminal(args []string) error {
-	if len(args) == 0 && (!isTerminal(os.Stdin) || !isTerminal(os.Stdout)) {
+	if len(args) == 0 && (!core.IsTerminal(os.Stdin) || !core.IsTerminal(os.Stdout)) {
 		return fmt.Errorf("zero claude needs a terminal; without one: zero claude --model PROVIDER/MODEL -p PROMPT")
 	}
 	return nil
@@ -645,10 +647,10 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 		return fmt.Errorf("the image of %s has no Claude Code; recreate it: zero rm && zero up", s.Name)
 	}
 	ssh := []string{"-F", s.path("ssh.conf"), s.Host, claudeScript(s.Dir, args)}
-	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
+	if core.IsTerminal(os.Stdin) && core.IsTerminal(os.Stdout) {
 		ssh = append([]string{"-t"}, ssh...)
 	}
-	return passthrough("ssh", ssh...)
+	return core.Passthrough("ssh", ssh...)
 }
 
 // claudeScript is the command run in the sandbox (PoC 24): Claude Code talks
@@ -656,11 +658,11 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 // its key and asks Anthropic for nothing; the image pins its version. The
 // model of --model is also the one for its background calls.
 func claudeScript(dir string, args []string) string {
-	script := "cd " + shellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
-		fmt.Sprintf("http://%s:%d", gateHost, modelPort) + ` ANTHROPIC_AUTH_TOKEN="$` + modelKeyEnv + `" ANTHROPIC_MODEL=` + shellQuote(modelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + shellQuote(modelArg(args)) +
+	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
+		fmt.Sprintf("http://%s:%d", gateHost, modelPort) + ` ANTHROPIC_AUTH_TOKEN="$` + modelKeyEnv + `" ANTHROPIC_MODEL=` + core.ShellQuote(modelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + core.ShellQuote(modelArg(args)) +
 		` CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1 DISABLE_UPDATES=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + claudeBin
 	for _, a := range args {
-		script += " " + shellQuote(a)
+		script += " " + core.ShellQuote(a)
 	}
 	return script
 }
@@ -692,10 +694,10 @@ func hasModelArg(args []string) bool { return modelArg(args) != "" }
 // model proxy (PoC 23): the CLI talks to the proxy and asks GitHub for
 // nothing. Its key is the placeholder of the sandbox's environment (PoC 20).
 func copilotProxyScript(dir string, args []string) string {
-	script := "cd " + shellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=` +
+	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=` +
 		fmt.Sprintf("http://%s:%d/v1", gateHost, modelPort) + ` COPILOT_PROVIDER_API_KEY="$` + modelKeyEnv + `" exec ` + copilotBin + " --no-auto-update"
 	for _, a := range args {
-		script += " " + shellQuote(a)
+		script += " " + core.ShellQuote(a)
 	}
 	return script
 }
@@ -703,9 +705,9 @@ func copilotProxyScript(dir string, args []string) string {
 // copilotScript is the command run in the sandbox. The CLI does not update
 // itself there: the image pins its version.
 func copilotScript(dir string, args []string) string {
-	script := "cd " + shellQuote(dir) + " && COPILOT_AUTO_UPDATE=false COPILOT_GITHUB_TOKEN=\"$" + copilotEnv + "\" exec " + copilotBin + " --no-auto-update"
+	script := "cd " + core.ShellQuote(dir) + " && COPILOT_AUTO_UPDATE=false COPILOT_GITHUB_TOKEN=\"$" + copilotEnv + "\" exec " + copilotBin + " --no-auto-update"
 	for _, a := range args {
-		script += " " + shellQuote(a)
+		script += " " + core.ShellQuote(a)
 	}
 	return script
 }
@@ -715,11 +717,11 @@ func (s *Sandbox) Run(out io.Writer, prompt []string) error {
 	if _, err := s.Up(io.Discard); err != nil {
 		return err
 	}
-	script := "cd " + shellQuote(s.Dir) + " && exec opencode run --"
+	script := "cd " + core.ShellQuote(s.Dir) + " && exec opencode run --"
 	for _, p := range prompt {
-		script += " " + shellQuote(p)
+		script += " " + core.ShellQuote(p)
 	}
-	return passthrough("ssh", "-F", s.path("ssh.conf"), s.Host, script)
+	return core.Passthrough("ssh", "-F", s.path("ssh.conf"), s.Host, script)
 }
 
 // noForge is the line for a workspace whose repositories are on no forge
@@ -778,7 +780,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 		}
 		fmt.Fprintf(out, "copilot: %s may reach the model proxy only (zero copilot --model PROVIDER/MODEL, or the workspace's model)\n", copilotBin)
 		fmt.Fprintf(out, "claude: %s may reach the model proxy only (zero claude --model PROVIDER/MODEL, or the workspace's model)\n", claudeBin)
-	} else if fileExists(s.path("copilot-cli.rule")) {
+	} else if core.FileExists(s.path("copilot-cli.rule")) {
 		fmt.Fprintf(out, "copilot: %s may reach %s\n", copilotBin, copilotHost)
 	}
 	if s.read("gate.key") != "" {
@@ -911,7 +913,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 	}
 	if len(s.Models) > 0 {
 		fmt.Fprintln(out, "models: this workspace uses the model proxy; Copilot inside VS Code has no login and no way out here")
-	} else if !fileExists(s.path("copilot.done")) {
+	} else if !core.FileExists(s.path("copilot.done")) {
 		if err := rt.AllowEgress(s.Name, "copilot", "/go/.vscode-server/**", "read-write", copilotEndpoints); err != nil {
 			return fmt.Errorf("copilot policy: %w", err)
 		}
@@ -924,7 +926,7 @@ func (s *Sandbox) Code(out io.Writer) error {
 	}
 	remote := "vscode-remote://ssh-remote+" + s.Host
 	if len(s.Folders) == 1 {
-		return passthrough("code", "--folder-uri", remote+sandboxDir(s.Folders[0]))
+		return core.Passthrough("code", "--folder-uri", remote+sandboxDir(s.Folders[0]))
 	}
 	// Several directories open as a multi-root workspace (spec F11).
 	type folder struct {
@@ -938,10 +940,10 @@ func (s *Sandbox) Code(out io.Writer) error {
 	}
 	b, _ := json.Marshal(ws)
 	const file = "/tmp/zero/zero.code-workspace"
-	if _, err := s.ssh("printf '%s' " + shellQuote(string(b)) + " > " + file); err != nil {
+	if _, err := s.ssh("printf '%s' " + core.ShellQuote(string(b)) + " > " + file); err != nil {
 		return fmt.Errorf("write %s: %w", file, err)
 	}
-	return passthrough("code", "--file-uri", remote+file)
+	return core.Passthrough("code", "--file-uri", remote+file)
 }
 
 // ensureHostSSHConfig appends our Host entry to the openshell ssh_config the
@@ -986,7 +988,7 @@ func (s *Sandbox) Logs(out io.Writer, follow bool) error {
 	if follow {
 		cmd := exec.Command("ssh", "-F", s.path("ssh.conf"), s.Host,
 			"tail -n 200 -f ~/.local/share/opencode/log/opencode.log")
-		cmd.Stdout, cmd.Stderr = &cleanWriter{w: out}, &cleanWriter{w: os.Stderr}
+		cmd.Stdout, cmd.Stderr = &core.CleanWriter{W: out}, &core.CleanWriter{W: os.Stderr}
 		return cmd.Run()
 	}
 	text, err := s.ssh("if test -f ~/.local/share/opencode/log/opencode.log; then tail -n 200 ~/.local/share/opencode/log/opencode.log; " +

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // Doctor checks the host setup and, inside a git repo, the forge guardrails.
@@ -44,7 +46,7 @@ func Doctor(out io.Writer) error {
 		check("openshell cli", "not on PATH")
 	} else {
 		withGateway("", func() {
-			if _, err := sh("openshell", "gateway", "info"); err != nil {
+			if _, err := core.Sh("openshell", "gateway", "info"); err != nil {
 				check("openshell gateway", "unreachable: "+err.Error())
 			} else {
 				check("openshell gateway", "")
@@ -84,7 +86,7 @@ func Doctor(out io.Writer) error {
 	}
 
 	if top := gitTop(); top != "" {
-		remote, _ := sh("git", "-C", top, "remote", "get-url", "origin")
+		remote, _ := core.Sh("git", "-C", top, "remote", "get-url", "origin")
 		f, path := forgeFor(remote)
 		if g, ok := f.(gitlab); ok && g.LoggedIn() == nil && g.PlaintextLogin() {
 			fmt.Fprintf(out, "warn  glab login for %s is stored in plain text: glab auth login --hostname %s --use-keyring\n", g.host, g.host)
@@ -111,7 +113,7 @@ var notGitlab = []string{"github.com", "bitbucket.org", "codeberg.org", "dev.azu
 // noForgeHere says why a repository has no forge checks. It is no failure of
 // the host setup: the sandbox works, the agent cannot push.
 func noForgeHere(remote string) string {
-	remote = clean(strings.TrimSpace(remote))
+	remote = core.Clean(strings.TrimSpace(remote))
 	if remote == "" {
 		return "this repository has no origin; a sandbox for it cannot push"
 	}

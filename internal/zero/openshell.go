@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // openshell is the Runtime backed by the NVIDIA OpenShell CLI.
@@ -15,17 +17,17 @@ type openshell struct{}
 func (openshell) Name() string { return "openshell" }
 
 func (openshell) Exists(name string) bool {
-	_, err := sh("openshell", "sandbox", "get", name)
+	_, err := core.Sh("openshell", "sandbox", "get", name)
 	return err == nil
 }
 
 func (openshell) Reachable() bool {
-	_, err := sh("openshell", "gateway", "info")
+	_, err := core.Sh("openshell", "gateway", "info")
 	return err == nil
 }
 
 func (openshell) List() ([]string, error) {
-	out, err := sh("openshell", "sandbox", "list", "--names", "--page-size", "1000")
+	out, err := core.Sh("openshell", "sandbox", "list", "--names", "--page-size", "1000")
 	if err != nil {
 		return nil, fmt.Errorf("list sandboxes: %w", err)
 	}
@@ -54,23 +56,23 @@ func (openshell) Create(name, image, policyFile string, creds, env []string, mou
 		b, _ := json.Marshal(map[string]any{drv: map[string]any{"mounts": []mount{{"bind", mountSrc, mountDst, true}}}})
 		args = append(args, "--driver-config-json", string(b))
 	}
-	_, err := sh("openshell", args...)
+	_, err := core.Sh("openshell", args...)
 	return err
 }
 
 func (openshell) Delete(name string) error {
-	_, err := sh("openshell", "sandbox", "delete", name)
+	_, err := core.Sh("openshell", "sandbox", "delete", name)
 	return err
 }
 
 func (openshell) Stop(name string) error {
-	_, err := sh("openshell", "sandbox", "stop", name)
+	_, err := core.Sh("openshell", "sandbox", "stop", name)
 	return err
 }
 
 // Start waits until the sandbox is ready again.
 func (openshell) Start(name string) error {
-	if _, err := sh("openshell", "sandbox", "start", name); err != nil {
+	if _, err := core.Sh("openshell", "sandbox", "start", name); err != nil {
 		return err
 	}
 	for i := 0; i < 60; i++ {
@@ -85,7 +87,7 @@ func (openshell) Start(name string) error {
 func (openshell) Stopped(name string) bool { return sandboxPhase(name) == "Stopped" }
 
 func sandboxPhase(name string) string {
-	out, _ := sh("openshell", "sandbox", "get", name)
+	out, _ := core.Sh("openshell", "sandbox", "get", name)
 	for _, l := range strings.Split(out, "\n") {
 		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "Phase:"); ok {
 			return strings.TrimSpace(v)
@@ -95,13 +97,13 @@ func sandboxPhase(name string) string {
 }
 
 func (openshell) SSHConfig(name string) (string, error) {
-	return sh("openshell", "sandbox", "ssh-config", name)
+	return core.Sh("openshell", "sandbox", "ssh-config", name)
 }
 
 func (openshell) HostAlias(name string) string { return "openshell-" + name + ".default" }
 
 func (openshell) Upload(name, src, dst string) error {
-	_, err := sh("openshell", "sandbox", "upload", name, src, dst)
+	_, err := core.Sh("openshell", "sandbox", "upload", name, src, dst)
 	return err
 }
 
@@ -115,7 +117,7 @@ func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) 
 		if i == len(hosts)-1 {
 			args = append(args, "--wait")
 		}
-		if _, err := sh("openshell", args...); err != nil {
+		if _, err := core.Sh("openshell", args...); err != nil {
 			return fmt.Errorf("%s: %w", h, err)
 		}
 	}
@@ -123,7 +125,7 @@ func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) 
 }
 
 func (openshell) SetRule(name, rule string, spec map[string]any) error {
-	out, err := sh("openshell", "policy", "get", name, "--base")
+	out, err := core.Sh("openshell", "policy", "get", name, "--base")
 	if err != nil {
 		return err
 	}
@@ -144,7 +146,7 @@ func (openshell) SetRule(name, rule string, spec map[string]any) error {
 		return err
 	}
 	tmp.Close()
-	_, err = sh("openshell", "policy", "set", name, "--policy", tmp.Name(), "--wait")
+	_, err = core.Sh("openshell", "policy", "set", name, "--policy", tmp.Name(), "--wait")
 	return err
 }
 
@@ -161,7 +163,7 @@ func (openshell) ImportCredentialType(id string, spec []byte) error {
 		return err
 	}
 	tmp.Close()
-	if _, err := sh("openshell", "profile", "import", "-f", tmp.Name()); err != nil &&
+	if _, err := core.Sh("openshell", "profile", "import", "-f", tmp.Name()); err != nil &&
 		!strings.Contains(err.Error(), "already exists") {
 		return err
 	}
@@ -170,7 +172,7 @@ func (openshell) ImportCredentialType(id string, spec []byte) error {
 
 // BindCredential passes the secret via env lookup, never in argv.
 func (openshell) BindCredential(id, typ, env, secret string) error {
-	sh("openshell", "provider", "delete", id)
+	core.Sh("openshell", "provider", "delete", id)
 	cmd := exec.Command("openshell", "provider", "create", "--name", id, "--type", typ, "--credential", env)
 	cmd.Env = append(os.Environ(), env+"="+secret)
 	if b, err := cmd.CombinedOutput(); err != nil {
@@ -179,7 +181,7 @@ func (openshell) BindCredential(id, typ, env, secret string) error {
 	return nil
 }
 
-func (openshell) UnbindCredential(id string) { sh("openshell", "provider", "delete", id) }
+func (openshell) UnbindCredential(id string) { core.Sh("openshell", "provider", "delete", id) }
 
 // RotateCredential passes the secret via env lookup, never in argv.
 func (openshell) RotateCredential(id, env, secret string) error {
@@ -195,23 +197,23 @@ func (openshell) RotateCredential(id, env, secret string) error {
 // host the sandbox withholds it, and the rule can only name an attached one
 // (PoC 20).
 func (openshell) AttachCredential(name, id string) error {
-	_, err := sh("openshell", "sandbox", "provider", "attach", name, id)
+	_, err := core.Sh("openshell", "sandbox", "provider", "attach", name, id)
 	return err
 }
 
 func (openshell) DetachCredential(name, id string) {
-	sh("openshell", "sandbox", "provider", "detach", "--wait", name, id)
+	core.Sh("openshell", "sandbox", "provider", "detach", "--wait", name, id)
 }
 
 func (openshell) CredentialReady(name, id string) error {
-	_, err := sh("openshell", "sandbox", "provider", "status", "--wait", name, id)
+	_, err := core.Sh("openshell", "sandbox", "provider", "status", "--wait", name, id)
 	return err
 }
 
 // computeDriver names the gateway's compute driver (podman or docker); the
 // mount settings are passed under that name (ADR 0057).
 func computeDriver() (string, error) {
-	out, err := sh("openshell", "gateway", "info")
+	out, err := core.Sh("openshell", "gateway", "info")
 	if err != nil {
 		return "", err
 	}

@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/core"
+
 	"charm.land/huh/v2"
 )
 
@@ -55,7 +57,7 @@ func presetLabel(p preset) string { return p.Name + ": " + strings.Join(p.Hosts,
 func detectPresets(dir string) []preset {
 	var found []preset
 	for _, p := range presets {
-		if slices.ContainsFunc(p.Files, func(f string) bool { return fileExists(filepath.Join(dir, f)) }) {
+		if slices.ContainsFunc(p.Files, func(f string) bool { return core.FileExists(filepath.Join(dir, f)) }) {
 			found = append(found, p)
 		}
 	}
@@ -110,7 +112,7 @@ func renderPolicy(p *Policy) []byte {
 func firstRunPlan(repos []string) (dirs []string, found map[string][]preset, names []string) {
 	found = map[string][]preset{}
 	for _, top := range repos {
-		if fileExists(filepath.Join(top, ".zero", "policy.yaml")) {
+		if core.FileExists(filepath.Join(top, ".zero", "policy.yaml")) {
 			continue
 		}
 		dirs = append(dirs, top)
@@ -175,7 +177,7 @@ func writeFirstRun(dirs []string, files map[string][]byte) error {
 // hosts, permissions, then the file. It asks only at a terminal; the answer
 // yes approves the workspace policy shown, and nothing beyond it (ADR 0058).
 func (s *Sandbox) firstRun() error {
-	if s.Approve || !isTerminal(os.Stdin) || !isTerminal(os.Stderr) {
+	if s.Approve || !core.IsTerminal(os.Stdin) || !core.IsTerminal(os.Stderr) {
 		return nil
 	}
 	dirs, found, names := firstRunPlan(s.repos())

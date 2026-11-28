@@ -11,6 +11,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // wsRow is one workspace with its live state.
@@ -44,7 +46,7 @@ func loadOverview() (*overview, error) {
 
 	// Forges in use: recorded in a state dir, or the remote of a directory.
 	forges := map[string]Forge{}
-	dirs, _ := filepath.Glob(filepath.Join(stateRoot(), "zero-*"))
+	dirs, _ := filepath.Glob(filepath.Join(core.StateRoot(), "zero-*"))
 	for _, d := range dirs {
 		if f := forgeOf(d); f != nil {
 			forges[f.Name()+"@"+f.Host()] = f
@@ -104,7 +106,7 @@ func loadOverview() (*overview, error) {
 	liveTokens := map[string]bool{}
 	for _, n := range names {
 		sb := "zero-" + n
-		dir := filepath.Join(stateRoot(), sb)
+		dir := filepath.Join(core.StateRoot(), sb)
 		gw := readState(dir, "gateway")
 		status := "none"
 		if l, ok := sandboxes[gw]; !ok {
@@ -132,7 +134,7 @@ func loadOverview() (*overview, error) {
 			}
 		}
 		policy := "-"
-		if fileExists(filepath.Join(dir, "policy.sha")) {
+		if core.FileExists(filepath.Join(dir, "policy.sha")) {
 			policy = c.sandbox(n).policyState()
 		}
 		rows = append(rows, wsRow{Name: n, Status: status, Token: token, Policy: policy,
@@ -210,7 +212,7 @@ func Ls(out io.Writer) error {
 				continue
 			}
 			why := "no sandbox); zero-cp revokes it within 10 minutes, else revoke it on the forge"
-			if readState(filepath.Join(stateRoot(), name), "forge.id") == t.ID {
+			if readState(filepath.Join(core.StateRoot(), name), "forge.id") == t.ID {
 				why = "no workspace)" + adopt(name)
 			}
 			orphans = append(orphans, fmt.Sprintf("token %s %s (%s", t.ID, t.Name, why))
@@ -283,7 +285,7 @@ func (s *Sandbox) unpushedIn(top string) string {
 		return "unknown (sandbox paused)"
 	}
 	dir := sandboxDir(top)
-	res, err := s.ssh("cd " + shellQuote(dir) + " 2>/dev/null || { echo 'no checkout'; exit 0; }; " + unpushedScript)
+	res, err := s.ssh("cd " + core.ShellQuote(dir) + " 2>/dev/null || { echo 'no checkout'; exit 0; }; " + unpushedScript)
 	if err != nil {
 		return "unknown (sandbox not reachable)"
 	}

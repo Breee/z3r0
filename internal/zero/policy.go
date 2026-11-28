@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/core"
+
 	"go.yaml.in/yaml/v3"
 )
 
@@ -133,8 +135,8 @@ func parsePolicy(b []byte) (*Policy, error) {
 func (s *Sandbox) recordPolicy() error {
 	var lines []string
 	for i, top := range s.repos() {
-		sha, _ := sh("git", "-C", top, "rev-parse", "HEAD")
-		dirty, _ := sh("git", "-C", top, "status", "--porcelain", "--", ".zero/policy.yaml")
+		sha, _ := core.Sh("git", "-C", top, "rev-parse", "HEAD")
+		dirty, _ := core.Sh("git", "-C", top, "status", "--porcelain", "--", ".zero/policy.yaml")
 		v := strings.TrimSpace(sha)
 		if strings.TrimSpace(dirty) != "" {
 			v += " dirty"
@@ -238,7 +240,7 @@ func (s *Sandbox) approvePolicy(p *Policy) (policyChange, error) {
 	}
 	seen := s.shown != nil && len(widened(s.shown, p)) == 0
 	if len(w) > 0 && !s.Approve && !seen {
-		if !isTerminal(os.Stdin) {
+		if !core.IsTerminal(os.Stdin) {
 			return policyChange{}, errors.New("policy widening not approved: no terminal to ask at; to accept the lines above: zero up --approve")
 		}
 		fmt.Fprint(os.Stderr, "approve? [y/N] ")

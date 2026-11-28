@@ -3,7 +3,6 @@
 package zero
 
 import (
-	"bytes"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -11,12 +10,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 //go:embed policy.yaml
@@ -102,17 +102,6 @@ func SandboxName(repo string) string {
 	return "zero-" + b.String()
 }
 
-func stateRoot() string {
-	if v := os.Getenv("XDG_STATE_HOME"); v != "" {
-		return filepath.Join(v, "zero")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		home = "."
-	}
-	return filepath.Join(home, ".local", "state", "zero")
-}
-
 func image() string {
 	if v := os.Getenv("Z3R0_IMAGE"); v != "" {
 		return v
@@ -171,11 +160,6 @@ func (s *Sandbox) write(name, val string, mode os.FileMode) error {
 	return os.WriteFile(s.path(name), []byte(val), mode)
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 // port returns the local forward port: the stored one if still free,
 // otherwise a freshly allocated port (guards against port collisions).
 func (s *Sandbox) port() (int, error) {
@@ -213,49 +197,11 @@ func (s *Sandbox) exists() bool {
 // error text come from the sandbox and are returned without control
 // characters.
 func (s *Sandbox) ssh(script string) (string, error) {
-	out, err := sh("ssh", "-F", s.path("ssh.conf"), s.Host, script)
+	out, err := core.Sh("ssh", "-F", s.path("ssh.conf"), s.Host, script)
 	if err != nil {
-		err = errors.New(clean(err.Error()))
+		err = errors.New(core.Clean(err.Error()))
 	}
-	return clean(out), err
-}
-
-// sh runs a command capturing stdout and stderr. On failure the error carries
-// the full command line and stderr — failures are never swallowed.
-func sh(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
-	var out, errBuf bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errBuf
-	if err := cmd.Run(); err != nil {
-		detail := strings.TrimSpace(errBuf.String())
-		if detail == "" {
-			detail = err.Error()
-		}
-		return "", fmt.Errorf("%s %s: %s", name, strings.Join(args, " "), detail)
-	}
-	return strings.TrimRight(out.String(), "\n"), nil
-}
-
-// passthrough runs a host command attached to the terminal; the underlying
-// ExitError is preserved so main can propagate the child's exit code.
-func passthrough(name string, args ...string) error {
-	return passthroughEnv(nil, name, args...)
-}
-
-// passthroughEnv is passthrough with extra environment (secrets stay out of argv).
-func passthroughEnv(env []string, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %w", name, err)
-	}
-	return nil
-}
-
-// shellQuote single-quotes s for a POSIX remote shell.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	return core.Clean(out), err
 }
 
 // probeServe asks the API through the forward. Without a paired browser the

@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/core"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -36,7 +38,7 @@ type firstView struct {
 // directory of a workspace.
 func (m home) firstSandbox(name string) *Sandbox {
 	sb := "zero-" + name
-	return &Sandbox{Name: sb, Folders: m.ws[name].Folders, State: filepath.Join(stateRoot(), sb)}
+	return &Sandbox{Name: sb, Folders: m.ws[name].Folders, State: filepath.Join(core.StateRoot(), sb)}
 }
 
 // first opens the first run when the workspace has no sandbox yet and a

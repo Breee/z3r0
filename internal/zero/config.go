@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/core"
+
 	"go.yaml.in/yaml/v3"
 )
 
@@ -179,7 +181,7 @@ func (c *Config) adopt(top string) bool {
 	if top == "" || name == "" || c.Workspaces[name] != nil || len(c.at(top)) > 0 {
 		return false
 	}
-	if _, err := os.Stat(filepath.Join(stateRoot(), "zero-"+name)); err != nil {
+	if _, err := os.Stat(filepath.Join(core.StateRoot(), "zero-"+name)); err != nil {
 		return false
 	}
 	c.Workspaces[name] = &Workspace{Folders: []string{top}}
@@ -187,7 +189,7 @@ func (c *Config) adopt(top string) bool {
 }
 
 func gitTop() string {
-	top, err := sh("git", "rev-parse", "--show-toplevel")
+	top, err := core.Sh("git", "rev-parse", "--show-toplevel")
 	if err != nil || top == "" {
 		return ""
 	}
@@ -286,7 +288,7 @@ func (c *Config) sandbox(name string) *Sandbox {
 		Repo:         repo,
 		Top:          top,
 		Dir:          dir,
-		State:        filepath.Join(stateRoot(), "zero-"+name),
+		State:        filepath.Join(core.StateRoot(), "zero-"+name),
 		Host:         rt.HostAlias("zero-" + name),
 	}
 	s.setGateway(s.read("gateway"))
@@ -423,7 +425,7 @@ func Ctx(out io.Writer, flag string, args []string) error {
 			case sub == "remove" && i < 0:
 				return fmt.Errorf("%s is not in workspace %s (directories: %s); name one of them: zero -c %s ctx remove PATH", p, name, strings.Join(w.Folders, " "), name)
 			case sub == "remove":
-				if !isInput(p) || !fileExists(p) {
+				if !isInput(p) || !core.FileExists(p) {
 					if s := c.sandbox(name); s.exists() {
 						fmt.Fprintf(out, "%s: unpushed: %s -> kept in sandbox, not reachable via token\n", sandboxDir(p), s.unpushedIn(p))
 					}
@@ -463,15 +465,15 @@ func Ctx(out io.Writer, flag string, args []string) error {
 // behind (zero ls: leftover): sandbox, token, input copy, state.
 func rmLeftover(out io.Writer, name string, yes bool) error {
 	sb := "zero-" + name
-	s := &Sandbox{Name: sb, State: filepath.Join(stateRoot(), sb), Host: rt.HostAlias(sb)}
+	s := &Sandbox{Name: sb, State: filepath.Join(core.StateRoot(), sb), Host: rt.HostAlias(sb)}
 	if !wsNameRe.MatchString(name) {
 		return fmt.Errorf("no workspace %q (zero ls lists them)", name)
 	}
 	s.setGateway(s.read("gateway"))
-	if !fileExists(s.State) && !s.exists() {
+	if !core.FileExists(s.State) && !s.exists() {
 		s.setGateway(vmGateway)
 	}
-	if !fileExists(s.State) && !fileExists(s.stage()) && !s.exists() {
+	if !core.FileExists(s.State) && !core.FileExists(s.stage()) && !s.exists() {
 		return fmt.Errorf("no workspace %q and nothing left of one (zero ls lists them)", name)
 	}
 	return s.Rm(out, yes)

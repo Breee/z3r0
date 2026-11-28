@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // The read-only API and web UI of zero-cp (ADR 0053). They have a listener of
@@ -56,10 +58,10 @@ func UI(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(stateRoot(), 0o700); err != nil {
+	if err := os.MkdirAll(core.StateRoot(), 0o700); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(stateRoot(), uiCodeFile), []byte(code), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(core.StateRoot(), uiCodeFile), []byte(code), 0o600); err != nil {
 		return err
 	}
 	url := fmt.Sprintf("http://%s/ui/enter?code=%s", uiAddr(), code)
@@ -72,7 +74,7 @@ func UI(out io.Writer) error {
 func uiEnter(code string) bool {
 	uiMu.Lock()
 	defer uiMu.Unlock()
-	path := filepath.Join(stateRoot(), uiCodeFile)
+	path := filepath.Join(core.StateRoot(), uiCodeFile)
 	st, err := os.Stat(path)
 	if err != nil {
 		return false
@@ -144,7 +146,7 @@ type uiPart struct {
 func cleanAll(in []string) []string {
 	out := make([]string, 0, len(in))
 	for _, s := range in {
-		out = append(out, clean(s))
+		out = append(out, core.Clean(s))
 	}
 	return out
 }
@@ -221,7 +223,7 @@ func uiDecisions(c *Config, name string) []map[string]string {
 		d := map[string]string{}
 		for _, k := range uiLogFields {
 			if v := m[k]; v != "" {
-				d[k] = clean(v)
+				d[k] = core.Clean(v)
 			}
 		}
 		all = append(all, d)
@@ -336,7 +338,7 @@ func uiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := loadConfig()
 	if err != nil {
-		http.Error(w, clean(err.Error()), http.StatusInternalServerError)
+		http.Error(w, core.Clean(err.Error()), http.StatusInternalServerError)
 		return
 	}
 	name := r.URL.Query().Get("workspace")
@@ -344,10 +346,10 @@ func uiHandler(w http.ResponseWriter, r *http.Request) {
 	case "/api/workspaces":
 		list, warn, err := uiWorkspaces()
 		if err != nil {
-			http.Error(w, clean(err.Error()), http.StatusInternalServerError)
+			http.Error(w, core.Clean(err.Error()), http.StatusInternalServerError)
 			return
 		}
-		uiJSON(w, map[string]any{"workspaces": list, "warning": clean(warn)})
+		uiJSON(w, map[string]any{"workspaces": list, "warning": core.Clean(warn)})
 	case "/api/decisions":
 		if c.Workspaces[name] == nil {
 			http.Error(w, "no such workspace", http.StatusNotFound)
@@ -359,14 +361,14 @@ func uiHandler(w http.ResponseWriter, r *http.Request) {
 	case "/ui/", "/ui":
 		list, warn, err := uiWorkspaces()
 		if err != nil {
-			http.Error(w, clean(err.Error()), http.StatusInternalServerError)
+			http.Error(w, core.Clean(err.Error()), http.StatusInternalServerError)
 			return
 		}
-		uiPage(w, "Workspaces", map[string]any{"List": list, "Warn": clean(warn)})
+		uiPage(w, "Workspaces", map[string]any{"List": list, "Warn": core.Clean(warn)})
 	case "/ui/workspace":
 		list, _, err := uiWorkspaces()
 		if err != nil {
-			http.Error(w, clean(err.Error()), http.StatusInternalServerError)
+			http.Error(w, core.Clean(err.Error()), http.StatusInternalServerError)
 			return
 		}
 		for _, ws := range list {
@@ -383,7 +385,7 @@ func uiHandler(w http.ResponseWriter, r *http.Request) {
 			name = strings.TrimPrefix(r.URL.Path, "/api/workspace/")
 			list, _, err := uiWorkspaces()
 			if err != nil {
-				http.Error(w, clean(err.Error()), http.StatusInternalServerError)
+				http.Error(w, core.Clean(err.Error()), http.StatusInternalServerError)
 				return
 			}
 			for _, ws := range list {

@@ -19,6 +19,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // The model proxy (ADR 0049, #162): LiteLLM in a container next to the
@@ -39,7 +41,7 @@ const (
 	modelProject = "zero-parts"
 )
 
-func partsDir() string { return filepath.Join(stateRoot(), "parts") }
+func partsDir() string { return filepath.Join(core.StateRoot(), "parts") }
 
 func modelURL() string { return fmt.Sprintf("http://127.0.0.1:%d", modelPort) }
 
@@ -55,8 +57,8 @@ func compose() []string {
 // composeProblem says why the compose command of the parts does not run.
 func composeProblem() string {
 	c := compose()
-	if _, err := sh(c[0], append(c[1:], "version")...); err != nil {
-		return fmt.Sprintf("%s does not run (%s); the model proxy needs Docker with its compose plugin and a user who may use it, or another compose command in ZERO_COMPOSE", strings.Join(c, " "), clean(strings.SplitN(err.Error(), "\n", 2)[0]))
+	if _, err := core.Sh(c[0], append(c[1:], "version")...); err != nil {
+		return fmt.Sprintf("%s does not run (%s); the model proxy needs Docker with its compose plugin and a user who may use it, or another compose command in ZERO_COMPOSE", strings.Join(c, " "), core.Clean(strings.SplitN(err.Error(), "\n", 2)[0]))
 	}
 	return ""
 }
@@ -175,7 +177,7 @@ func startModelProxy(out io.Writer, providers []string, keyCmds map[string]strin
 		cmd.Env = append(cmd.Env, "ZERO_KEY_"+strings.ToUpper(p)+"="+v)
 	}
 	if b, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("model proxy: %s failed: %v\n%s", strings.Join(c, " "), err, clean(string(b)))
+		return fmt.Errorf("model proxy: %s failed: %v\n%s", strings.Join(c, " "), err, core.Clean(string(b)))
 	}
 	for i := 0; i < 150; i++ {
 		if modelHealthy() {
@@ -402,7 +404,7 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]proxyModel, e
 	}
 	// A sandbox that used the Copilot CLI before the workspace got models
 	// still has the rule to GitHub's model host: it goes.
-	if fileExists(s.path("copilot-cli.rule")) {
+	if core.FileExists(s.path("copilot-cli.rule")) {
 		if err := rt.SetRule(s.Name, copilotRule, nil); err != nil {
 			return nil, err
 		}

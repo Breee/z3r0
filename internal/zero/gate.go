@@ -24,6 +24,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // The push gate (L4, #95) is a git smart-HTTP proxy on the host. Sandboxes
@@ -278,7 +280,7 @@ func gateLookup(key string) *gateSession {
 	if len(key) != 32 {
 		return nil
 	}
-	dirs, _ := filepath.Glob(filepath.Join(stateRoot(), "*", "gate.key"))
+	dirs, _ := filepath.Glob(filepath.Join(core.StateRoot(), "*", "gate.key"))
 	for _, p := range dirs {
 		b, err := os.ReadFile(p)
 		if err != nil || subtle.ConstantTimeCompare(bytes.TrimSpace(b), []byte(key)) != 1 {

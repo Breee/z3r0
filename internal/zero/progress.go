@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // progress shows the slow parts of a command on stderr: on a terminal a
@@ -19,7 +21,7 @@ var progress = struct {
 }{out: os.Stderr, tty: fancy(os.Stderr)}
 
 func fancy(f *os.File) bool {
-	return isTerminal(f) && os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
+	return core.IsTerminal(f) && os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
 }
 
 var spinner = []rune("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")

@@ -1,4 +1,4 @@
-package zero
+package core
 
 import (
 	"io"
@@ -11,13 +11,13 @@ import (
 // tab), so it cannot move the cursor, repaint a question or set the window
 // title (#140).
 
-// cleaner removes from a UTF-8 byte stream: control characters (C0 except \n
+// Cleaner removes from a UTF-8 byte stream: control characters (C0 except \n
 // and \t, DEL, C1), the characters that change the writing direction
 // (U+202A..U+202E, U+2066..U+2069) and bytes that are not UTF-8, which a
 // terminal with an 8-bit character set could read as C1.
-type cleaner struct{ rest []byte } // start of a character cut off by the end of a write
+type Cleaner struct{ rest []byte } // start of a character cut off by the end of a write
 
-func (c *cleaner) filter(p []byte) []byte {
+func (c *Cleaner) Filter(p []byte) []byte {
 	p = append(c.rest, p...)
 	c.rest = nil
 	out := make([]byte, 0, len(p))
@@ -38,20 +38,20 @@ func (c *cleaner) filter(p []byte) []byte {
 	return out
 }
 
-// clean is the filter for a whole text.
-func clean(s string) string {
-	var c cleaner
-	return string(c.filter([]byte(s)))
+// Clean is the filter for a whole text.
+func Clean(s string) string {
+	var c Cleaner
+	return string(c.Filter([]byte(s)))
 }
 
-// cleanWriter filters what is written through it.
-type cleanWriter struct {
-	w io.Writer
-	c cleaner
+// CleanWriter filters what is written through it.
+type CleanWriter struct {
+	W io.Writer
+	c Cleaner
 }
 
-func (w *cleanWriter) Write(p []byte) (int, error) {
-	if _, err := w.w.Write(w.c.filter(p)); err != nil {
+func (w *CleanWriter) Write(p []byte) (int, error) {
+	if _, err := w.W.Write(w.c.Filter(p)); err != nil {
 		return 0, err
 	}
 	return len(p), nil

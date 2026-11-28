@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // Tool path through the model proxy (ADR 0055, PoC 27): a workspace with
@@ -44,7 +46,7 @@ var (
 
 // mcpEntries lists the entries of every sandbox that holds a tool token.
 func mcpEntries() ([]mcpEntry, error) {
-	dirs, _ := filepath.Glob(filepath.Join(stateRoot(), "zero-*"))
+	dirs, _ := filepath.Glob(filepath.Join(core.StateRoot(), "zero-*"))
 	sort.Strings(dirs)
 	var out []mcpEntry
 	for _, d := range dirs {

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // Token is an active forge token as listed by the forge.
@@ -105,7 +107,7 @@ func (s *Sandbox) folderForge() (Forge, map[string]string, error) {
 	var forge Forge
 	paths := map[string]string{}
 	for _, top := range s.Folders {
-		origin, _ := sh("git", "-C", top, "remote", "get-url", "origin")
+		origin, _ := core.Sh("git", "-C", top, "remote", "get-url", "origin")
 		f, path := forgeFor(origin)
 		if f == nil {
 			continue
@@ -142,7 +144,7 @@ func (s *Sandbox) syncForgePaths() (bool, error) {
 	}
 	paths, old := s.orderedPaths(byTop), s.forgePaths()
 	if slices.Equal(paths, old) {
-		return fileExists(s.path("forge.stale")), nil
+		return core.FileExists(s.path("forge.stale")), nil
 	}
 	cur := s.forge()
 	if cur == nil || len(paths) == 0 || f.Host() != cur.Host() {
@@ -209,7 +211,7 @@ func mcpTools(list []string) ([]string, error) {
 func (s *Sandbox) syncTools() (bool, error) {
 	list := strings.Join(s.Tools, " ")
 	if list == s.read("tools") {
-		return fileExists(s.path("forge.stale")), nil
+		return core.FileExists(s.path("forge.stale")), nil
 	}
 	if err := s.write("forge.stale", "1", 0o600); err != nil {
 		return false, err
@@ -293,7 +295,7 @@ func (s *Sandbox) forgePolicyFile(base []byte, prov string) error {
 // workspace's projects changed.
 func (s *Sandbox) syncForgeRule() error {
 	f := s.forge()
-	if f == nil || !fileExists(s.path("forge.rule")) {
+	if f == nil || !core.FileExists(s.path("forge.rule")) {
 		return nil
 	}
 	rule, err := forgePolicy(f, s.forgeProvider(f), s.forgePaths())
@@ -354,7 +356,7 @@ func (s *Sandbox) recordToken(id string) error {
 // revokeUnrecorded revokes tokens with this sandbox's label after a mint whose
 // id was not written (state marker forge.minting).
 func (s *Sandbox) revokeUnrecorded(f Forge) error {
-	if !fileExists(s.path("forge.minting")) {
+	if !core.FileExists(s.path("forge.minting")) {
 		return nil
 	}
 	toks, err := f.Tokens()
@@ -487,7 +489,7 @@ func revokeOrphans(f Forge) error {
 		if !ok || !strings.HasPrefix(name, "zero-") {
 			continue
 		}
-		dir := filepath.Join(stateRoot(), name)
+		dir := filepath.Join(core.StateRoot(), name)
 		if _, err := os.Stat(dir); err == nil {
 			// A sandbox being created or renewed holds its lock: not an orphan.
 			l, err := (&Sandbox{Name: name, State: dir}).acquireLock()
@@ -523,13 +525,13 @@ func (s *Sandbox) configureRemote(top, path string) error {
 	if err != nil {
 		return err
 	}
-	script := "cd " + shellQuote(sandboxDir(top)) + " && " +
-		"git remote set-url origin " + shellQuote("https://"+f.Host()+"/"+path+".git") + " && " +
-		"git config remote.origin.pushurl " + shellQuote(push) + " && " +
-		"git config credential.helper " + shellQuote(helper)
+	script := "cd " + core.ShellQuote(sandboxDir(top)) + " && " +
+		"git remote set-url origin " + core.ShellQuote("https://"+f.Host()+"/"+path+".git") + " && " +
+		"git config remote.origin.pushurl " + core.ShellQuote(push) + " && " +
+		"git config credential.helper " + core.ShellQuote(helper)
 	for _, k := range []string{"user.name", "user.email"} {
-		if v, err := sh("git", "-C", top, "config", k); err == nil && strings.TrimSpace(v) != "" {
-			script += " && git config " + k + " " + shellQuote(strings.TrimSpace(v))
+		if v, err := core.Sh("git", "-C", top, "config", k); err == nil && strings.TrimSpace(v) != "" {
+			script += " && git config " + k + " " + core.ShellQuote(strings.TrimSpace(v))
 		}
 	}
 	if _, err := s.ssh(script); err != nil {

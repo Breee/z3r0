@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // Input directories (ADR 0039): a workspace directory that is no git repo is copied,
@@ -40,7 +42,7 @@ var (
 	secretDirs = []string{".ssh", ".aws", ".kube", ".gnupg", ".docker", ".azure", ".terraform", ".git"}
 )
 
-func isInput(top string) bool { return !fileExists(filepath.Join(top, ".git")) }
+func isInput(top string) bool { return !core.FileExists(filepath.Join(top, ".git")) }
 
 func (s *Sandbox) inputs() []string {
 	var out []string
@@ -233,7 +235,7 @@ func (s *Sandbox) syncInputs(out io.Writer) error {
 	} else if len(s.Instructions)+len(s.Skills) > 0 {
 		what = "the workspace has instructions or skills; they"
 	}
-	if !fileExists(inputRoot) {
+	if !core.FileExists(inputRoot) {
 		if what != "" {
 			return fmt.Errorf("%s need %s: sudo zero install", what, inputRoot)
 		}

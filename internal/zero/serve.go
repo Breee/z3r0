@@ -10,6 +10,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // zero-cp (#97, #119) is the zero service, the one long-running host process: it hosts the push
@@ -69,11 +71,11 @@ func readState(dir, name string) string {
 // upkeep renews the token of every live forge sandbox and revokes tokens no
 // sandbox owns. A sandbox another zero command holds the lock on is skipped.
 func upkeep() {
-	ids, _ := filepath.Glob(filepath.Join(stateRoot(), "*", "forge.id"))
+	ids, _ := filepath.Glob(filepath.Join(core.StateRoot(), "*", "forge.id"))
 	used := map[string]Forge{}
 	// A sandbox whose token could not be revoked has no forge.id left; its
 	// forge is still swept for orphans.
-	marks, _ := filepath.Glob(filepath.Join(stateRoot(), "*", "forge"))
+	marks, _ := filepath.Glob(filepath.Join(core.StateRoot(), "*", "forge"))
 	for _, p := range marks {
 		if f := forgeOf(filepath.Dir(p)); f != nil {
 			used[f.Name()+"@"+f.Host()] = f
@@ -120,7 +122,7 @@ func upkeep() {
 // cpBinary finds zero-cp: next to this zero binary, else on PATH.
 func cpBinary() (string, error) {
 	if exe, err := os.Executable(); err == nil {
-		if p := filepath.Join(filepath.Dir(exe), "zero-cp"); fileExists(p) {
+		if p := filepath.Join(filepath.Dir(exe), "zero-cp"); core.FileExists(p) {
 			return p, nil
 		}
 	}
@@ -137,13 +139,13 @@ func ensureServe() error {
 	if gateUp() {
 		return nil
 	}
-	if err := os.MkdirAll(stateRoot(), 0o700); err != nil {
+	if err := os.MkdirAll(core.StateRoot(), 0o700); err != nil {
 		return err
 	}
-	out := filepath.Join(stateRoot(), "zero-cp.out")
-	if _, err := sh("systemctl", "--user", "cat", serveUnit); err == nil {
+	out := filepath.Join(core.StateRoot(), "zero-cp.out")
+	if _, err := core.Sh("systemctl", "--user", "cat", serveUnit); err == nil {
 		out = "journalctl --user -u " + serveUnit
-		if _, err := sh("systemctl", "--user", "start", serveUnit); err != nil {
+		if _, err := core.Sh("systemctl", "--user", "start", serveUnit); err != nil {
 			return err
 		}
 	} else {

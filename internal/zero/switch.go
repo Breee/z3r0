@@ -8,6 +8,8 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 const switchHelp = "up/down or k/j: move  enter: switch  q: leave unchanged"
@@ -106,7 +108,7 @@ func Switch(in, out *os.File, args []string) error {
 // pickWorkspace shows the list and returns the chosen name; "" if the user left.
 func pickWorkspace(in, out *os.File) (string, error) {
 	var cooked syscall.Termios
-	if err := termios(in, syscall.TCGETS, &cooked); err != nil || !isTerminal(out) {
+	if err := termios(in, syscall.TCGETS, &cooked); err != nil || !core.IsTerminal(out) {
 		return "", fmt.Errorf("zero switch without a name needs a terminal (zero switch NAME; zero ls lists them)")
 	}
 	o, err := loadOverview()

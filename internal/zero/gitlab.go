@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Breee/z3r0/internal/core"
+
 	"go.yaml.in/yaml/v3"
 )
 
@@ -160,7 +162,7 @@ func (g gitlab) projectID(path string) (int64, error) {
 func (gitlab) Env() []string { return []string{"GLAB_IS_OAUTH2=true"} }
 
 func (g gitlab) LoggedIn() error {
-	if _, err := sh("glab", "auth", "status", "--hostname", g.host); err != nil {
+	if _, err := core.Sh("glab", "auth", "status", "--hostname", g.host); err != nil {
 		return fmt.Errorf("glab is not logged in to %s; run: glab auth login --hostname %s --use-keyring", g.host, g.host)
 	}
 	return nil
@@ -187,7 +189,7 @@ func (g gitlab) PlaintextLogin() bool {
 }
 
 func (g gitlab) glab(args ...string) (string, error) {
-	return sh("glab", append(args, "--hostname", g.host)...)
+	return core.Sh("glab", append(args, "--hostname", g.host)...)
 }
 
 func (gitlab) Permissions(caps, tools []string) ([]string, error) {

@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Breee/z3r0/internal/core"
 )
 
 // Instructions and skills of a workspace (ADR 0049): plain files on the host,
@@ -38,7 +40,7 @@ func guidance(w *Workspace) (instr, skills []string, err error) {
 			return "", nil, fmt.Errorf("%s %s: %w", kind, p, err)
 		}
 		base := filepath.Base(q)
-		if strings.HasPrefix(base, ".") || base != clean(base) {
+		if strings.HasPrefix(base, ".") || base != core.Clean(base) {
 			return "", nil, fmt.Errorf("%s %s: the name %q is not usable", kind, p, base)
 		}
 		if seen[base] {
@@ -64,7 +66,7 @@ func guidance(w *Workspace) (instr, skills []string, err error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		if !st.IsDir() || !fileExists(filepath.Join(q, "SKILL.md")) {
+		if !st.IsDir() || !core.FileExists(filepath.Join(q, "SKILL.md")) {
 			return nil, nil, fmt.Errorf("skill %s: not a directory with a SKILL.md", p)
 		}
 		skills = append(skills, q)
@@ -139,7 +141,7 @@ func (s *Sandbox) syncGuidance(out io.Writer, models []proxyModel) error {
 	if sha == cur {
 		return nil
 	}
-	if _, err := s.ssh("f=" + opencodeConfig + "; mkdir -p \"$(dirname \"$f\")\" && printf %s " + shellQuote(want) + " > \"$f\""); err != nil {
+	if _, err := s.ssh("f=" + opencodeConfig + "; mkdir -p \"$(dirname \"$f\")\" && printf %s " + core.ShellQuote(want) + " > \"$f\""); err != nil {
 		return err
 	}
 	return s.write("opencode.sha", sha, 0o600)
