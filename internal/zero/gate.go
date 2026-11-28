@@ -38,7 +38,7 @@ import (
 // secret key in its push URL: /s/<key>/<group/project>.git
 const (
 	gatePort = 18095
-	gateHost = "host.openshell.internal"
+	gateHost = core.SandboxHost
 )
 
 const commandTimeout = 30 * time.Second

@@ -24,6 +24,7 @@ import (
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/gate"
+	"github.com/Breee/z3r0/internal/model/litellm"
 	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 	"github.com/Breee/z3r0/internal/workspace"
@@ -495,7 +496,7 @@ func TestSecretPatterns(t *testing.T) {
 		t.Fatalf("examples %v, patterns %v", dirs, secretDirs)
 	}
 	top := t.TempDir()
-	tree := map[string]string{"openapi.yaml": "a", "environment.md": "b", "keys.md": "c", "history.txt": "d", "docker/compose.yaml": "e"}
+	tree := map[string]string{"openapi.yaml": "a", "environment.md": "b", "keys.md": "c", "history.txt": "d", "docker/litellm.Compose.yaml": "e"}
 	for _, f := range files {
 		tree["sub/"+strings.ToUpper(f)] = "secret"
 		tree[f] = "secret"
@@ -513,7 +514,7 @@ func TestSecretPatterns(t *testing.T) {
 		names = append(names, f.rel)
 	}
 	slices.Sort(names)
-	if want := []string{"docker/compose.yaml", "environment.md", "history.txt", "keys.md", "openapi.yaml"}; !slices.Equal(names, want) {
+	if want := []string{"docker/litellm.Compose.yaml", "environment.md", "history.txt", "keys.md", "openapi.yaml"}; !slices.Equal(names, want) {
 		t.Fatalf("copied %v, want %v", names, want)
 	}
 	if want := 2*len(files) + len(dirs); len(skip) != want {
@@ -1394,7 +1395,7 @@ func TestCopilotScript(t *testing.T) {
 }
 
 func TestModelRoutes(t *testing.T) {
-	p := fmt.Sprint(modelPolicy("zero-a-models"))
+	p := fmt.Sprint(litellm.Policy("zero-a-models", modelClients))
 	for _, want := range []string{"path:/v1/models", "path:/v1/chat/completions", "path:/v1/messages", "path:/v1/responses"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("models rule lacks %s: %s", want, p)
@@ -1425,7 +1426,7 @@ func TestCopilotProxyScript(t *testing.T) {
 			t.Errorf("hasModelArg(%q) = %v", args, got)
 		}
 	}
-	pol := fmt.Sprint(modelPolicy("zero-a-models"))
+	pol := fmt.Sprint(litellm.Policy("zero-a-models", modelClients))
 	if !strings.Contains(pol, copilotBin) {
 		t.Error("models rule does not name the Copilot CLI")
 	}
@@ -1469,7 +1470,7 @@ func TestCheckModels(t *testing.T) {
 }
 
 func TestModelProxyParts(t *testing.T) {
-	cfg := modelConfig([]string{"github_copilot"}, nil)
+	cfg := litellm.Config([]string{"github_copilot"}, nil)
 	for _, want := range []string{`model_name: "github_copilot/*"`, "per_user_oauth", "credential_name: github-copilot", "require_key_mcp_access_defined: true", "master_key: os.environ/LITELLM_MASTER_KEY"} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("config lacks %q", want)
@@ -1479,31 +1480,31 @@ func TestModelProxyParts(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(cfg), &c); err != nil {
 		t.Fatal(err)
 	}
-	if err := yaml.Unmarshal(partsCompose, &c); err != nil {
+	if err := yaml.Unmarshal(litellm.ComposeYAML, &c); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(partsCompose), `"127.0.0.1:18096:4000"`) || strings.Count(string(partsCompose), "@sha256:") != 2 {
+	if !strings.Contains(string(litellm.ComposeYAML), `"127.0.0.1:18096:4000"`) || strings.Count(string(litellm.ComposeYAML), "@sha256:") != 2 {
 		t.Error("compose: loopback port and two images by digest wanted")
 	}
-	req := keyRequest("zero-a@h", []string{"github_copilot/*"}, "", nil)
+	req := litellm.KeyRequest("zero-a@h", []string{"github_copilot/*"}, "", nil)
 	b, _ := json.Marshal(req)
 	for _, want := range []string{`"no-mcp-servers"`, `"user_id":"default_user_id"`, `"models":["github_copilot/*"]`, `"key_alias":"zero-a@h"`} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("key request lacks %s: %s", want, b)
 		}
 	}
-	ids, err := proxyModels([]byte(`{"data":[{"id":"github_copilot/*"},{"id":"github_copilot/gpt-5","max_input_tokens":400000,"max_output_tokens":128000},{"id":"github_copilot/emb","mode":"embedding"},{"id":"github_copilot/img","mode":"image_generation"},{"id":"github_copilot/half","mode":"chat","max_input_tokens":1000},{"id":"github_copilot/claude-haiku-4.5"}]}`))
+	ids, err := litellm.Models([]byte(`{"data":[{"id":"github_copilot/*"},{"id":"github_copilot/gpt-5","max_input_tokens":400000,"max_output_tokens":128000},{"id":"github_copilot/emb","mode":"embedding"},{"id":"github_copilot/img","mode":"image_generation"},{"id":"github_copilot/half","mode":"chat","max_input_tokens":1000},{"id":"github_copilot/claude-haiku-4.5"}]}`))
 	if err != nil || len(ids) != 3 || ids[2].ID != "github_copilot/half" || ids[0].ID != "github_copilot/claude-haiku-4.5" || ids[1].In != 400000 {
 		t.Errorf("models: %v %v", ids, err)
 	}
-	if _, err := proxyModels([]byte("nope")); err == nil {
+	if _, err := litellm.Models([]byte("nope")); err == nil {
 		t.Error("unreadable list accepted")
 	}
 	got := guidanceConfig(nil, nil, ids, "", false)
 	if strings.Contains(got, `"context": 1000`) || strings.Contains(got, "emb") || strings.Contains(got, "img") {
 		t.Errorf("opencode config has a half limit or a model that cannot chat: %s", got)
 	}
-	if ms, err := proxyModels([]byte(`{"data":[]}`)); err != nil || len(ms) != 0 {
+	if ms, err := litellm.Models([]byte(`{"data":[]}`)); err != nil || len(ms) != 0 {
 		t.Errorf("empty list: %v %v", ms, err)
 	}
 	for _, want := range []string{`"litellm"`, `"baseURL": "http://host.openshell.internal:18096/v1"`, `"apiKey": "{env:LITELLM_API_KEY}"`, `"cacheFormat": "anthropic"`, `"context": 400000`, `"output": 128000`} {
@@ -1511,7 +1512,7 @@ func TestModelProxyParts(t *testing.T) {
 			t.Errorf("opencode config lacks %s", want)
 		}
 	}
-	if n := notConnected([]byte(`{"connections":[{"credential_name":"github-copilot","connected":false},{"credential_name":"x","connected":true}]}`)); len(n) != 1 || n[0] != "github-copilot" {
+	if n := litellm.NotConnected([]byte(`{"connections":[{"credential_name":"github-copilot","connected":false},{"credential_name":"x","connected":true}]}`)); len(n) != 1 || n[0] != "github-copilot" {
 		t.Errorf("not connected: %v", n)
 	}
 	if strings.Contains(got, "sk-") {
@@ -1521,19 +1522,19 @@ func TestModelProxyParts(t *testing.T) {
 
 func TestCompose(t *testing.T) {
 	t.Setenv("ZERO_COMPOSE", "")
-	if got := strings.Join(compose(), " "); got != "docker compose" {
+	if got := strings.Join(litellm.Compose(), " "); got != "docker compose" {
 		t.Errorf("default: %q", got)
 	}
 	t.Setenv("ZERO_COMPOSE", "podman compose")
-	if got := strings.Join(compose(), " "); got != "podman compose" {
+	if got := strings.Join(litellm.Compose(), " "); got != "podman compose" {
 		t.Errorf("override: %q", got)
 	}
 	t.Setenv("ZERO_COMPOSE", "true")
-	if got := composeProblem(); got != "" {
+	if got := litellm.ComposeProblem(); got != "" {
 		t.Errorf("command that runs: %q", got)
 	}
 	t.Setenv("ZERO_COMPOSE", "false")
-	if got := composeProblem(); !strings.Contains(got, "false does not run") || !strings.Contains(got, "ZERO_COMPOSE") {
+	if got := litellm.ComposeProblem(); !strings.Contains(got, "false does not run") || !strings.Contains(got, "ZERO_COMPOSE") {
 		t.Errorf("command that fails: %q", got)
 	}
 }
@@ -1548,7 +1549,7 @@ func TestClaudeScript(t *testing.T) {
 	if strings.Contains(got, "ANTHROPIC_API_KEY") || strings.Contains(got, "/v1") {
 		t.Errorf("script %q: x-api-key form or /v1 in the address", got)
 	}
-	if !strings.Contains(fmt.Sprint(modelPolicy("p")), claudeBin) {
+	if !strings.Contains(fmt.Sprint(litellm.Policy("p", modelClients)), claudeBin) {
 		t.Error("models rule does not name Claude Code")
 	}
 }
@@ -1720,7 +1721,7 @@ func TestDefaultModel(t *testing.T) {
 	if err := c.CheckModels(); err == nil {
 		t.Error("default model without models accepted")
 	}
-	ms := []proxyModel{{ID: "github_copilot/a"}}
+	ms := []litellm.Model{{ID: "github_copilot/a"}}
 	if got := guidanceConfig(nil, nil, ms, "github_copilot/a", false); !strings.Contains(got, `"model": "litellm/github_copilot/a"`) {
 		t.Errorf("default model not written:\n%s", got)
 	}
@@ -1740,14 +1741,14 @@ func TestDefaultModel(t *testing.T) {
 }
 
 func TestMCPProxy(t *testing.T) {
-	if got := mcpName("zero-a-b"); got != "gitlab_a_b" {
+	if got := litellm.MCPName("zero-a-b"); got != "gitlab_a_b" {
 		t.Errorf("mcpName = %q", got)
 	}
-	if got := mcpEnvName("zero-a-b"); got != "ZERO_MCP_A_B" {
+	if got := litellm.MCPEnvName("zero-a-b"); got != "ZERO_MCP_A_B" {
 		t.Errorf("mcpEnvName = %q", got)
 	}
-	e := []mcpEntry{{Name: "gitlab_a", Host: "gitlab.example", Env: "ZERO_MCP_A", Token: "SECRETTOKEN"}}
-	c := mcpConfig(e)
+	e := []litellm.MCPEntry{{Name: "gitlab_a", Host: "gitlab.example", Env: "ZERO_MCP_A", Token: "SECRETTOKEN"}}
+	c := litellm.MCPConfig(e)
 	for _, want := range []string{"mcp_servers:", "gitlab_a:", `url: "https://gitlab.example/api/v4/mcp"`, "auth_value: os.environ/ZERO_MCP_A"} {
 		if !strings.Contains(c, want) {
 			t.Errorf("mcpConfig lacks %q:\n%s", want, c)
@@ -1756,34 +1757,34 @@ func TestMCPProxy(t *testing.T) {
 	if strings.Contains(c, "SECRETTOKEN") {
 		t.Error("token in the proxy config")
 	}
-	if mcpConfig(nil) != "" {
+	if litellm.MCPConfig(nil) != "" {
 		t.Error("mcpConfig without entries is not empty")
 	}
-	if got := mcpEnv(e); got != "ZERO_MCP_A=SECRETTOKEN\n" {
+	if got := litellm.MCPEnv(e); got != "ZERO_MCP_A=SECRETTOKEN\n" {
 		t.Errorf("mcpEnv = %q", got)
 	}
-	if !strings.Contains(modelConfig([]string{"github_copilot"}, e), "mcp_servers:") {
+	if !strings.Contains(litellm.Config([]string{"github_copilot"}, e), "mcp_servers:") {
 		t.Error("modelConfig lacks the servers")
 	}
-	if strings.Contains(modelConfig([]string{"github_copilot"}, nil), "mcp_servers:") {
+	if strings.Contains(litellm.Config([]string{"github_copilot"}, nil), "mcp_servers:") {
 		t.Error("modelConfig names servers without entries")
 	}
 
-	with := fmt.Sprint(keyRequest("k", []string{"m"}, "gitlab_a", []string{"get_project"})["object_permission"])
+	with := fmt.Sprint(litellm.KeyRequest("k", []string{"m"}, "gitlab_a", []string{"get_project"})["object_permission"])
 	if !strings.Contains(with, "gitlab_a") || !strings.Contains(with, "get_project") || strings.Contains(with, "no-mcp-servers") {
 		t.Errorf("key with tools: %s", with)
 	}
 	for _, none := range []string{
-		fmt.Sprint(keyRequest("k", []string{"m"}, "", nil)["object_permission"]),
-		fmt.Sprint(keyRequest("k", []string{"m"}, "gitlab_a", nil)["object_permission"]),
-		fmt.Sprint(keyRequest("k", []string{"m"}, "", []string{"get_project"})["object_permission"]),
+		fmt.Sprint(litellm.KeyRequest("k", []string{"m"}, "", nil)["object_permission"]),
+		fmt.Sprint(litellm.KeyRequest("k", []string{"m"}, "gitlab_a", nil)["object_permission"]),
+		fmt.Sprint(litellm.KeyRequest("k", []string{"m"}, "", []string{"get_project"})["object_permission"]),
 	} {
 		if !strings.Contains(none, "no-mcp-servers") {
 			t.Errorf("key without tools: %s", none)
 		}
 	}
 
-	ms := []proxyModel{{ID: "github_copilot/a"}}
+	ms := []litellm.Model{{ID: "github_copilot/a"}}
 	g := guidanceConfig(nil, nil, ms, "", true)
 	for _, want := range []string{`"mcp"`, `"gitlab"`, "/mcp", "Bearer {env:LITELLM_API_KEY}"} {
 		if !strings.Contains(g, want) {
@@ -1795,7 +1796,7 @@ func TestMCPProxy(t *testing.T) {
 	}
 
 	route := false
-	for _, r := range modelRoutes {
+	for _, r := range litellm.Routes {
 		route = route || r.Method == "POST" && r.Path == "/mcp"
 	}
 	if !route {
@@ -1821,7 +1822,7 @@ func TestMCPProxy(t *testing.T) {
 	os.WriteFile(filepath.Join(d, "mcp.token"), []byte("T"), 0o600)
 	os.WriteFile(filepath.Join(d, "forge.host"), []byte("gitlab.example"), 0o600)
 	os.MkdirAll(filepath.Join(core.StateRoot(), "zero-c"), 0o700)
-	got, err := mcpEntries()
+	got, err := litellm.MCPEntries()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1833,7 +1834,7 @@ func TestMCPProxy(t *testing.T) {
 	os.MkdirAll(bad, 0o700)
 	os.WriteFile(filepath.Join(bad, "mcp.token"), []byte("tok"), 0o600)
 	os.WriteFile(filepath.Join(bad, "forge.host"), []byte("a\"b"), 0o600)
-	if _, err := mcpEntries(); err == nil {
+	if _, err := litellm.MCPEntries(); err == nil {
 		t.Error("mcpEntries accepted a host with a quote")
 	}
 	if (&Sandbox{State: bad}).mcpAged() == false {
@@ -1862,39 +1863,39 @@ func TestProviderKeys(t *testing.T) {
 		t.Error("a key command for a provider that is not listed is accepted")
 	}
 
-	cfg := modelConfig([]string{"github_copilot", "openrouter"}, nil)
+	cfg := litellm.Config([]string{"github_copilot", "openrouter"}, nil)
 	for _, want := range []string{`model_name: "openrouter/*"`, `api_key: os.environ/OPENROUTER_API_KEY`, `model_name: "github_copilot/*"`} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("proxy config lacks %q:\n%s", want, cfg)
 		}
 	}
 
-	keys, err := providerKeys(map[string]string{"openrouter": "printf sk-one\\nrest"})
+	keys, err := litellm.ProviderKeys(map[string]string{"openrouter": "printf sk-one\\nrest"})
 	if err != nil || keys["openrouter"] != "sk-one" {
 		t.Errorf("key command: %v %v", keys, err)
 	}
 	if strings.Contains(cfg, "sk-one") {
 		t.Error("key in the proxy config")
 	}
-	_, err = providerKeys(map[string]string{"openrouter": "false"})
+	_, err = litellm.ProviderKeys(map[string]string{"openrouter": "false"})
 	if err == nil || strings.Contains(err.Error(), "sk-") || !strings.Contains(err.Error(), "openrouter") {
 		t.Errorf("failing key command: %v", err)
 	}
-	if _, err := providerKeys(map[string]string{"openrouter": "true"}); err == nil {
+	if _, err := litellm.ProviderKeys(map[string]string{"openrouter": "true"}); err == nil {
 		t.Error("a command that prints nothing gives a key")
 	}
-	a, b := keysSum(map[string]string{"x": "1"}), keysSum(map[string]string{"x": "2"})
-	if a == b || a != keysSum(map[string]string{"x": "1"}) || strings.Contains(a, "1=") {
+	a, b := litellm.KeysSum(map[string]string{"x": "1"}), litellm.KeysSum(map[string]string{"x": "2"})
+	if a == b || a != litellm.KeysSum(map[string]string{"x": "1"}) || strings.Contains(a, "1=") {
 		t.Errorf("key sums: %s %s", a, b)
 	}
 	// The error names the provider, never the command or what it printed.
-	if _, err := providerKeys(map[string]string{"openrouter": "echo sk-inline"}); err != nil {
+	if _, err := litellm.ProviderKeys(map[string]string{"openrouter": "echo sk-inline"}); err != nil {
 		t.Errorf("inline key: %v", err)
 	}
 	d := t.TempDir()
 	script := filepath.Join(d, "k")
 	os.WriteFile(script, []byte("#!/bin/sh\necho sk-printed\nexit 1\n"), 0o755)
-	if _, err := providerKeys(map[string]string{"openrouter": script}); err == nil || strings.Contains(err.Error(), "sk-printed") || strings.Contains(err.Error(), script) {
+	if _, err := litellm.ProviderKeys(map[string]string{"openrouter": script}); err == nil || strings.Contains(err.Error(), "sk-printed") || strings.Contains(err.Error(), script) {
 		t.Errorf("failing key command leaks: %v", err)
 	}
 	c.ProviderKeys = map[string]string{"openrouter": "sh -c 'echo k'"}
@@ -1903,11 +1904,11 @@ func TestProviderKeys(t *testing.T) {
 	}
 	// Every key provider's variable is handed to the proxy container.
 	for p, env := range workspace.KeyProviders {
-		if !strings.Contains(string(partsCompose), env+": ${ZERO_KEY_"+strings.ToUpper(p)+"-}") {
+		if !strings.Contains(string(litellm.ComposeYAML), env+": ${ZERO_KEY_"+strings.ToUpper(p)+"-}") {
 			t.Errorf("compose file lacks %s for %s", env, p)
 		}
 	}
-	if providerKeysProblem(map[string]string{"x": "false"}) == "" || providerKeysProblem(map[string]string{"x": "echo k"}) != "" {
+	if litellm.ProviderKeysProblem(map[string]string{"x": "false"}) == "" || litellm.ProviderKeysProblem(map[string]string{"x": "echo k"}) != "" {
 		t.Error("doctor check of the key commands")
 	}
 }

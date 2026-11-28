@@ -15,6 +15,7 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/gate"
+	"github.com/Breee/z3r0/internal/model/litellm"
 )
 
 // copilotEndpoints are added to the sandbox policy on first `zero vscode` use;
@@ -53,7 +54,7 @@ func (s *Sandbox) up(out io.Writer) (int, error) {
 		os.Remove(s.path("copilot-auth.done"))
 		os.Remove(s.path("copilot-cli.rule"))
 		if s.read("models.provider") != "" {
-			rt.UnbindCredential(s.modelProvider())
+			rt.UnbindCredential(s.modelCredential())
 			os.Remove(s.path("models.provider"))
 		}
 	} else {
@@ -659,8 +660,8 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 // its key and asks Anthropic for nothing; the image pins its version. The
 // model of --model is also the one for its background calls.
 func claudeScript(dir string, args []string) string {
-	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
-		fmt.Sprintf("http://%s:%d", gateHost, modelPort) + ` ANTHROPIC_AUTH_TOKEN="$` + modelKeyEnv + `" ANTHROPIC_MODEL=` + core.ShellQuote(modelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + core.ShellQuote(modelArg(args)) +
+	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + litellm.KeyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
+		fmt.Sprintf("http://%s:%d", gateHost, litellm.Port) + ` ANTHROPIC_AUTH_TOKEN="$` + litellm.KeyEnv + `" ANTHROPIC_MODEL=` + core.ShellQuote(modelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + core.ShellQuote(modelArg(args)) +
 		` CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1 DISABLE_UPDATES=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + claudeBin
 	for _, a := range args {
 		script += " " + core.ShellQuote(a)
@@ -695,8 +696,8 @@ func hasModelArg(args []string) bool { return modelArg(args) != "" }
 // model proxy (PoC 23): the CLI talks to the proxy and asks GitHub for
 // nothing. Its key is the placeholder of the sandbox's environment (PoC 20).
 func copilotProxyScript(dir string, args []string) string {
-	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + modelKeyEnv + `" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=` +
-		fmt.Sprintf("http://%s:%d/v1", gateHost, modelPort) + ` COPILOT_PROVIDER_API_KEY="$` + modelKeyEnv + `" exec ` + copilotBin + " --no-auto-update"
+	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + litellm.KeyEnv + `" ] || { echo 'zero copilot: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && COPILOT_AUTO_UPDATE=false COPILOT_OFFLINE=true COPILOT_PROVIDER_BASE_URL=` +
+		fmt.Sprintf("http://%s:%d/v1", gateHost, litellm.Port) + ` COPILOT_PROVIDER_API_KEY="$` + litellm.KeyEnv + `" exec ` + copilotBin + " --no-auto-update"
 	for _, a := range args {
 		script += " " + core.ShellQuote(a)
 	}
@@ -757,7 +758,7 @@ func (s *Sandbox) Status(out io.Writer) error {
 		if t := strings.Fields(s.read("tools")); len(t) > 0 {
 			via := ""
 			if s.read("mcp.id") != "" {
-				via = " through the model proxy (" + mcpName(s.Name) + ", its own token)"
+				via = " through the model proxy (" + litellm.MCPName(s.Name) + ", its own token)"
 				if s.mcpAged() {
 					via += "; that token may have ended, zero up makes a new one"
 				}

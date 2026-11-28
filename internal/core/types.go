@@ -82,3 +82,6 @@ type AgentConfig struct {
 	Skills       []string // paths in the sandbox
 	Model        string   // default model; empty: the agent's own
 }
+
+// SandboxHost is the name a sandbox reaches the host's own services by.
+const SandboxHost = "host.openshell.internal"

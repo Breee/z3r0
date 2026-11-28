@@ -15,6 +15,7 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
+	"github.com/Breee/z3r0/internal/model/litellm"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 	"github.com/Breee/z3r0/internal/workspace"
 )
@@ -81,10 +82,10 @@ func Doctor(out io.Writer) error {
 		fmt.Fprintln(out, "na    model login: every workspace uses the model proxy")
 	}
 	if c != nil && c.Parts.Models != "" {
-		check("model proxy runtime", composeProblem())
-		check("model proxy login", proxyLogin())
+		check("model proxy runtime", litellm.ComposeProblem())
+		check("model proxy login", litellm.Login())
 		if len(c.ProviderKeys) > 0 {
-			check("model provider keys", providerKeysProblem(c.ProviderKeys))
+			check("model provider keys", litellm.ProviderKeysProblem(c.ProviderKeys))
 		}
 	}
 

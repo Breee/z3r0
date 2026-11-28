@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/model/litellm"
 	"github.com/Breee/z3r0/internal/workspace"
 )
 
@@ -77,7 +78,7 @@ func guidance(w *workspace.Workspace) (instr, skills []string, err error) {
 
 // guidanceConfig is the opencode config that names the copied instructions
 // and skills; empty when the workspace has none.
-func guidanceConfig(instr, skills []string, models []proxyModel, model string, tools bool) string {
+func guidanceConfig(instr, skills []string, models []litellm.Model, model string, tools bool) string {
 	if len(instr)+len(skills)+len(models) == 0 {
 		return ""
 	}
@@ -94,15 +95,15 @@ func guidanceConfig(instr, skills []string, models []proxyModel, model string, t
 		c["skills"] = []string{root + "/skills"}
 	}
 	if len(models) > 0 {
-		c["providers"] = map[string]any{"litellm": modelProvider(models)}
+		c["providers"] = map[string]any{"litellm": litellm.Provider(models)}
 		if model != "" {
 			c["model"] = "litellm/" + model
 		}
 		if tools {
 			// The workspace's tools: the proxy's MCP endpoint, same key (ADR 0055).
 			c["mcp"] = map[string]any{"servers": map[string]any{"gitlab": map[string]any{
-				"type": "remote", "url": fmt.Sprintf("http://%s:%d/mcp", gateHost, modelPort), "oauth": false,
-				"headers": map[string]string{"Authorization": "Bearer {env:" + modelKeyEnv + "}"},
+				"type": "remote", "url": fmt.Sprintf("http://%s:%d/mcp", gateHost, litellm.Port), "oauth": false,
+				"headers": map[string]string{"Authorization": "Bearer {env:" + litellm.KeyEnv + "}"},
 			}}}
 		}
 	}
@@ -112,7 +113,7 @@ func guidanceConfig(instr, skills []string, models []proxyModel, model string, t
 
 // syncGuidance writes, replaces or removes the opencode user config in the
 // sandbox. It only touches a file zero wrote itself (state opencode.sha).
-func (s *Sandbox) syncGuidance(out io.Writer, models []proxyModel) error {
+func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
 	want := guidanceConfig(s.Instructions, s.Skills, models, s.Model, s.read("mcp.id") != "")
 	mine := s.read("opencode.sha")
 	if want == "" && mine == "" {

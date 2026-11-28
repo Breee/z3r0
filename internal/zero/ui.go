@@ -22,6 +22,7 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/gate"
+	"github.com/Breee/z3r0/internal/model/litellm"
 	"github.com/Breee/z3r0/internal/policy"
 	"github.com/Breee/z3r0/internal/workspace"
 )
@@ -245,13 +246,13 @@ func uiParts(c *workspace.Config) []uiPart {
 	models := uiPart{Name: "model proxy", On: c.Parts.Models != ""}
 	if models.On {
 		models.State = "ready"
-		if p := proxyLogin(); p != "" {
+		if p := litellm.Login(); p != "" {
 			models.State = p
 		}
 		// LiteLLM's own page, passed on below uiProxyPath, with LiteLLM's own
 		// login: zero cannot sign the user in there (C59).
 		models.URL = uiProxyPath + "/ui/"
-		models.Note = "its own login: user admin, password in " + filepath.Join(partsDir(), "models.key")
+		models.Note = "its own login: user admin, password in " + filepath.Join(litellm.PartsDir(), "models.key")
 	}
 	return []uiPart{gate, models}
 }
@@ -273,7 +274,7 @@ func uiAllowed(r *http.Request) (int, string) {
 // something; zero's own pages and API only read.
 const uiProxyPath = "/litellm"
 
-var uiProxy = httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: fmt.Sprintf("127.0.0.1:%d", modelPort)})
+var uiProxy = httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: fmt.Sprintf("127.0.0.1:%d", litellm.Port)})
 
 // uiPassOn hands a request below uiProxyPath to the model proxy, without
 // zero's session cookie.

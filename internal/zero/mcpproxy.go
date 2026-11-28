@@ -3,14 +3,10 @@ package zero
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/forge/gitlab"
 )
 
@@ -20,71 +16,8 @@ import (
 // minted for the tools only; the token lives in the proxy's environment,
 // never in the sandbox. The sandbox's proxy key names the entry and the tools.
 
-// mcpEntry is one MCP server of the model proxy.
-type mcpEntry struct{ Name, Host, Env, Token string }
-
 // proxyTools says whether the workspace's tools go through the model proxy.
 func (s *Sandbox) proxyTools() bool { return len(s.Models) > 0 && len(s.Tools) > 0 }
-
-// mcpName is the workspace's entry among the proxy's MCP servers.
-func mcpName(sandbox string) string {
-	// LiteLLM refuses a '-' in a server name; workspace names hold no '_'.
-	return "gitlab_" + strings.ReplaceAll(strings.TrimPrefix(sandbox, "zero-"), "-", "_")
-}
-
-// mcpEnvName is the proxy's environment variable holding the entry's token.
-func mcpEnvName(sandbox string) string {
-	n := strings.ToUpper(strings.TrimPrefix(sandbox, "zero-"))
-	return "ZERO_MCP_" + strings.ReplaceAll(n, "-", "_")
-}
-
-// What goes into the proxy's config and env file is checked first: a host or
-// token with other characters would break out of its line.
-var (
-	mcpHostRe  = regexp.MustCompile(`^[A-Za-z0-9.-]+(:[0-9]+)?$`)
-	mcpTokenRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
-)
-
-// mcpEntries lists the entries of every sandbox that holds a tool token.
-func mcpEntries() ([]mcpEntry, error) {
-	dirs, _ := filepath.Glob(filepath.Join(core.StateRoot(), "zero-*"))
-	sort.Strings(dirs)
-	var out []mcpEntry
-	for _, d := range dirs {
-		tok, host := readState(d, "mcp.token"), readState(d, "forge.host")
-		if tok == "" {
-			continue
-		}
-		n := filepath.Base(d)
-		if !mcpHostRe.MatchString(host) || !mcpTokenRe.MatchString(tok) {
-			return nil, fmt.Errorf("%s: tool token or forge host not usable for the model proxy; zero -c %s up makes them anew", n, strings.TrimPrefix(n, "zero-"))
-		}
-		out = append(out, mcpEntry{mcpName(n), host, mcpEnvName(n), tok})
-	}
-	return out, nil
-}
-
-// mcpConfig is the mcp_servers block of the proxy's config.
-func mcpConfig(entries []mcpEntry) string {
-	if len(entries) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString("mcp_servers:\n")
-	for _, e := range entries {
-		fmt.Fprintf(&b, "  %s:\n    url: \"https://%s/api/v4/mcp\"\n    transport: \"http\"\n    auth_type: \"bearer_token\"\n    auth_value: os.environ/%s\n", e.Name, e.Host, e.Env)
-	}
-	return b.String()
-}
-
-// mcpEnv is the env file that hands the entries' tokens to the proxy.
-func mcpEnv(entries []mcpEntry) string {
-	var b strings.Builder
-	for _, e := range entries {
-		fmt.Fprintf(&b, "%s=%s\n", e.Env, e.Token)
-	}
-	return b.String()
-}
 
 // syncMCP makes the workspace's tool token match its tool list: minted when
 // missing, when the list changed or when it ends soon; revoked when the
