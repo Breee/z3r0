@@ -1503,7 +1503,7 @@ func TestModelProxyParts(t *testing.T) {
 	if _, err := litellm.Models([]byte("nope")); err == nil {
 		t.Error("unreadable list accepted")
 	}
-	got := guidanceConfig(nil, nil, ids, "", false)
+	got := guidanceConfig(nil, nil, litellm.CoreModels(ids), "", false)
 	if strings.Contains(got, `"context": 1000`) || strings.Contains(got, "emb") || strings.Contains(got, "img") {
 		t.Errorf("opencode config has a half limit or a model that cannot chat: %s", got)
 	}
@@ -1704,11 +1704,11 @@ func TestDefaultModel(t *testing.T) {
 		"github_copilot/claude-haiku-4.5": true, "github_copilot/a": true,
 		"github_copilot/*": false, "other/x": false, "nomodel": false, "github_copilot/": false,
 	} {
-		if got := workspace.ModelListed(m, list); got != want {
+		if got := core.ModelListed(m, list); got != want {
 			t.Errorf("modelListed(%q) = %v", m, got)
 		}
 	}
-	if workspace.ModelListed("github_copilot/b", []string{"github_copilot/a"}) {
+	if core.ModelListed("github_copilot/b", []string{"github_copilot/a"}) {
 		t.Error("a model outside a list without wildcard counts")
 	}
 	c := &workspace.Config{Parts: workspace.Parts{Models: workspace.PartLiteLLM}, Providers: []string{"github_copilot"},
@@ -1724,7 +1724,7 @@ func TestDefaultModel(t *testing.T) {
 	if err := c.CheckModels(); err == nil {
 		t.Error("default model without models accepted")
 	}
-	ms := []litellm.Model{{ID: "github_copilot/a"}}
+	ms := []core.Model{{ID: "github_copilot/a"}}
 	if got := guidanceConfig(nil, nil, ms, "github_copilot/a", false); !strings.Contains(got, `"model": "litellm/github_copilot/a"`) {
 		t.Errorf("default model not written:\n%s", got)
 	}
@@ -1787,7 +1787,7 @@ func TestMCPProxy(t *testing.T) {
 		}
 	}
 
-	ms := []litellm.Model{{ID: "github_copilot/a"}}
+	ms := []core.Model{{ID: "github_copilot/a"}}
 	g := guidanceConfig(nil, nil, ms, "", true)
 	for _, want := range []string{`"mcp"`, `"gitlab"`, "/mcp", "Bearer {env:LITELLM_API_KEY}"} {
 		if !strings.Contains(g, want) {
@@ -2358,26 +2358,6 @@ func TestHomeFirstRun(t *testing.T) {
 	g, quit := press(n, 'v')
 	if g.mode == homeFirst || g.cmd != "vscode" || !quit {
 		t.Errorf("second run: mode %v cmd %q", g.mode, g.cmd)
-	}
-}
-
-func TestKeepModelKey(t *testing.T) {
-	want := litellm.KeyAllows([]string{"a/b"}, "", nil)
-	for _, c := range []struct {
-		name   string
-		left   time.Duration
-		allows string
-		keep   bool
-	}{
-		{"unchanged", 48 * time.Hour, want, true},
-		{"expires soon", renewBefore - time.Minute, want, false},
-		{"no key", 0, "", false},
-		{"models changed", 48 * time.Hour, litellm.KeyAllows([]string{"a/b", "c/d"}, "", nil), false},
-		{"tools changed", 48 * time.Hour, litellm.KeyAllows([]string{"a/b"}, "zero-x", []string{"t"}), false},
-	} {
-		if got := keepModelKey(c.left, c.allows, want); got != c.keep {
-			t.Errorf("%s: keep %v, want %v", c.name, got, c.keep)
-		}
 	}
 }
 

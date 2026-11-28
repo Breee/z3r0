@@ -351,15 +351,15 @@ func Models(list []byte) ([]Model, error) {
 	return ms, nil
 }
 
-// Provider is the opencode provider entry for the proxy. opencode finds
+// OpencodeProvider is the opencode provider entry for the proxy. opencode finds
 // no model of the proxy by itself (PoC 21), so every model is written, with
 // the proxy's limits where it reports them.
-func Provider(ms []Model) map[string]any {
+func OpencodeProvider(ms []core.Model) map[string]any {
 	models := map[string]any{}
 	for _, pm := range ms {
 		m := map[string]any{"name": pm.ID}
-		if pm.In > 0 && pm.Out > 0 {
-			m["limit"] = map[string]any{"context": pm.In, "output": pm.Out}
+		if pm.Context > 0 && pm.Output > 0 {
+			m["limit"] = map[string]any{"context": pm.Context, "output": pm.Output}
 		}
 		if strings.Contains(pm.ID, "claude") {
 			m["compatibility"] = map[string]any{"cacheFormat": "anthropic"}

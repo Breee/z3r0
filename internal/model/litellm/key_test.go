@@ -76,3 +76,23 @@ func TestKeyState(t *testing.T) {
 		}
 	}
 }
+
+func TestKeepKey(t *testing.T) {
+	want := KeyAllows([]string{"a/b"}, "", nil)
+	for _, c := range []struct {
+		name   string
+		left   time.Duration
+		allows string
+		keep   bool
+	}{
+		{"unchanged", 48 * time.Hour, want, true},
+		{"expires soon", keyRenewBefore - time.Minute, want, false},
+		{"no key", 0, "", false},
+		{"models changed", 48 * time.Hour, KeyAllows([]string{"a/b", "c/d"}, "", nil), false},
+		{"tools changed", 48 * time.Hour, KeyAllows([]string{"a/b"}, "zero-x", []string{"t"}), false},
+	} {
+		if got := keepKey(c.left, c.allows, want); got != c.keep {
+			t.Errorf("%s: keep %v, want %v", c.name, got, c.keep)
+		}
+	}
+}

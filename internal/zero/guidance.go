@@ -22,7 +22,7 @@ import (
 
 // guidanceConfig is the opencode config that names the copied instructions
 // and skills; empty when the workspace has none.
-func guidanceConfig(instr, skills []string, models []litellm.Model, model string, tools bool) string {
+func guidanceConfig(instr, skills []string, models []core.Model, model string, tools bool) string {
 	if len(instr)+len(skills)+len(models) == 0 {
 		return ""
 	}
@@ -39,7 +39,7 @@ func guidanceConfig(instr, skills []string, models []litellm.Model, model string
 		c["skills"] = []string{root + "/skills"}
 	}
 	if len(models) > 0 {
-		c["providers"] = map[string]any{"litellm": litellm.Provider(models)}
+		c["providers"] = map[string]any{"litellm": litellm.OpencodeProvider(models)}
 		if model != "" {
 			c["model"] = "litellm/" + model
 		}
@@ -57,7 +57,7 @@ func guidanceConfig(instr, skills []string, models []litellm.Model, model string
 
 // syncGuidance writes, replaces or removes the opencode user config in the
 // sandbox. It only touches a file zero wrote itself (state opencode.sha).
-func (s *Sandbox) syncGuidance(out io.Writer, models []litellm.Model) error {
+func (s *Sandbox) syncGuidance(out io.Writer, models []core.Model) error {
 	want := guidanceConfig(s.Instructions, s.Skills, models, s.Model, s.read("mcp.id") != "")
 	mine := s.read("opencode.sha")
 	if want == "" && mine == "" {

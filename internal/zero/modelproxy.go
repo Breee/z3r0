@@ -1,20 +1,16 @@
 package zero
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/Breee/z3r0/internal/agent/claude"
 	"github.com/Breee/z3r0/internal/agent/copilot"
 	"github.com/Breee/z3r0/internal/agent/opencode"
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/model/litellm"
-	"github.com/Breee/z3r0/internal/workspace"
 )
 
 // The model proxy (ADR 0049, #162): LiteLLM in a container next to the
@@ -38,7 +34,7 @@ func (s *Sandbox) revokeModelKey() error {
 // syncModels sets up the model path of a running sandbox: proxy up, a fresh
 // key, the egress rule, the key in opencode's service. It returns the models
 // for the opencode config. Without models it takes the path away.
-func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model, error) {
+func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]core.Model, error) {
 	if len(s.Models) == 0 {
 		if err := s.revokeMCP(); err != nil {
 			return nil, err
@@ -62,12 +58,12 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model
 		return nil, err
 	}
 	lap("  tool token")
-	if err := litellm.Start(out, providers, s.ProviderKeys); err != nil {
-		return nil, err
-	}
-	alias, entry := s.modelKeyAlias(), ""
+	mp := litellm.Proxy{Providers: providers, KeyCmds: s.ProviderKeys, Alias: s.modelKeyAlias(), Tools: s.Tools, HadKey: s.read("models.key") != ""}
 	if s.read("mcp.id") != "" {
-		entry = litellm.MCPName(s.Name)
+		mp.ToolEntry = litellm.MCPName(s.Name)
+	}
+	if err := mp.Ensure(out); err != nil {
+		return nil, err
 	}
 	lap("  proxy up")
 	// A sandbox that used the Copilot CLI before the workspace got models
@@ -79,76 +75,44 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]litellm.Model
 		os.Remove(s.path("copilot-cli.rule"))
 	}
 	// Nothing changed: the key stays, and with it the sandbox's credential
-	// and opencode's service. A sandbox made or started in this run is
-	// set up again.
-	s.keptKey = false
-	if !s.fresh && s.read("models.key") != "" && s.read("models.provider") != "" {
-		left, allows, err := litellm.KeyLeft(alias)
-		if err == nil && keepModelKey(left, allows, litellm.KeyAllows(s.Models, entry, s.Tools)) && rt.CredentialReady(s.Name, s.modelCredential()) == nil {
-			list, err := litellm.API("", "GET", "/v1/models", nil)
-			if err != nil {
-				return nil, err
-			}
-			all, err := litellm.Models(list)
-			if err != nil {
-				return nil, err
-			}
-			var ids []litellm.Model
-			for _, m := range all {
-				if workspace.ModelListed(m.ID, s.Models) {
-					ids = append(ids, m)
-				}
-			}
-			s.keptKey = true
-			err = s.modelNotes(out, ids)
-			lap("  key kept")
-			return ids, err
-		}
-	}
-	if _, err := litellm.API("", "POST", "/key/delete", map[string]any{"key_aliases": []string{alias}}); err != nil && s.read("models.key") != "" {
-		return nil, err
-	}
-	b, err := litellm.API("", "POST", "/key/generate", litellm.KeyRequest(alias, s.Models, entry, s.Tools))
+	// and opencode's service. A sandbox made or started in this run, or one
+	// whose credential is not there, is set up again.
+	mp.Renew = s.fresh || !mp.HadKey || s.read("models.provider") == "" || rt.CredentialReady(s.Name, s.modelCredential()) != nil
+	var provider core.ModelProvider = mp
+	a, err := provider.Grant(s.Name, s.Models)
 	if err != nil {
 		return nil, err
 	}
-	var k struct {
-		Key string `json:"key"`
-	}
-	if json.Unmarshal(b, &k) != nil || k.Key == "" {
-		return nil, fmt.Errorf("model proxy: no key in the answer")
+	s.keptKey = a.Credential.Secret == ""
+	if s.keptKey {
+		s.modelNotes(out, a)
+		lap("  key kept")
+		return a.Models, nil
 	}
 	if err := s.write("models.key", "1", 0o600); err != nil {
 		return nil, err
 	}
 	lap("  key renewed")
-	if err := s.bindModelKey(k.Key); err != nil {
+	if err := s.bindModelKey(a.Credential.Secret); err != nil {
 		return nil, err
 	}
 	// A new session has the placeholder in its environment; that is what
 	// opencode's service keeps, not the key.
 	lap("  key bound")
-	if _, err := s.ssh(`[ -n "$` + litellm.KeyEnv + `" ] && opencode service set env ` + litellm.KeyEnv + ` "$` + litellm.KeyEnv + `" >/dev/null && opencode service restart >/dev/null`); err != nil {
+	env := a.Credential.Env
+	if _, err := s.ssh(`[ -n "$` + env + `" ] && opencode service set env ` + env + ` "$` + env + `" >/dev/null && opencode service restart >/dev/null`); err != nil {
 		return nil, fmt.Errorf("model proxy key not handed to opencode in %s: %w; check: zero logs, then zero up", s.Name, err)
 	}
 	lap("  service restart")
-	list, err := litellm.API(k.Key, "GET", "/v1/models", nil)
-	if err != nil {
-		return nil, err
-	}
-	ids, err := litellm.Models(list)
-	if err != nil {
-		return nil, err
-	}
-	return ids, s.modelNotes(out, ids)
+	s.modelNotes(out, a)
+	return a.Models, nil
 }
 
-func (s *Sandbox) modelNotes(out io.Writer, ids []litellm.Model) error {
-	fmt.Fprintf(out, "models: %d through the model proxy (%s)\n", len(ids), strings.Join(s.Models, ", "))
-	for _, n := range litellm.NotConnected(litellm.Conns()) {
-		fmt.Fprintf(out, "models: %s is not connected, no answer will come; connect it in the proxy's UI: %s/ui/ (user admin, password in %s), Models + Endpoints, LLM Credentials, Connect\n", n, litellm.URL(), filepath.Join(litellm.PartsDir(), "models.key"))
+func (s *Sandbox) modelNotes(out io.Writer, a core.ModelAccess) {
+	fmt.Fprintf(out, "models: %d through the model proxy (%s)\n", len(a.Models), strings.Join(s.Models, ", "))
+	for _, w := range a.Warnings {
+		fmt.Fprintf(out, "models: %s\n", w)
 	}
-	return nil
 }
 
 func (s *Sandbox) modelCredential() string { return s.Name + "-models" }
@@ -195,9 +159,3 @@ func (s *Sandbox) dropModelProvider() error {
 
 // modelClients are the programs in the sandbox that may reach the model proxy.
 var modelClients = []string{opencode.Bin, copilot.Bin, claude.Bin, "/usr/bin/curl"}
-
-// keepModelKey: the key at the proxy stays when it lives long enough and
-// allows exactly what this workspace asks for.
-func keepModelKey(left time.Duration, allows, want string) bool {
-	return left > renewBefore && allows == want
-}

@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -13,8 +12,6 @@ import (
 // agents reach models only through the model proxy.
 
 const PartLiteLLM = "litellm"
-
-var modelNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 
 // CheckModels validates parts.models, providers and every workspace's model
 // list. A model is "provider/name" or "provider/*" of a listed provider.
@@ -59,7 +56,7 @@ func (c *Config) CheckModels() error {
 			if !ok || !slices.Contains(c.Providers, prov) {
 				return fmt.Errorf("workspace %q: model %q: want PROVIDER/MODEL or PROVIDER/* with a provider of: %s", name, m, strings.Join(c.Providers, ", "))
 			}
-			if model != "*" && !modelNameRe.MatchString(model) {
+			if model != "*" && !core.ModelNameRe.MatchString(model) {
 				return fmt.Errorf("workspace %q: model %q: the model name is not usable", name, m)
 			}
 			if seen[m] {
@@ -67,19 +64,9 @@ func (c *Config) CheckModels() error {
 			}
 			seen[m] = true
 		}
-		if w.Model != "" && !ModelListed(w.Model, w.Models) {
+		if w.Model != "" && !core.ModelListed(w.Model, w.Models) {
 			return fmt.Errorf("workspace %q: model %q is not one of its models (%s)", name, w.Model, strings.Join(w.Models, ", "))
 		}
 	}
 	return nil
-}
-
-// ModelListed reports whether the default model m is a full name that the
-// list names itself or covers with PROVIDER/*.
-func ModelListed(m string, list []string) bool {
-	prov, model, ok := strings.Cut(m, "/")
-	if !ok || model == "*" || !modelNameRe.MatchString(model) {
-		return false
-	}
-	return slices.Contains(list, m) || slices.Contains(list, prov+"/*")
 }
