@@ -82,6 +82,11 @@ func (s *Sandbox) syncModels(out io.Writer, providers []string) ([]core.Model, e
 	var provider core.ModelProvider = mp
 	a, err := provider.Grant(s.Name, s.Models)
 	if err != nil {
+		// A key made before the failure is recorded, so that zero rm and
+		// the next zero up remove it at the proxy.
+		if a.Credential.Secret != "" {
+			_ = s.write("models.key", "1", 0o600)
+		}
 		return nil, err
 	}
 	s.keptKey = a.Credential.Secret == ""
