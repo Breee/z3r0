@@ -1907,7 +1907,7 @@ func TestProviderKeys(t *testing.T) {
 		t.Errorf("command with quotes: %v", err)
 	}
 	// Every key provider's variable is handed to the proxy container.
-	for p, env := range workspace.KeyProviders {
+	for p, env := range core.KeyProviders {
 		if !strings.Contains(string(litellm.ComposeYAML), env+": ${ZERO_KEY_"+strings.ToUpper(p)+"-}") {
 			t.Errorf("compose file lacks %s for %s", env, p)
 		}

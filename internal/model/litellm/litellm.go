@@ -22,7 +22,6 @@ import (
 
 	"github.com/Breee/z3r0/internal/core"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
-	"github.com/Breee/z3r0/internal/workspace"
 )
 
 //go:embed model-key-profile.yaml
@@ -71,7 +70,7 @@ func Config(providers []string, entries []MCPEntry) string {
 			b.WriteString("  - model_name: \"github_copilot/*\"\n    litellm_params:\n      model: \"github_copilot/*\"\n      litellm_credential_name: github-copilot\n      github_copilot_auth_type: per_user_oauth\n")
 			creds += "  - credential_name: github-copilot\n    credential_values:\n      github_copilot_auth_type: per_user_oauth\n    credential_info:\n      custom_llm_provider: github_copilot\n"
 		}
-		if env, ok := workspace.KeyProviders[p]; ok {
+		if env, ok := core.KeyProviders[p]; ok {
 			fmt.Fprintf(&b, "  - model_name: \"%s/*\"\n    litellm_params:\n      model: \"%s/*\"\n      api_key: os.environ/%s\n", p, p, env)
 		}
 	}
