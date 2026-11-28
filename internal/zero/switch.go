@@ -35,7 +35,11 @@ func renderSwitch(out io.Writer, o *overview, sel int) {
 	writeRows(&table, o.rows)
 	var b strings.Builder
 	b.WriteString("\x1b[H\x1b[2J")
-	for i, l := range strings.Split(strings.TrimRight(table.String(), "\n"), "\n") {
+	t := table.String()
+	if Fancy(out) {
+		t = styleRows(t, o.rows)
+	}
+	for i, l := range strings.Split(strings.TrimRight(t, "\n"), "\n") {
 		cur := "  "
 		if i == sel+1 {
 			cur = "> "

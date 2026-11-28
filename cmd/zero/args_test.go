@@ -2,8 +2,11 @@ package main
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/Breee/z3r0/internal/zero"
 )
 
 func TestCheckArgs(t *testing.T) {
@@ -110,5 +113,18 @@ func TestContextFlag(t *testing.T) {
 		if _, _, err := contextFlag(in); !errors.As(err, &u) {
 			t.Errorf("%v: got %v, want a usage error", in, err)
 		}
+	}
+}
+
+func TestStyledHelpSameText(t *testing.T) {
+	styled := zero.StyleHelp(usageText)
+	if styled == usageText {
+		t.Fatal("help not styled")
+	}
+	if got := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(styled, ""); got != usageText {
+		t.Errorf("styled help differs from the plain text:\n%s", got)
+	}
+	if !strings.Contains(styled, "\x1b[36mopencode\x1b[0m") || !strings.Contains(styled, "\x1b[1;36mWorkspaces\x1b[0m") {
+		t.Errorf("command or heading not coloured:\n%q", styled)
 	}
 }

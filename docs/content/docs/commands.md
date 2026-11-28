@@ -84,6 +84,8 @@ zero sets no model unless the workspace names one (`model:`, with the [model pro
 zero run "add a test for the parser and push"
 ```
 
+On a terminal the help and the workspace table are coloured; piped or with `NO_COLOR` set they are plain, with the same text and columns.
+
 ## Workspaces
 
 | Command | What it does |

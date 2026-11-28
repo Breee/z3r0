@@ -71,6 +71,15 @@ const bashCompletion = `_zero() {
 complete -F _zero zero
 `
 
+// usage prints the help, coloured on a terminal.
+func usage(out *os.File) {
+	t := usageText
+	if zero.Fancy(out) {
+		t = zero.StyleHelp(t)
+	}
+	fmt.Fprint(out, t)
+}
+
 func main() {
 	if len(os.Args) < 2 && zero.Interactive() {
 		exe, err := os.Executable()
@@ -88,7 +97,7 @@ func main() {
 		}
 	}
 	if len(os.Args) < 2 {
-		fmt.Fprint(os.Stderr, usageText)
+		usage(os.Stderr)
 		os.Exit(2)
 	}
 	ctx, rest, err := contextFlag(os.Args[1:])
@@ -97,7 +106,7 @@ func main() {
 		os.Exit(2)
 	}
 	if len(rest) == 0 {
-		fmt.Fprint(os.Stderr, usageText)
+		usage(os.Stderr)
 		os.Exit(2)
 	}
 	cmd, args := rest[0], rest[1:]
@@ -113,7 +122,7 @@ func main() {
 	}
 	if _, ok := argSpecs[cmd]; !ok && cmd != "run" && cmd != "copilot" && cmd != "claude" {
 		fmt.Fprintf(os.Stderr, "zero: unknown command %q\n\n", cmd)
-		fmt.Fprint(os.Stderr, usageText)
+		usage(os.Stderr)
 		os.Exit(2)
 	}
 	if err := checkArgs(cmd, args); err != nil {
@@ -122,7 +131,7 @@ func main() {
 	}
 	switch cmd {
 	case "help":
-		fmt.Print(usageText)
+		usage(os.Stdout)
 		return
 	case "version":
 		fmt.Println("zero", zero.Version())

@@ -2,6 +2,7 @@ package zero
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -194,7 +195,15 @@ func Ls(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := writeRows(out, o.rows); err != nil {
+	var table bytes.Buffer
+	if err := writeRows(&table, o.rows); err != nil {
+		return err
+	}
+	t := table.String()
+	if Fancy(out) {
+		t = styleRows(t, o.rows)
+	}
+	if _, err := io.WriteString(out, t); err != nil {
 		return err
 	}
 	c, tokens, liveTokens, sandboxes, dirs, warn := o.c, o.tokens, o.liveTokens, o.sandboxes, o.dirs, o.warn

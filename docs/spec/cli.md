@@ -17,6 +17,8 @@ Rules:
 - The workspace comes from `-c`, else `ZERO_CONTEXT`, else the current directory, else the current context (workspaces spec, section 4).
 - A second run asks nothing.
 
+On a terminal the help, `zero ls` and the picker of `zero switch` are coloured: headings and the current workspace bold, command names cyan, the status green (running), yellow (stopped) or faint. Piped, with `NO_COLOR` set or with `TERM=dumb` the same text comes without colour; words, columns and exit codes are the same in both forms.
+
 ## 2. First run
 
 A first run is: the sandbox does not exist yet and at least one repo directory of the workspace has no `.zero/policy.yaml`.

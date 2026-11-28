@@ -2380,3 +2380,31 @@ func TestKeepModelKey(t *testing.T) {
 		}
 	}
 }
+
+func TestStyleRows(t *testing.T) {
+	rows := []wsRow{
+		{Name: "apps", Status: "none", Token: "-", Policy: "-", Folders: 1},
+		{Name: "running", Status: "running", Token: "gitlab 16h", Policy: "ok", Folders: 2, Current: true},
+		{Name: "old", Status: "stopped", Token: "-", Policy: "changed", Folders: 1},
+	}
+	var b bytes.Buffer
+	if err := writeRows(&b, rows); err != nil {
+		t.Fatal(err)
+	}
+	plain := b.String()
+	if strings.Contains(plain, "\x1b") {
+		t.Fatal("plain table has escape codes")
+	}
+	styled := styleRows(plain, rows)
+	if got := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(styled, ""); got != plain {
+		t.Errorf("styled table differs from the plain one:\n%s\n%s", got, plain)
+	}
+	for _, want := range []string{"\x1b[1;32mrunning\x1b[0m", "\x1b[33mstopped\x1b[0m", "\x1b[2mnone\x1b[0m", "\x1b[1m* running"} {
+		if !strings.Contains(styled, want) {
+			t.Errorf("styled table lacks %q:\n%q", want, styled)
+		}
+	}
+	if Fancy(&b) {
+		t.Error("a buffer is not a terminal")
+	}
+}
