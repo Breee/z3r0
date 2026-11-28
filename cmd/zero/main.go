@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Breee/z3r0/internal/install"
 	"github.com/Breee/z3r0/internal/zero"
 )
 
@@ -135,7 +136,7 @@ func main() {
 			}
 			runtime = strings.TrimPrefix(a, "--")
 		}
-		if err := zero.Install(runtime); err != nil {
+		if err := install.Install(runtime); err != nil {
 			fatal(err)
 		}
 		return

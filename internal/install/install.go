@@ -1,4 +1,4 @@
-package zero
+package install
 
 import (
 	_ "embed"
