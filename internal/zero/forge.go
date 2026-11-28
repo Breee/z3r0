@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 // Token is an active forge token as listed by the forge.
@@ -42,7 +43,7 @@ type Forge interface {
 	Profile() []byte
 	// Egress is what the sandbox may reach on the forge host for the
 	// projects at paths; anything not allowed is refused.
-	Egress(paths []string) (allow, deny []EgressRule, err error)
+	Egress(paths []string) (allow, deny []core.EgressRule, err error)
 	// LoggedIn is nil when the host session can mint tokens; the error says
 	// how to log in.
 	LoggedIn() error
@@ -284,7 +285,7 @@ func (s *Sandbox) forgePolicyFile(base []byte, prov string) error {
 	if err != nil {
 		return err
 	}
-	b, err := policyWith(base, forgeRule, rule)
+	b, err := openshell.PolicyWith(base, forgeRule, rule)
 	if err != nil {
 		return err
 	}

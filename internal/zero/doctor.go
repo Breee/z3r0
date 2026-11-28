@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 // Doctor checks the host setup and, inside a git repo, the forge guardrails.
@@ -50,7 +51,7 @@ func Doctor(out io.Writer) error {
 				check("openshell gateway", "unreachable: "+err.Error())
 			} else {
 				check("openshell gateway", "")
-				switch drv, err := computeDriver(); {
+				switch drv, err := openshell.ComputeDriver(); {
 				case err != nil:
 					check("runtime", err.Error())
 				case drv == "docker" && gatewayInDockerGroup():

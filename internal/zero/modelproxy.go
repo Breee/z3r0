@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 // The model proxy (ADR 0049, #162): LiteLLM in a container next to the
@@ -323,7 +324,7 @@ func modelProvider(ms []proxyModel) map[string]any {
 func modelPolicy(provider string) map[string]any {
 	var rules []map[string]any
 	for _, r := range modelRoutes {
-		rules = append(rules, map[string]any{"allow": matcher(r)})
+		rules = append(rules, map[string]any{"allow": openshell.Matcher(r)})
 	}
 	return map[string]any{
 		"name": modelRule,
@@ -340,7 +341,7 @@ func modelPolicy(provider string) map[string]any {
 // calls that ask a model. The key is one of the proxy's admin user, so every
 // other path (keys, users, credentials, MCP servers) is closed here, outside
 // the sandbox.
-var modelRoutes = []EgressRule{
+var modelRoutes = []core.EgressRule{
 	{Method: "GET", Path: "/v1/models"},
 	{Method: "POST", Path: "/v1/chat/completions"},
 	{Method: "POST", Path: "/v1/responses"},

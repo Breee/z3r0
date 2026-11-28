@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 // wsRow is one workspace with its live state.
@@ -75,7 +76,7 @@ func loadOverview() (*overview, error) {
 
 	// Sandboxes per gateway ("" = default).
 	sandboxes := map[string][]string{}
-	for _, gw := range []string{"", vmGateway} {
+	for _, gw := range []string{"", openshell.VMGateway} {
 		withGateway(gw, func() {
 			if !rt.Reachable() {
 				if gw == "" {
@@ -218,7 +219,7 @@ func Ls(out io.Writer) error {
 			orphans = append(orphans, fmt.Sprintf("token %s %s (%s", t.ID, t.Name, why))
 		}
 	}
-	for _, gw := range []string{"", vmGateway} {
+	for _, gw := range []string{"", openshell.VMGateway} {
 		for _, sb := range sandboxes[gw] {
 			if strings.HasPrefix(sb, "zero-") && !known(sb) {
 				orphans = append(orphans, fmt.Sprintf("sandbox %s (no workspace)%s", sb, adopt(sb)))

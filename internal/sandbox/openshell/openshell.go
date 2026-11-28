@@ -1,4 +1,5 @@
-package zero
+// Package openshell runs sandboxes through an OpenShell gateway.
+package openshell
 
 import (
 	"encoding/json"
@@ -12,21 +13,38 @@ import (
 )
 
 // openshell is the Runtime backed by the NVIDIA OpenShell CLI.
-type openshell struct{}
+// Provider is the OpenShell sandbox system.
+type Provider struct{}
 
-func (openshell) Name() string { return "openshell" }
+// VMGateway is the second OpenShell gateway with the MicroVM driver (E3, ADR 0015).
+const VMGateway = "openshell-vm"
 
-func (openshell) Exists(name string) bool {
+// DefaultGateway is the gateway `zero install` registers. State records it as "".
+const DefaultGateway = "openshell"
+
+// GatewayName is the openshell gateway for a recorded state value. zero always
+// names the gateway, so OPENSHELL_GATEWAY of the caller and `openshell gateway
+// select` do not decide where a sandbox is looked up.
+func GatewayName(gw string) string {
+	if gw == "" {
+		return DefaultGateway
+	}
+	return gw
+}
+
+func (Provider) Name() string { return "openshell" }
+
+func (Provider) Exists(name string) bool {
 	_, err := core.Sh("openshell", "sandbox", "get", name)
 	return err == nil
 }
 
-func (openshell) Reachable() bool {
+func (Provider) Reachable() bool {
 	_, err := core.Sh("openshell", "gateway", "info")
 	return err == nil
 }
 
-func (openshell) List() ([]string, error) {
+func (Provider) List() ([]string, error) {
 	out, err := core.Sh("openshell", "sandbox", "list", "--names", "--page-size", "1000")
 	if err != nil {
 		return nil, fmt.Errorf("list sandboxes: %w", err)
@@ -34,7 +52,7 @@ func (openshell) List() ([]string, error) {
 	return strings.Fields(out), nil
 }
 
-func (openshell) Create(name, image, policyFile string, creds, env []string, mountSrc, mountDst string) error {
+func (Provider) Create(name, image, policyFile string, creds, env []string, mountSrc, mountDst string) error {
 	args := []string{"sandbox", "create", "--name", name, "--from", image, "--policy", policyFile, "--detach"}
 	for _, c := range creds {
 		args = append(args, "--provider", c)
@@ -49,7 +67,7 @@ func (openshell) Create(name, image, policyFile string, creds, env []string, mou
 			Target   string `json:"target"`
 			ReadOnly bool   `json:"read_only"`
 		}
-		drv, err := computeDriver()
+		drv, err := ComputeDriver()
 		if err != nil {
 			return err
 		}
@@ -60,18 +78,18 @@ func (openshell) Create(name, image, policyFile string, creds, env []string, mou
 	return err
 }
 
-func (openshell) Delete(name string) error {
+func (Provider) Delete(name string) error {
 	_, err := core.Sh("openshell", "sandbox", "delete", name)
 	return err
 }
 
-func (openshell) Stop(name string) error {
+func (Provider) Stop(name string) error {
 	_, err := core.Sh("openshell", "sandbox", "stop", name)
 	return err
 }
 
 // Start waits until the sandbox is ready again.
-func (openshell) Start(name string) error {
+func (Provider) Start(name string) error {
 	if _, err := core.Sh("openshell", "sandbox", "start", name); err != nil {
 		return err
 	}
@@ -84,7 +102,7 @@ func (openshell) Start(name string) error {
 	return fmt.Errorf("sandbox %s not ready 60s after start (phase %s); check: zero doctor", name, sandboxPhase(name))
 }
 
-func (openshell) Stopped(name string) bool { return sandboxPhase(name) == "Stopped" }
+func (Provider) Stopped(name string) bool { return sandboxPhase(name) == "Stopped" }
 
 func sandboxPhase(name string) string {
 	out, _ := core.Sh("openshell", "sandbox", "get", name)
@@ -96,18 +114,18 @@ func sandboxPhase(name string) string {
 	return ""
 }
 
-func (openshell) SSHConfig(name string) (string, error) {
+func (Provider) SSHConfig(name string) (string, error) {
 	return core.Sh("openshell", "sandbox", "ssh-config", name)
 }
 
-func (openshell) HostAlias(name string) string { return "openshell-" + name + ".default" }
+func (Provider) HostAlias(name string) string { return "openshell-" + name + ".default" }
 
-func (openshell) Upload(name, src, dst string) error {
+func (Provider) Upload(name, src, dst string) error {
 	_, err := core.Sh("openshell", "sandbox", "upload", name, src, dst)
 	return err
 }
 
-func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) error {
+func (Provider) AllowEgress(name, rule, binary, access string, hosts []string) error {
 	// One endpoint per call; each --wait costs seconds, so only the last waits.
 	for i, h := range hosts {
 		args := []string{"policy", "update", name,
@@ -124,7 +142,7 @@ func (openshell) AllowEgress(name, rule, binary, access string, hosts []string) 
 	return nil
 }
 
-func (openshell) SetRule(name, rule string, spec map[string]any) error {
+func (Provider) SetRule(name, rule string, spec map[string]any) error {
 	out, err := core.Sh("openshell", "policy", "get", name, "--base")
 	if err != nil {
 		return err
@@ -133,7 +151,7 @@ func (openshell) SetRule(name, rule string, spec map[string]any) error {
 	if !ok {
 		return fmt.Errorf("policy get %s: no policy in the answer", name)
 	}
-	b, err := policyWith([]byte(base), rule, spec)
+	b, err := PolicyWith([]byte(base), rule, spec)
 	if err != nil {
 		return err
 	}
@@ -153,7 +171,7 @@ func (openshell) SetRule(name, rule string, spec map[string]any) error {
 // ImportCredentialType imports a provider profile. `profile update` needs a
 // resource_version, so an existing profile is kept; after editing one run
 // `openshell profile delete <id>` once.
-func (openshell) ImportCredentialType(id string, spec []byte) error {
+func (Provider) ImportCredentialType(id string, spec []byte) error {
 	tmp, err := os.CreateTemp("", id+"-*.yaml")
 	if err != nil {
 		return err
@@ -171,7 +189,7 @@ func (openshell) ImportCredentialType(id string, spec []byte) error {
 }
 
 // BindCredential passes the secret via env lookup, never in argv.
-func (openshell) BindCredential(id, typ, env, secret string) error {
+func (Provider) BindCredential(id, typ, env, secret string) error {
 	core.Sh("openshell", "provider", "delete", id)
 	cmd := exec.Command("openshell", "provider", "create", "--name", id, "--type", typ, "--credential", env)
 	cmd.Env = append(os.Environ(), env+"="+secret)
@@ -181,10 +199,10 @@ func (openshell) BindCredential(id, typ, env, secret string) error {
 	return nil
 }
 
-func (openshell) UnbindCredential(id string) { core.Sh("openshell", "provider", "delete", id) }
+func (Provider) UnbindCredential(id string) { core.Sh("openshell", "provider", "delete", id) }
 
 // RotateCredential passes the secret via env lookup, never in argv.
-func (openshell) RotateCredential(id, env, secret string) error {
+func (Provider) RotateCredential(id, env, secret string) error {
 	cmd := exec.Command("openshell", "provider", "update", id, "--credential", env)
 	cmd.Env = append(os.Environ(), env+"="+secret)
 	if b, err := cmd.CombinedOutput(); err != nil {
@@ -196,34 +214,34 @@ func (openshell) RotateCredential(id, env, secret string) error {
 // AttachCredential does not wait: until a rule binds the credential to a
 // host the sandbox withholds it, and the rule can only name an attached one
 // (PoC 20).
-func (openshell) AttachCredential(name, id string) error {
+func (Provider) AttachCredential(name, id string) error {
 	_, err := core.Sh("openshell", "sandbox", "provider", "attach", name, id)
 	return err
 }
 
-func (openshell) DetachCredential(name, id string) {
+func (Provider) DetachCredential(name, id string) {
 	core.Sh("openshell", "sandbox", "provider", "detach", "--wait", name, id)
 }
 
-func (openshell) CredentialReady(name, id string) error {
+func (Provider) CredentialReady(name, id string) error {
 	_, err := core.Sh("openshell", "sandbox", "provider", "status", "--wait", name, id)
 	return err
 }
 
-// computeDriver names the gateway's compute driver (podman or docker); the
+// ComputeDriver names the gateway's compute driver (podman or docker); the
 // mount settings are passed under that name (ADR 0057).
-func computeDriver() (string, error) {
+func ComputeDriver() (string, error) {
 	out, err := core.Sh("openshell", "gateway", "info")
 	if err != nil {
 		return "", err
 	}
-	if d := parseComputeDriver(out); d != "" {
+	if d := ParseComputeDriver(out); d != "" {
 		return d, nil
 	}
 	return "", fmt.Errorf("openshell gateway info names no compute driver zero knows (podman, docker)")
 }
 
-func parseComputeDriver(info string) string {
+func ParseComputeDriver(info string) string {
 	lines := strings.Split(info, "\n")
 	for i, l := range lines {
 		if strings.TrimSpace(l) == "Compute drivers:" && i+1 < len(lines) {

@@ -114,7 +114,7 @@ func (gitlab) Profile() []byte   { return gitlabProfileYAML }
 // project id and by encoded path, and git fetch. Everything else on the host
 // is refused: other projects, user and group API, GraphQL, MCP, snippets,
 // web pages (#52). Pushes go through the push gate only (#95).
-func (g gitlab) Egress(paths []string) (allow, deny []EgressRule, err error) {
+func (g gitlab) Egress(paths []string) (allow, deny []core.EgressRule, err error) {
 	for _, path := range paths {
 		if strings.ContainsAny(path, "*?[]{}\\") {
 			return nil, nil, fmt.Errorf("project path %q: not usable in an egress rule", path)
@@ -125,24 +125,24 @@ func (g gitlab) Egress(paths []string) (allow, deny []EgressRule, err error) {
 		}
 		allow = append(allow, gitlabProjectRules(path, id)...)
 	}
-	deny = []EgressRule{
+	deny = []core.EgressRule{
 		{Method: "*", Path: "/**/git-receive-pack"},
 		{Method: "GET", Path: "/**/info/refs", Query: map[string]string{"service": "git-receive-pack"}},
 	}
 	return allow, deny, nil
 }
 
-func gitlabProjectRules(path string, id int64) (allow []EgressRule) {
+func gitlabProjectRules(path string, id int64) (allow []core.EgressRule) {
 	for _, p := range []string{fmt.Sprint(id), url.PathEscape(path)} {
 		base := "/api/v4/projects/" + p
-		allow = append(allow, EgressRule{Method: "GET", Path: base})
+		allow = append(allow, core.EgressRule{Method: "GET", Path: base})
 		for _, m := range []string{"GET", "HEAD", "POST"} {
-			allow = append(allow, EgressRule{Method: m, Path: base + "/**"})
+			allow = append(allow, core.EgressRule{Method: m, Path: base + "/**"})
 		}
 	}
 	return append(allow,
-		EgressRule{Method: "GET", Path: "/" + path + ".git/info/refs"},
-		EgressRule{Method: "POST", Path: "/" + path + ".git/git-upload-pack"})
+		core.EgressRule{Method: "GET", Path: "/" + path + ".git/info/refs"},
+		core.EgressRule{Method: "POST", Path: "/" + path + ".git/git-upload-pack"})
 }
 
 func (g gitlab) projectID(path string) (int64, error) {

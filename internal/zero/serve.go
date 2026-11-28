@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 // zero-cp (#97, #119) is the zero service, the one long-running host process: it hosts the push
@@ -52,7 +53,7 @@ func Serve() error {
 // ("" = the podman gateway) and restores the environment afterwards.
 func withGateway(gw string, fn func()) {
 	old, had := os.LookupEnv("OPENSHELL_GATEWAY")
-	os.Setenv("OPENSHELL_GATEWAY", gatewayName(gw))
+	os.Setenv("OPENSHELL_GATEWAY", openshell.GatewayName(gw))
 	defer func() {
 		if had {
 			os.Setenv("OPENSHELL_GATEWAY", old)

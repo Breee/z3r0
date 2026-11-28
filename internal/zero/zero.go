@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 //go:embed policy.yaml
@@ -54,38 +55,25 @@ type Sandbox struct {
 	MaxInput int64 // --approve: accept a wider policy without asking
 }
 
-// vmGateway is the second OpenShell gateway with the MicroVM driver (E3, ADR 0015).
-const vmGateway = "openshell-vm"
-
-// podmanGateway is the gateway `zero install` registers. State records it as "".
-const podmanGateway = "openshell"
-
-// gatewayName is the openshell gateway for a recorded state value. zero always
-// names the gateway, so OPENSHELL_GATEWAY of the caller and `openshell gateway
-// select` do not decide where a sandbox is looked up.
-func gatewayName(gw string) string {
-	if gw == "" {
-		return podmanGateway
-	}
-	return gw
-}
+// rt is the sandbox system zero runs on.
+var rt core.Runtime = openshell.Provider{}
 
 // New resolves the enclosing git repo into a sandbox description. zero only
 // operates inside a git work tree; the sandbox name derives from the repo name.
 // UseVM selects the MicroVM gateway for a new sandbox. An existing sandbox
 // keeps the gateway it was created on.
 func (s *Sandbox) UseVM() error {
-	if gw := s.read("gateway"); gw != vmGateway && rt.Exists(s.Name) {
+	if gw := s.read("gateway"); gw != openshell.VMGateway && rt.Exists(s.Name) {
 		return fmt.Errorf("%s exists on the podman gateway; zero rm first", s.Name)
 	}
-	s.setGateway(vmGateway)
+	s.setGateway(openshell.VMGateway)
 	return nil
 }
 
 // setGateway routes every openshell call (and ssh ProxyCommand) to gw.
 func (s *Sandbox) setGateway(gw string) {
 	s.gw = gw
-	os.Setenv("OPENSHELL_GATEWAY", gatewayName(gw))
+	os.Setenv("OPENSHELL_GATEWAY", openshell.GatewayName(gw))
 }
 
 // SandboxName maps a repo basename to the sandbox name: lowercase, every

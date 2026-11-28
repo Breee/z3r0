@@ -1,4 +1,4 @@
-package zero
+package core
 
 // Runtime is the sandbox substrate zero runs on. zero owns the workflow,
 // credentials and policy intent; a Runtime only executes them.
@@ -46,4 +46,10 @@ type Runtime interface {
 	CredentialReady(name, id string) error
 }
 
-var rt Runtime = openshell{}
+// EgressRule matches requests by method and path glob ("*" within a
+// segment, "**" across segments, at least one). Query is optional.
+type EgressRule struct {
+	Method string
+	Path   string
+	Query  map[string]string
+}

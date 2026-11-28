@@ -22,6 +22,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -126,11 +127,11 @@ func TestForgeRule(t *testing.T) {
 			t.Errorf("rule %q reaches beyond the project", r)
 		}
 	}
-	b, err := policyWith(policyYAML, forgeRule, map[string]any{"name": forgeRule})
+	b, err := openshell.PolicyWith(policyYAML, forgeRule, map[string]any{"name": forgeRule})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err = policyWith(b, "zen", map[string]any{"name": "zen"})
+	b, err = openshell.PolicyWith(b, "zen", map[string]any{"name": "zen"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -778,15 +779,15 @@ func TestGatewayPinned(t *testing.T) {
 	t.Setenv("OPENSHELL_GATEWAY", "other")
 	s := &Sandbox{State: t.TempDir()}
 	s.setGateway("")
-	if got := os.Getenv("OPENSHELL_GATEWAY"); got != podmanGateway || s.gw != "" {
+	if got := os.Getenv("OPENSHELL_GATEWAY"); got != openshell.DefaultGateway || s.gw != "" {
 		t.Fatalf("setGateway(\"\"): env %q, gw %q", got, s.gw)
 	}
 	os.Setenv("OPENSHELL_GATEWAY", "other")
 	var in []string
-	for _, gw := range []string{"", vmGateway} {
+	for _, gw := range []string{"", openshell.VMGateway} {
 		withGateway(gw, func() { in = append(in, os.Getenv("OPENSHELL_GATEWAY")) })
 	}
-	if !slices.Equal(in, []string{podmanGateway, vmGateway}) || os.Getenv("OPENSHELL_GATEWAY") != "other" {
+	if !slices.Equal(in, []string{openshell.DefaultGateway, openshell.VMGateway}) || os.Getenv("OPENSHELL_GATEWAY") != "other" {
 		t.Fatalf("withGateway: %v, after %q", in, os.Getenv("OPENSHELL_GATEWAY"))
 	}
 }
@@ -1248,7 +1249,7 @@ func TestProjectPolicy(t *testing.T) {
 			t.Errorf("endpoint = %v", e)
 		}
 	}
-	b, err := policyWith(base, projectRule, projectPolicy([]string{"a.example"}))
+	b, err := openshell.PolicyWith(base, projectRule, projectPolicy([]string{"a.example"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1256,7 +1257,7 @@ func TestProjectPolicy(t *testing.T) {
 		!strings.Contains(out, "access: read-only") || !strings.Contains(out, "zen") {
 		t.Errorf("rule not replaced:\n%s", out)
 	}
-	b, err = policyWith(base, projectRule, projectPolicy(nil))
+	b, err = openshell.PolicyWith(base, projectRule, projectPolicy(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1516,7 +1517,7 @@ func TestGuidance(t *testing.T) {
 }
 
 // noSandbox is a runtime in which no sandbox exists.
-type noSandbox struct{ Runtime }
+type noSandbox struct{ core.Runtime }
 
 func (noSandbox) Exists(string) bool { return false }
 
@@ -2055,8 +2056,8 @@ func TestParseComputeDriver(t *testing.T) {
 		"  Extensions:\n    docker (x)\n": "",
 		"  Compute drivers:\n    vm\n":    "",
 	} {
-		if got := parseComputeDriver(in); got != want {
-			t.Errorf("parseComputeDriver(%q) = %q, want %q", in, got, want)
+		if got := openshell.ParseComputeDriver(in); got != want {
+			t.Errorf("openshell.ParseComputeDriver(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

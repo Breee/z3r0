@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -471,7 +472,7 @@ func rmLeftover(out io.Writer, name string, yes bool) error {
 	}
 	s.setGateway(s.read("gateway"))
 	if !core.FileExists(s.State) && !s.exists() {
-		s.setGateway(vmGateway)
+		s.setGateway(openshell.VMGateway)
 	}
 	if !core.FileExists(s.State) && !core.FileExists(s.stage()) && !s.exists() {
 		return fmt.Errorf("no workspace %q and nothing left of one (zero ls lists them)", name)
