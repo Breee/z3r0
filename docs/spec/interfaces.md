@@ -273,10 +273,14 @@ same way.
   it later; nothing asks for it now.
 - Renaming config keys.
 
-## 6. Open points for the user
+## 6. Decided by the user (2026-11-28)
 
-1. One `ModelProvider` per workspace, or several at once (e.g. LiteLLM and
-   Copilot directly)? Proposed: one, chosen in the workspace config.
-2. `InstructionsProvider` and `SkillProvider` as two interfaces (as asked) with
-   a shared source, as above; or one `GuidanceProvider`? Proposed: two.
-3. Forge-neutral capability names now or with #186? Proposed: with #186.
+1. One `ModelProvider` per workspace, chosen in the workspace config. More than
+   one at once is unlikely to be needed and is not built.
+2. `InstructionsProvider` and `SkillProvider` are two interfaces with a shared
+   source.
+3. Permission names depend on what the forge offers: each `Forge` lists the
+   permissions it has (name and explaining line); only `git.read`,
+   `git.commit` and `git.push` are the same for every forge. A policy naming a
+   permission its forge does not offer is refused. GitHub's names come with
+   #186.

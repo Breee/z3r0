@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-28
 deciders: bree
 requirements: [Z-INV-1, Z-INV-2]
@@ -38,3 +38,9 @@ interfaces defined from requirements first (#190).
 - The move touches every file; behaviour, output and exit codes stay.
 - Each interface was checked against one second case on paper only; the first
   real second implementation (#186) may still change it.
+
+## Accepted
+
+The user read the spec on 2026-11-28 and decided its open points: one model
+provider per workspace; instructions and skills as two interfaces; permission
+names depend on what the forge offers (spec, section 6).
