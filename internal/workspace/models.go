@@ -37,7 +37,7 @@ func (c *Config) CheckModels() error {
 			return fmt.Errorf("provider_keys: %s is not a listed provider that takes a key", p)
 		}
 		if strings.ContainsAny(c.ProviderKeys[p], "\"'|;&$<>`\\") {
-			return fmt.Errorf("provider_keys.%s: the command is split At spaces and run without a shell; quotes, pipes and variables do not work (put them into a script and name that)", p)
+			return fmt.Errorf("provider_keys.%s: the command is split at spaces and run without a shell; quotes, pipes and variables do not work (put them into a script and name that)", p)
 		}
 	}
 	if c.Parts.Models == "" && len(c.Providers) > 0 {

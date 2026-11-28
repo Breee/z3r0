@@ -49,6 +49,8 @@ func Passthrough(name string, args ...string) error {
 	return PassthroughEnv(nil, name, args...)
 }
 
+// PassthroughEnv is Passthrough with extra environment (secrets stay out of
+// argv); the exit error is kept.
 // PassthroughEnv is Passthrough with extra environment; the exit error is kept.
 func PassthroughEnv(env []string, name string, args ...string) error {
 	cmd := exec.Command(name, args...)

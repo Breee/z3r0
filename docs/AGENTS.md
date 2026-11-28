@@ -37,11 +37,11 @@ Every change has an issue (root `AGENTS.md`). Use these per kind of change.
 ### zero behaviour changed (command, flag, output, capability, default)
 
 - GOOD: the guide says what the build does. Same commit series as the code.
-- DONE: `commands.md` matches the usage text; `policy.md` matches `defaultCaps` and `gitlabCaps`; changed outputs re-quoted from a run; `security.md` tables updated when a protection or open point changed.
+- DONE: `commands.md` matches the usage text; `policy.md` matches `policy.DefaultCaps` and `gitlab.Caps`; changed outputs re-quoted from a run; `security.md` tables updated when a protection or open point changed.
 - PROOF:
   ```sh
   /tmp/zero-docs/zero 2>&1 | head -40          # compare with commands.md
-  grep -n -A12 'defaultCaps = ' internal/zero/policy.go
+  grep -n -A12 'DefaultCaps = ' internal/policy/policy.go
   hugo --source docs --panicOnWarning
   ```
 

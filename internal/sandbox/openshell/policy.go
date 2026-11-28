@@ -3,18 +3,8 @@ package openshell
 import (
 	"fmt"
 
-	"github.com/Breee/z3r0/internal/core"
 	"go.yaml.in/yaml/v3"
 )
-
-// Matcher is the policy form of one egress rule.
-func Matcher(r core.EgressRule) map[string]any {
-	m := map[string]any{"method": r.Method, "path": r.Path}
-	if len(r.Query) > 0 {
-		m["query"] = r.Query
-	}
-	return m
-}
 
 // PolicyWith returns the policy file base with network rule name set to
 // rule; a nil rule removes it.

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Breee/z3r0/internal/agent"
 	"github.com/Breee/z3r0/internal/agent/claude"
 	"github.com/Breee/z3r0/internal/agent/copilot"
 	"github.com/Breee/z3r0/internal/agent/opencode"
@@ -566,7 +565,7 @@ func (s *Sandbox) Copilot(out io.Writer, args []string) error {
 	if proxy {
 		args = s.withModel(args)
 	}
-	if proxy && !agent.HasModelArg(args) {
+	if proxy && !core.HasModelArg(args) {
 		return fmt.Errorf("zero copilot in this workspace needs a model: zero copilot --model PROVIDER/MODEL ..., or model: for the workspace in zero's config (models of the workspace: %s)", strings.Join(s.Models, ", "))
 	}
 	if _, err := s.Up(out); err != nil {
@@ -614,7 +613,7 @@ func ClaudeNeedsTerminal(args []string) error {
 // withModel puts the workspace's default model in front of the arguments
 // when they name none (ADR 0054).
 func (s *Sandbox) withModel(args []string) []string {
-	if s.Model == "" || agent.HasModelArg(args) {
+	if s.Model == "" || core.HasModelArg(args) {
 		return args
 	}
 	return append([]string{"--model", s.Model}, args...)
@@ -631,7 +630,7 @@ func (s *Sandbox) Claude(out io.Writer, args []string) error {
 		return fmt.Errorf("zero claude needs the model proxy: set parts.models, providers and models for this workspace in zero's config")
 	}
 	args = s.withModel(args)
-	if !agent.HasModelArg(args) {
+	if !core.HasModelArg(args) {
 		return fmt.Errorf("zero claude needs a model: zero claude --model PROVIDER/MODEL ..., or model: for the workspace in zero's config (models of the workspace: %s)", strings.Join(s.Models, ", "))
 	}
 	if _, err := s.Up(out); err != nil {

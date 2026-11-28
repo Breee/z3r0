@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
-	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 //go:embed model-key-profile.yaml
@@ -42,7 +41,7 @@ func PartsDir() string { return filepath.Join(core.StateRoot(), "parts") }
 
 func URL() string { return fmt.Sprintf("http://127.0.0.1:%d", Port) }
 
-// Compose is the Compose command for the opt-in parts: Docker, until the
+// Compose is the compose command for the opt-in parts: Docker, until the
 // podman here runs health checks (ADR 0051, C58); ZERO_COMPOSE overrides it.
 func Compose() []string {
 	if v := strings.Fields(os.Getenv("ZERO_COMPOSE")); len(v) > 0 {
@@ -51,11 +50,11 @@ func Compose() []string {
 	return []string{"docker", "compose"}
 }
 
-// ComposeProblem says why the Compose command of the parts does not run.
+// ComposeProblem says why the compose command of the parts does not run.
 func ComposeProblem() string {
 	c := Compose()
 	if _, err := core.Sh(c[0], append(c[1:], "version")...); err != nil {
-		return fmt.Sprintf("%s does not run (%s); the model proxy needs Docker with its Compose plugin and a user who may use it, or another Compose command in ZERO_COMPOSE", strings.Join(c, " "), core.Clean(strings.SplitN(err.Error(), "\n", 2)[0]))
+		return fmt.Sprintf("%s does not run (%s); the model proxy needs Docker with its compose plugin and a user who may use it, or another compose command in ZERO_COMPOSE", strings.Join(c, " "), core.Clean(strings.SplitN(err.Error(), "\n", 2)[0]))
 	}
 	return ""
 }
@@ -306,7 +305,7 @@ func Provider(ms []Model) map[string]any {
 func Policy(provider string, binaries []string) map[string]any {
 	var rules []map[string]any
 	for _, r := range Routes {
-		rules = append(rules, map[string]any{"allow": openshell.Matcher(r)})
+		rules = append(rules, map[string]any{"allow": r.Matcher()})
 	}
 	var bins []map[string]any
 	for _, b := range binaries {
@@ -376,7 +375,7 @@ func NotConnected(list []byte) []string {
 
 // ProviderKeys runs each provider's key command (no shell) and takes the
 // first line it prints. The key goes to the proxy through the environment of
-// the Compose command only; zero writes it to no file (ADR 0056).
+// the compose command only; zero writes it to no file (ADR 0056).
 // KeyTimeout bounds a key command; it runs under the lock of the parts.
 const KeyTimeout = 30 * time.Second
 

@@ -98,7 +98,7 @@ func TestPushOptions(t *testing.T) {
 	}
 	for caps, ok := range map[string]bool{"report-status push-options": true, "report-status": true, "push-options=1": false, "a Push-Options": false, "push-options-x": false} {
 		if (CheckCaps(caps) == nil) != ok {
-			t.Errorf("checkCaps(%q) ok = %v", caps, !ok)
+			t.Errorf("CheckCaps(%q) ok = %v", caps, !ok)
 		}
 	}
 	if CheckOptions(nil, false) != nil {
@@ -106,13 +106,10 @@ func TestPushOptions(t *testing.T) {
 	}
 	for _, bad := range []string{"", "0003", "zzzz", "0009ab"} {
 		if _, err := ReadOptions(bufio.NewReader(strings.NewReader(bad))); err == nil {
-			t.Errorf("readOptions(%q) passes", bad)
+			t.Errorf("ReadOptions(%q) passes", bad)
 		}
 	}
 }
-
-// FuzzGateCommands feeds arbitrary bytes to the gate's parser (#100): it must
-// not panic, and whatever it accepts must survive the rewrite unchanged.
 
 // FuzzGateCommands feeds arbitrary bytes to the gate's parser (#100): it must
 // not panic, and whatever it accepts must survive the rewrite unchanged.

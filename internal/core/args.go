@@ -1,5 +1,4 @@
-// Package agent holds what the agents of the sandbox share.
-package agent
+package core
 
 import "strings"
 

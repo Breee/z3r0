@@ -81,7 +81,7 @@ func Load() (*Config, error) {
 	}
 	for name, w := range c.Workspaces {
 		if !NameRe.MatchString(name) || w == nil || len(w.Folders) == 0 {
-			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and At least one directory", Path(), name)
+			return nil, fmt.Errorf("%s: workspace %q needs a name of [a-z0-9-]{1,40} and at least one directory", Path(), name)
 		}
 	}
 	return c, nil

@@ -3,7 +3,6 @@ package zero
 import (
 	"github.com/Breee/z3r0/internal/agent/opencode"
 	"github.com/Breee/z3r0/internal/core"
-	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
 const forgeRule = "forge"
@@ -21,10 +20,10 @@ func forgePolicy(f core.ForgeHost, provider string, paths []string) (map[string]
 	}
 	var rules, denies []map[string]any
 	for _, r := range allow {
-		rules = append(rules, map[string]any{"allow": openshell.Matcher(r)})
+		rules = append(rules, map[string]any{"allow": r.Matcher()})
 	}
 	for _, r := range deny {
-		denies = append(denies, openshell.Matcher(r))
+		denies = append(denies, r.Matcher())
 	}
 	bind := map[string]any{"provider": provider}
 	var bins []map[string]any

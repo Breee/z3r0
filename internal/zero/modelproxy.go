@@ -1,7 +1,6 @@
 package zero
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"

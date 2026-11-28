@@ -43,7 +43,7 @@ Runtime state stays per workspace: `~/.local/state/zero/zero-<name>/` (port, for
     tools: [get_project, list_branches]   # own list; names can stand next to default
 ```
 
-Without `tools` nothing changes for the workspace. A name without an entry in zero's tool table (`gitlabTools` in `internal/zero/gitlab.go`) fails when the config is read. The token gets the permissions of the policy capabilities plus those of the listed tools; a changed list re-mints the token at the next `zero up`. `zero status` shows the list the token was minted for. A wrong name stops every zero command until the file is fixed, like a wrong workspace name. Changing the order of the list also re-mints. The setting is edited in the file, there is no command for it. Limit: the sandbox cannot reach the MCP endpoint (ADR 0046), so until the MCP gateway is built into zero the list decides the token's permissions only.
+Without `tools` nothing changes for the workspace. A name without an entry in zero's tool table (`gitlab.Tools` in `internal/forge/gitlab/gitlab.go`) fails when the config is read. The token gets the permissions of the policy capabilities plus those of the listed tools; a changed list re-mints the token at the next `zero up`. `zero status` shows the list the token was minted for. A wrong name stops every zero command until the file is fixed, like a wrong workspace name. Changing the order of the list also re-mints. The setting is edited in the file, there is no command for it. Limit: the sandbox cannot reach the MCP endpoint (ADR 0046), so until the MCP gateway is built into zero the list decides the token's permissions only.
 
 `instructions` and `skills` (optional, built in #161, ADR 0049) list files and directories with a `SKILL.md`:
 

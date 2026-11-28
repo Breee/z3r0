@@ -21,7 +21,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/Breee/z3r0/internal/agent"
 	"github.com/Breee/z3r0/internal/agent/claude"
 	"github.com/Breee/z3r0/internal/agent/copilot"
 	"github.com/Breee/z3r0/internal/core"
@@ -500,7 +499,7 @@ func TestSecretPatterns(t *testing.T) {
 		t.Fatalf("examples %v, patterns %v", dirs, secretDirs)
 	}
 	top := t.TempDir()
-	tree := map[string]string{"openapi.yaml": "a", "environment.md": "b", "keys.md": "c", "history.txt": "d", "docker/litellm.Compose.yaml": "e"}
+	tree := map[string]string{"openapi.yaml": "a", "environment.md": "b", "keys.md": "c", "history.txt": "d", "docker/compose.yaml": "e"}
 	for _, f := range files {
 		tree["sub/"+strings.ToUpper(f)] = "secret"
 		tree[f] = "secret"
@@ -518,7 +517,7 @@ func TestSecretPatterns(t *testing.T) {
 		names = append(names, f.rel)
 	}
 	slices.Sort(names)
-	if want := []string{"docker/litellm.Compose.yaml", "environment.md", "history.txt", "keys.md", "openapi.yaml"}; !slices.Equal(names, want) {
+	if want := []string{"docker/compose.yaml", "environment.md", "history.txt", "keys.md", "openapi.yaml"}; !slices.Equal(names, want) {
 		t.Fatalf("copied %v, want %v", names, want)
 	}
 	if want := 2*len(files) + len(dirs); len(skip) != want {
@@ -1426,7 +1425,7 @@ func TestCopilotProxyScript(t *testing.T) {
 		t.Errorf("script passes a GitHub login: %s", got)
 	}
 	for args, want := range map[string]bool{"--model x": true, "--model=x": true, "-p hi": false, "--model": false, "--model=": false} {
-		if got := agent.HasModelArg(strings.Fields(args)); got != want {
+		if got := core.HasModelArg(strings.Fields(args)); got != want {
 			t.Errorf("hasModelArg(%q) = %v", args, got)
 		}
 	}
@@ -1573,7 +1572,7 @@ func TestModelArg(t *testing.T) {
 		{[]string{"-p", "x", "--", "--model", "a/b"}, ""},
 		{[]string{"--model", "a/b", "--", "--model", "c/d"}, "a/b"},
 	} {
-		if got := agent.ModelArg(c.args); got != c.want {
+		if got := core.ModelArg(c.args); got != c.want {
 			t.Errorf("modelArg(%q) = %q, want %q", c.args, got, c.want)
 		}
 	}

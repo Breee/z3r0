@@ -72,7 +72,7 @@ func CheckChosenCaps(caps []string) error {
 	return nil
 }
 
-// FirstRunPolicy is the policy file for one directory: the chosen Presets
+// FirstRunPolicy is the policy file for one directory: the chosen presets
 // that were found in it, and the chosen permissions in their usual order.
 func FirstRunPolicy(found []Preset, chosen, caps []string) *Policy {
 	p := &Policy{}
@@ -105,7 +105,7 @@ func Render(p *Policy) []byte {
 	return []byte(b.String())
 }
 
-// FirstRunPlan finds the directories without a policy file and the Presets
+// FirstRunPlan finds the directories without a policy file and the presets
 // in them.
 func FirstRunPlan(repos []string) (dirs []string, found map[string][]Preset, names []string) {
 	found = map[string][]Preset{}

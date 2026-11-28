@@ -53,3 +53,12 @@ type EgressRule struct {
 	Path   string
 	Query  map[string]string
 }
+
+// Matcher is the policy form of the rule.
+func (r EgressRule) Matcher() map[string]any {
+	m := map[string]any{"method": r.Method, "path": r.Path}
+	if len(r.Query) > 0 {
+		m["query"] = r.Query
+	}
+	return m
+}

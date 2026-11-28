@@ -2,7 +2,6 @@
 package claude
 
 import (
-	"github.com/Breee/z3r0/internal/agent"
 	"github.com/Breee/z3r0/internal/core"
 )
 
@@ -16,7 +15,7 @@ const Bin = "/usr/local/libexec/claude/node_modules/@anthropic-ai/claude-code/bi
 // model of --model is also the one for its background calls.
 func Script(dir, baseURL, keyEnv string, args []string) string {
 	script := "cd " + core.ShellQuote(dir) + ` && [ -n "$` + keyEnv + `" ] || { echo 'zero claude: the sandbox has no key for the model proxy; run zero up' >&2; exit 1; } && ANTHROPIC_BASE_URL=` +
-		baseURL + ` ANTHROPIC_AUTH_TOKEN="$` + keyEnv + `" ANTHROPIC_MODEL=` + core.ShellQuote(agent.ModelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + core.ShellQuote(agent.ModelArg(args)) +
+		baseURL + ` ANTHROPIC_AUTH_TOKEN="$` + keyEnv + `" ANTHROPIC_MODEL=` + core.ShellQuote(core.ModelArg(args)) + ` ANTHROPIC_DEFAULT_HAIKU_MODEL=` + core.ShellQuote(core.ModelArg(args)) +
 		` CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1 DISABLE_UPDATES=1 DISABLE_AUTOUPDATER=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 exec ` + Bin
 	for _, a := range args {
 		script += " " + core.ShellQuote(a)
