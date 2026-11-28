@@ -1,6 +1,9 @@
 package zero
 
-import "github.com/Breee/z3r0/internal/sandbox/openshell"
+import (
+	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/sandbox/openshell"
+)
 
 const forgeRule = "forge"
 
@@ -10,7 +13,7 @@ var forgeBinaries = []string{"/usr/bin/git", "/usr/lib/git-core/git-remote-https
 // forgePolicy is the sandbox's network rule for its forge: only the
 // workspace's projects on the forge host, and the push gate. The token is
 // bound to these two endpoints and to no other (#52).
-func forgePolicy(f Forge, provider string, paths []string) (map[string]any, error) {
+func forgePolicy(f core.ForgeHost, provider string, paths []string) (map[string]any, error) {
 	allow, deny, err := f.Egress(paths)
 	if err != nil {
 		return nil, err

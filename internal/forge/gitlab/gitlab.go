@@ -1,4 +1,5 @@
-package zero
+// Package gitlab is the GitLab forge.
+package gitlab
 
 import (
 	"context"
@@ -22,25 +23,25 @@ import (
 )
 
 //go:embed gitlab-profile.yaml
-var gitlabProfileYAML []byte
+var profileYAML []byte
 
-// gitlabCaps maps policy capabilities to fine-grained token permissions
+// Caps maps policy capabilities to fine-grained token permissions
 // (D20, docs/architecture/07a). git.commit is local only.
-var gitlabCaps = map[string][]string{
+var Caps = map[string][]string{
 	"git.read":             {"read_project", "read_code", "download_code"},
 	"git.commit":           {},
 	"git.push":             {"push_code"},
-	capCIRun:               {"read_repository"}, // the gate compares the pushed commit with the default branch (#126)
+	core.CapCIRun:          {"read_repository"}, // the gate compares the pushed commit with the default branch (#126)
 	"gitlab.issue.read":    {"read_work_item"},
 	"gitlab.mr.read":       {"read_merge_request"},
 	"gitlab.mr.create":     {"create_merge_request"},
 	"gitlab.pipeline.read": {"read_pipeline", "read_job"},
 }
 
-// gitlabTools maps the tools of GitLab's MCP endpoint that zero offers to
+// Tools maps the tools of GitLab's MCP endpoint that zero offers to
 // the fine-grained token permissions GitLab checks for them (ADR 0043,
 // MG14; checked with pocs/15-gitlab-mcp/tools-check.sh).
-var gitlabTools = map[string][]string{
+var Tools = map[string][]string{
 	"get_project":          {"read_project"},
 	"get_repository_file":  {"read_project", "read_code", "read_repository"},
 	"list_repository_tree": {"read_project", "read_code", "read_repository"},
@@ -58,19 +59,19 @@ var gitlabTools = map[string][]string{
 	"search_labels":        {"read_project"},
 }
 
-// gitlabDefaultTools is the tool list of a workspace that sets none.
-var gitlabDefaultTools = []string{
+// DefaultTools is the tool list of a workspace that sets none.
+var DefaultTools = []string{
 	"get_project", "get_repository_file", "list_repository_tree", "list_branches",
 	"list_tags", "list_commits", "get_commit", "list_merge_requests",
 	"get_merge_request", "list_pipelines", "get_pipeline", "get_job",
 	"list_work_items", "get_work_item", "search_labels",
 }
 
-// gitlabToolPermissions returns the token permissions the tools need.
-func gitlabToolPermissions(tools []string) ([]string, error) {
+// ToolPermissions returns the token permissions the tools need.
+func ToolPermissions(tools []string) ([]string, error) {
 	var perms []string
 	for _, t := range tools {
-		p, ok := gitlabTools[t]
+		p, ok := Tools[t]
 		if !ok {
 			return nil, fmt.Errorf("unknown gitlab tool %q", t)
 		}
@@ -86,7 +87,7 @@ func gitlabToolPermissions(tools []string) ([]string, error) {
 // remoteRe splits an origin URL into host and project path.
 var remoteRe = regexp.MustCompile(`^(?:git@([^:/]+):|ssh://git@([^:/]+)(?::\d+)?/|https://(?:[^@/]+@)?([^/]+)/)(.+?)(?:\.git)?/?$`)
 
-func parseRemote(remote string) (host, path string, ok bool) {
+func ParseRemote(remote string) (host, path string, ok bool) {
 	m := remoteRe.FindStringSubmatch(remote)
 	if m == nil {
 		return "", "", false
@@ -94,27 +95,27 @@ func parseRemote(remote string) (host, path string, ok bool) {
 	return m[1] + m[2] + m[3], m[4], true
 }
 
-const gitlabCom = "gitlab.com"
+const Com = "gitlab.com"
 
 // gitlab mints tokens through the host's glab session for one GitLab
 // instance: gitlab.com or any host glab is logged in to (ADR 0038).
-type gitlab struct{ host string }
+type Forge struct{ HostName string }
 
-func (gitlab) Name() string     { return "gitlab" }
-func (g gitlab) Host() string   { return g.host }
-func (gitlab) TokenEnv() string { return "GITLAB_TOKEN" }
-func (gitlab) GitUser() string  { return "oauth2" }
+func (Forge) Name() string     { return "gitlab" }
+func (g Forge) Host() string   { return g.HostName }
+func (Forge) TokenEnv() string { return "GITLAB_TOKEN" }
+func (Forge) GitUser() string  { return "oauth2" }
 
 // The profile holds the credential only; the endpoints are in the sandbox's
 // policy (forgePolicy), so one profile serves every instance.
-func (gitlab) ProfileID() string { return "zero-gitlab-token" }
-func (gitlab) Profile() []byte   { return gitlabProfileYAML }
+func (Forge) ProfileID() string { return "zero-gitlab-token" }
+func (Forge) Profile() []byte   { return profileYAML }
 
 // Egress limits the forge host to the workspace's projects: the REST API by
 // project id and by encoded path, and git fetch. Everything else on the host
 // is refused: other projects, user and group API, GraphQL, MCP, snippets,
 // web pages (#52). Pushes go through the push gate only (#95).
-func (g gitlab) Egress(paths []string) (allow, deny []core.EgressRule, err error) {
+func (g Forge) Egress(paths []string) (allow, deny []core.EgressRule, err error) {
 	for _, path := range paths {
 		if strings.ContainsAny(path, "*?[]{}\\") {
 			return nil, nil, fmt.Errorf("project path %q: not usable in an egress rule", path)
@@ -123,7 +124,7 @@ func (g gitlab) Egress(paths []string) (allow, deny []core.EgressRule, err error
 		if err != nil {
 			return nil, nil, err
 		}
-		allow = append(allow, gitlabProjectRules(path, id)...)
+		allow = append(allow, ProjectRules(path, id)...)
 	}
 	deny = []core.EgressRule{
 		{Method: "*", Path: "/**/git-receive-pack"},
@@ -132,7 +133,7 @@ func (g gitlab) Egress(paths []string) (allow, deny []core.EgressRule, err error
 	return allow, deny, nil
 }
 
-func gitlabProjectRules(path string, id int64) (allow []core.EgressRule) {
+func ProjectRules(path string, id int64) (allow []core.EgressRule) {
 	for _, p := range []string{fmt.Sprint(id), url.PathEscape(path)} {
 		base := "/api/v4/projects/" + p
 		allow = append(allow, core.EgressRule{Method: "GET", Path: base})
@@ -145,7 +146,7 @@ func gitlabProjectRules(path string, id int64) (allow []core.EgressRule) {
 		core.EgressRule{Method: "POST", Path: "/" + path + ".git/git-upload-pack"})
 }
 
-func (g gitlab) projectID(path string) (int64, error) {
+func (g Forge) projectID(path string) (int64, error) {
 	out, err := g.glab("api", "projects/"+url.PathEscape(path))
 	if err != nil {
 		return 0, fmt.Errorf("project %s: %w", path, err)
@@ -159,18 +160,18 @@ func (g gitlab) projectID(path string) (int64, error) {
 
 // glab sends PATs as PRIVATE-TOKEN, which OpenShell >= 0.1.8 does not
 // substitute; as OAuth it sends Authorization: Bearer (ADR 0026, C46, #65).
-func (gitlab) Env() []string { return []string{"GLAB_IS_OAUTH2=true"} }
+func (Forge) Env() []string { return []string{"GLAB_IS_OAUTH2=true"} }
 
-func (g gitlab) LoggedIn() error {
-	if _, err := core.Sh("glab", "auth", "status", "--hostname", g.host); err != nil {
-		return fmt.Errorf("glab is not logged in to %s; run: glab auth login --hostname %s --use-keyring", g.host, g.host)
+func (g Forge) LoggedIn() error {
+	if _, err := core.Sh("glab", "auth", "status", "--hostname", g.HostName); err != nil {
+		return fmt.Errorf("glab is not logged in to %s; run: glab auth login --hostname %s --use-keyring", g.HostName, g.HostName)
 	}
 	return nil
 }
 
 // PlaintextLogin reports whether glab keeps this host's token in its config
 // file instead of the OS keyring.
-func (g gitlab) PlaintextLogin() bool {
+func (g Forge) PlaintextLogin() bool {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return false
@@ -185,17 +186,17 @@ func (g gitlab) PlaintextLogin() bool {
 			Token yaml.Node `yaml:"token"`
 		} `yaml:"hosts"`
 	}
-	return yaml.Unmarshal(b, &c) == nil && c.Hosts[g.host].Token.Value != ""
+	return yaml.Unmarshal(b, &c) == nil && c.Hosts[g.HostName].Token.Value != ""
 }
 
-func (g gitlab) glab(args ...string) (string, error) {
-	return core.Sh("glab", append(args, "--hostname", g.host)...)
+func (g Forge) glab(args ...string) (string, error) {
+	return core.Sh("glab", append(args, "--hostname", g.HostName)...)
 }
 
-func (gitlab) Permissions(caps, tools []string) ([]string, error) {
+func (Forge) Permissions(caps, tools []string) ([]string, error) {
 	perms := []string{"read_project"}
 	for _, c := range caps {
-		p, ok := gitlabCaps[c]
+		p, ok := Caps[c]
 		if !ok {
 			return nil, fmt.Errorf("unknown capability %q for gitlab", c)
 		}
@@ -205,7 +206,7 @@ func (gitlab) Permissions(caps, tools []string) ([]string, error) {
 			}
 		}
 	}
-	tp, err := gitlabToolPermissions(tools)
+	tp, err := ToolPermissions(tools)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +218,7 @@ func (gitlab) Permissions(caps, tools []string) ([]string, error) {
 	return perms, nil
 }
 
-func (g gitlab) Mint(label string, paths []string, perms []string) (string, string, error) {
+func (g Forge) Mint(label string, paths []string, perms []string) (string, string, error) {
 	var ids []int64
 	for _, path := range paths {
 		id, err := g.projectID(path)
@@ -242,7 +243,7 @@ func (g gitlab) Mint(label string, paths []string, perms []string) (string, stri
 		}},
 	})
 	cmd := exec.Command("glab", "api", "-X", "POST", "/user/personal_access_tokens",
-		"-H", "Content-Type: application/json", "--input", "-", "--hostname", g.host)
+		"-H", "Content-Type: application/json", "--input", "-", "--hostname", g.HostName)
 	cmd.Stdin = strings.NewReader(string(body))
 	b, err := cmd.Output()
 	if err != nil {
@@ -263,7 +264,7 @@ func (g gitlab) Mint(label string, paths []string, perms []string) (string, stri
 	return r.Token, fmt.Sprint(r.ID), nil
 }
 
-func (g gitlab) Revoke(id string) error {
+func (g Forge) Revoke(id string) error {
 	_, err := g.glab("api", "-X", "DELETE", "/personal_access_tokens/"+id)
 	if err != nil && !strings.Contains(err.Error(), "404") && !strings.Contains(err.Error(), "401") {
 		return err
@@ -271,7 +272,7 @@ func (g gitlab) Revoke(id string) error {
 	return nil
 }
 
-func (g gitlab) Tokens() ([]Token, error) {
+func (g Forge) Tokens() ([]core.Token, error) {
 	out, err := g.glab("api", "--paginate", "/personal_access_tokens?state=active&per_page=100")
 	if err != nil {
 		return nil, fmt.Errorf("list tokens: %w", err)
@@ -284,28 +285,28 @@ func (g gitlab) Tokens() ([]Token, error) {
 	if err := json.Unmarshal([]byte(out), &list); err != nil {
 		return nil, fmt.Errorf("list tokens: bad response")
 	}
-	var toks []Token
+	var toks []core.Token
 	for _, t := range list {
 		// GitLab tokens expire at the start of expires_at (UTC).
 		exp, _ := time.Parse("2006-01-02", t.ExpiresAt)
-		toks = append(toks, Token{ID: fmt.Sprint(t.ID), Name: t.Name, Expires: exp})
+		toks = append(toks, core.Token{ID: fmt.Sprint(t.ID), Name: t.Name, Expires: exp})
 	}
 	return toks, nil
 }
 
-func (g gitlab) DefinitionChanged(token, path, sha string) (string, error) {
-	return gitlabDefinitionChanged("https://"+g.host+"/api/v4", token, path, sha)
+func (g Forge) DefinitionChanged(token, path, sha string) (string, error) {
+	return DefinitionChanged("https://"+g.HostName+"/api/v4", token, path, sha)
 }
 
-// maxCompareFiles: a comparison with this many files or more counts as not
+// MaxCompareFiles: a comparison with this many files or more counts as not
 // known. gitlab.com listed 633 files in full and cut at 3000 with
 // compare_timeout set (2026-11-23); the margin is for instances set lower.
-const maxCompareFiles = 300
+const MaxCompareFiles = 300
 
-// gitlabDefinitionChanged compares sha with the project's default branch from
+// DefinitionChanged compares sha with the project's default branch from
 // their merge base, so the definition the pipeline starts from was on the
 // default branch once.
-func gitlabDefinitionChanged(api, token, path, sha string) (string, error) {
+func DefinitionChanged(api, token, path, sha string) (string, error) {
 	get := func(rest string, v any) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
@@ -345,12 +346,12 @@ func gitlabDefinitionChanged(api, token, path, sha string) (string, error) {
 	if err := get("/repository/compare?"+q.Encode(), &c); err != nil {
 		return "", err
 	}
-	if c.Timeout || len(c.Diffs) >= maxCompareFiles {
+	if c.Timeout || len(c.Diffs) >= MaxCompareFiles {
 		return "", fmt.Errorf("comparison incomplete")
 	}
 	for _, d := range c.Diffs {
 		for _, f := range []string{d.Old, d.New} {
-			if gitlabDefinitionFile(f, p.CIConfigPath) {
+			if DefinitionFile(f, p.CIConfigPath) {
 				return f, nil
 			}
 		}
@@ -358,10 +359,10 @@ func gitlabDefinitionChanged(api, token, path, sha string) (string, error) {
 	return "", nil
 }
 
-// gitlabDefinitionFile reports whether a change of file can change what a
+// DefinitionFile reports whether a change of file can change what a
 // pipeline does before any job runs: the project's CI config file, anything
 // under .gitlab/, and every YAML file (a local include must be one).
-func gitlabDefinitionFile(file, ciConfig string) bool {
+func DefinitionFile(file, ciConfig string) bool {
 	if ciConfig = strings.TrimPrefix(ciConfig, "/"); ciConfig == "" {
 		ciConfig = ".gitlab-ci.yml"
 	}
@@ -370,7 +371,7 @@ func gitlabDefinitionFile(file, ciConfig string) bool {
 		strings.HasSuffix(l, ".yml") || strings.HasSuffix(l, ".yaml")
 }
 
-func (g gitlab) Guardrails(path string) ([]string, error) {
+func (g Forge) Guardrails(path string) ([]string, error) {
 	out, err := g.glab("api", "projects/"+url.PathEscape(path))
 	if err != nil {
 		return nil, fmt.Errorf("project %s: %w", path, err)

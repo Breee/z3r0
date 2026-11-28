@@ -30,15 +30,6 @@ var defaultCaps = []string{
 	"gitlab.issue.read", "gitlab.mr.read", "gitlab.pipeline.read",
 }
 
-// capMRCreate is not in the default set: opening a merge request starts a
-// merge request pipeline, which ci.skip on the push does not prevent. It is
-// accepted only together with ci.run (ADR 0044).
-const capMRCreate = "gitlab.mr.create"
-
-// capCIRun lets pipelines start on the agent's pushes. Without it (default)
-// the push gate adds ci.skip and a human starts the pipeline (ADR 0035).
-const capCIRun = "ci.run"
-
 var hostRe = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
 // loadPolicy reads .zero/policy.yaml from the host directories, never from the
@@ -56,8 +47,8 @@ func (s *Sandbox) loadPolicy() (*Policy, error) {
 		ps = append(ps, p)
 	}
 	u := unionPolicy(ps...)
-	if slices.Contains(u.Capabilities, capMRCreate) && !slices.Contains(u.Capabilities, capCIRun) {
-		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline; add %s or take %s out", capMRCreate, capCIRun, capCIRun, capMRCreate)
+	if slices.Contains(u.Capabilities, core.CapMRCreate) && !slices.Contains(u.Capabilities, core.CapCIRun) {
+		return nil, fmt.Errorf(".zero/policy.yaml: %s needs %s: a merge request opened by the agent starts a pipeline; add %s or take %s out", core.CapMRCreate, core.CapCIRun, core.CapCIRun, core.CapMRCreate)
 	}
 	if f, _, err := s.folderForge(); err != nil {
 		return nil, err

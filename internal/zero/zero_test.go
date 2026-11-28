@@ -22,6 +22,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 	"go.yaml.in/yaml/v3"
 )
@@ -82,17 +83,17 @@ func TestForwardCmdlineMatch(t *testing.T) {
 }
 
 func TestGitlabHost(t *testing.T) {
-	h, p, ok := parseRemote("ssh://git@git.example.org:2222/a/b.git")
+	h, p, ok := gitlab.ParseRemote("ssh://git@git.example.org:2222/a/b.git")
 	if !ok || h != "git.example.org" || p != "a/b" {
 		t.Fatalf("parseRemote = %q %q %v", h, p, ok)
 	}
-	if strings.Contains(string(gitlab{h}.Profile()), "endpoints") {
+	if strings.Contains(string(gitlab.Forge{HostName: h}.Profile()), "endpoints") {
 		t.Error("the token profile must not carry an endpoint: profile endpoints add to the sandbox's rules")
 	}
 }
 
 func TestForgeRule(t *testing.T) {
-	rules := gitlabProjectRules("grp/sub/app", 42)
+	rules := gitlab.ProjectRules("grp/sub/app", 42)
 	var got []string
 	for _, r := range rules {
 		got = append(got, r.Method+" "+r.Path)
@@ -109,7 +110,7 @@ func TestForgeRule(t *testing.T) {
 			t.Errorf("rule %q: method not needed", r)
 		}
 	}
-	if _, _, err := (gitlab{host: "gitlab.com"}).Egress([]string{"grp/a*"}); err == nil {
+	if _, _, err := (gitlab.Forge{HostName: "gitlab.com"}).Egress([]string{"grp/a*"}); err == nil {
 		t.Error("project path with a glob character accepted")
 	}
 	for host, want := range map[string]bool{"gitlab.com": false, "*.example.com": false, "proxy.golang.org": true, "*.gitlab.com": true} {
@@ -166,7 +167,7 @@ func TestParsePolicy(t *testing.T) {
 			t.Errorf("accepted %q", bad)
 		}
 	}
-	if _, err := (gitlab{}).Permissions([]string{"container.build"}, nil); err == nil {
+	if _, err := (gitlab.Forge{}).Permissions([]string{"container.build"}, nil); err == nil {
 		t.Error("unknown capability accepted")
 	}
 }
@@ -409,7 +410,7 @@ func TestLoadPolicyUnion(t *testing.T) {
 }
 
 func TestMRCreateNeedsCIRun(t *testing.T) {
-	if slices.Contains(defaultCaps, capMRCreate) {
+	if slices.Contains(defaultCaps, core.CapMRCreate) {
 		t.Error("gitlab.mr.create is in the default capabilities")
 	}
 	for caps, ok := range map[string]bool{
@@ -874,36 +875,36 @@ func TestSwitchByName(t *testing.T) {
 }
 
 func TestGitlabToolPermissions(t *testing.T) {
-	got, err := gitlabToolPermissions([]string{"get_project", "list_commits", "get_commit", "list_branches"})
+	got, err := gitlab.ToolPermissions([]string{"get_project", "list_commits", "get_commit", "list_branches"})
 	if err != nil || strings.Join(got, " ") != "read_project read_code read_branch" {
 		t.Fatalf("got %v, %v", got, err)
 	}
-	if got, _ := gitlabToolPermissions([]string{"list_branches"}); strings.Join(got, " ") != "read_branch" {
+	if got, _ := gitlab.ToolPermissions([]string{"list_branches"}); strings.Join(got, " ") != "read_branch" {
 		t.Fatalf("one tool: %v", got)
 	}
-	if _, err := gitlabToolPermissions([]string{"get_project", "save_note"}); err == nil {
+	if _, err := gitlab.ToolPermissions([]string{"get_project", "save_note"}); err == nil {
 		t.Fatal("tool without entry accepted")
 	}
 	// the list pocs/15-gitlab-mcp/tools-check.sh was run with (#131)
 	const all = "read_project read_code read_repository read_branch read_repository_tag read_merge_request read_pipeline read_job read_work_item read_namespace"
-	if got, err := gitlabToolPermissions(gitlabDefaultTools); err != nil || strings.Join(got, " ") != all {
+	if got, err := gitlab.ToolPermissions(gitlab.DefaultTools); err != nil || strings.Join(got, " ") != all {
 		t.Fatalf("default list: %v, %v", got, err)
 	}
-	if len(gitlabTools) != len(gitlabDefaultTools) {
-		t.Fatalf("%d tools in the table, %d in the default list", len(gitlabTools), len(gitlabDefaultTools))
+	if len(gitlab.Tools) != len(gitlab.DefaultTools) {
+		t.Fatalf("%d tools in the table, %d in the default list", len(gitlab.Tools), len(gitlab.DefaultTools))
 	}
 	b, err := os.ReadFile("../../pocs/15-gitlab-mcp/default-tools.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(strings.Fields(string(b)), gitlabDefaultTools) {
+	if !slices.Equal(strings.Fields(string(b)), gitlab.DefaultTools) {
 		t.Fatal("default list differs from pocs/15-gitlab-mcp/default-tools.txt")
 	}
 }
 
 func TestWorkspaceTools(t *testing.T) {
 	got, err := mcpTools([]string{"get_project", "default", "get_project"})
-	if err != nil || len(got) != len(gitlabDefaultTools) || got[0] != "get_project" {
+	if err != nil || len(got) != len(gitlab.DefaultTools) || got[0] != "get_project" {
 		t.Fatalf("default with names: %v, %v", got, err)
 	}
 	if got, err := mcpTools(nil); err != nil || got != nil {
@@ -914,15 +915,15 @@ func TestWorkspaceTools(t *testing.T) {
 	}
 
 	caps := []string{"git.read", "git.push"}
-	base, err := (gitlab{}).Permissions(caps, nil)
+	base, err := (gitlab.Forge{}).Permissions(caps, nil)
 	if err != nil || strings.Join(base, " ") != "read_project read_code download_code push_code" {
 		t.Fatalf("without tools: %v, %v", base, err)
 	}
-	with, err := (gitlab{}).Permissions(caps, []string{"get_project", "list_branches"})
+	with, err := (gitlab.Forge{}).Permissions(caps, []string{"get_project", "list_branches"})
 	if err != nil || strings.Join(with, " ") != strings.Join(base, " ")+" read_branch" {
 		t.Fatalf("with tools: %v, %v", with, err)
 	}
-	if _, err := (gitlab{}).Permissions(caps, []string{"save_note"}); err == nil {
+	if _, err := (gitlab.Forge{}).Permissions(caps, []string{"save_note"}); err == nil {
 		t.Fatal("permissions for a tool without entry")
 	}
 
@@ -976,14 +977,14 @@ func TestDefinitionFile(t *testing.T) {
 		".gitlab-ci.yml": true, "ci/build.yaml": true, "deploy/app.YML": true, ".gitlab/CODEOWNERS": true,
 		"ci/pipeline.conf": true, "main.go": false, "Makefile": false, "docs/yml.md": false,
 	} {
-		if got := gitlabDefinitionFile(f, "ci/pipeline.conf"); got != want {
+		if got := gitlab.DefinitionFile(f, "ci/pipeline.conf"); got != want {
 			t.Errorf("%s: got %v, want %v", f, got, want)
 		}
 	}
-	if !gitlabDefinitionFile("ci/pipeline.conf", "/ci/pipeline.conf") {
+	if !gitlab.DefinitionFile("ci/pipeline.conf", "/ci/pipeline.conf") {
 		t.Error("ci_config_path with a leading / not matched")
 	}
-	if gitlabDefinitionFile("ci/pipeline.conf", "") {
+	if gitlab.DefinitionFile("ci/pipeline.conf", "") {
 		t.Error("ci/pipeline.conf is no definition file without ci_config_path")
 	}
 }
@@ -1009,7 +1010,7 @@ func TestDefinitionChanged(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	many := `{"diffs":[` + strings.Repeat(`{"old_path":"a","new_path":"a"},`, maxCompareFiles-1) + `{"old_path":"a","new_path":"a"}]}`
+	many := `{"diffs":[` + strings.Repeat(`{"old_path":"a","new_path":"a"},`, gitlab.MaxCompareFiles-1) + `{"old_path":"a","new_path":"a"}]}`
 	for _, c := range []struct {
 		name, compare, config string
 		status                int
@@ -1026,7 +1027,7 @@ func TestDefinitionChanged(t *testing.T) {
 		{"no json", `<html>`, "", 200, "", true},
 	} {
 		compare, config, status = c.compare, c.config, c.status
-		file, err := gitlabDefinitionChanged(srv.URL, "tok", "g/p", "abc")
+		file, err := gitlab.DefinitionChanged(srv.URL, "tok", "g/p", "abc")
 		if file != c.file || (err != nil) != c.err {
 			t.Errorf("%s: got %q, %v", c.name, file, err)
 		}
@@ -1149,7 +1150,7 @@ func TestSyncForgePathsRevokes(t *testing.T) {
 		t.Error("forge.id kept after a failed revoke")
 	}
 
-	// Forge not recorded: the message does not claim a revoke.
+	// core.ForgeHost not recorded: the message does not claim a revoke.
 	os.Remove(s.path("forge"))
 	s.write("forge.id", "11", 0o600)
 	if _, err := s.syncForgePaths(); err == nil || !strings.Contains(err.Error(), "token 11 is not revoked") {
@@ -2135,10 +2136,10 @@ func TestFirstRunPolicy(t *testing.T) {
 	if strings.Contains(string(renderPolicy(firstRunPolicy(nil, nil, defaultCaps))), "network") {
 		t.Fatal("network block without hosts")
 	}
-	if checkChosenCaps(nil) == nil || checkChosenCaps([]string{capMRCreate}) == nil {
+	if checkChosenCaps(nil) == nil || checkChosenCaps([]string{core.CapMRCreate}) == nil {
 		t.Fatal("empty set or mr.create without ci.run accepted")
 	}
-	if err := checkChosenCaps([]string{"git.read", capMRCreate, capCIRun}); err != nil {
+	if err := checkChosenCaps([]string{"git.read", core.CapMRCreate, core.CapCIRun}); err != nil {
 		t.Fatal(err)
 	}
 	for f, want := range map[string]string{"requirements.txt": "Python", "pyproject.toml": "Python", "Cargo.toml": "Rust"} {
@@ -2150,7 +2151,7 @@ func TestFirstRunPolicy(t *testing.T) {
 			t.Errorf("%s: %v", f, got)
 		}
 	}
-	caps := append(slices.Clone(defaultCaps), capCIRun, capMRCreate)
+	caps := append(slices.Clone(defaultCaps), core.CapCIRun, core.CapMRCreate)
 	if p := firstRunPolicy(nil, nil, caps); !slices.Equal(p.Capabilities, caps) {
 		t.Fatalf("caps = %v", p.Capabilities)
 	}
@@ -2169,7 +2170,7 @@ func TestFirstRunApproval(t *testing.T) {
 	if _, err := s.approvePolicy(shown); err != nil {
 		t.Fatalf("the shown policy asked again: %v", err)
 	}
-	wider := &Policy{Capabilities: append(slices.Clone(defaultCaps), capCIRun)}
+	wider := &Policy{Capabilities: append(slices.Clone(defaultCaps), core.CapCIRun)}
 	wider.Network.Allow = []string{"proxy.golang.org", "evil.example.com"}
 	if _, err := s.approvePolicy(wider); err == nil {
 		t.Fatal("a policy wider than the shown one passed without approval")
@@ -2408,7 +2409,7 @@ func TestHomeFirstRun(t *testing.T) {
 	fr.cur = len(fr.items) - 1
 	last.fr = &fr
 	e, _ := press(last, ' ', tea.KeyEnter)
-	if e.fr == nil || e.fr.preview || !strings.Contains(plain(e), capMRCreate+" needs "+capCIRun) {
+	if e.fr == nil || e.fr.preview || !strings.Contains(plain(e), core.CapMRCreate+" needs "+core.CapCIRun) {
 		t.Errorf("gitlab.mr.create without ci.run got through:\n%s", plain(e))
 	}
 

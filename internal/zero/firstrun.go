@@ -36,8 +36,8 @@ var capText = map[string]string{
 	"gitlab.issue.read":    "read issues",
 	"gitlab.mr.read":       "read merge requests and their comments",
 	"gitlab.pipeline.read": "read pipelines and job logs",
-	capCIRun:               "pipelines run on the agent's pushes (off: skipped, you start them)",
-	capMRCreate:            "open merge requests (needs ci.run: a merge request starts a pipeline)",
+	core.CapCIRun:          "pipelines run on the agent's pushes (off: skipped, you start them)",
+	core.CapMRCreate:       "open merge requests (needs ci.run: a merge request starts a pipeline)",
 }
 
 const (
@@ -48,7 +48,7 @@ const (
 )
 
 // optionalCaps are off by default.
-var optionalCaps = []string{capCIRun, capMRCreate}
+var optionalCaps = []string{core.CapCIRun, core.CapMRCreate}
 
 func capLabel(c string) string { return c + ": " + capText[c] }
 
@@ -68,8 +68,8 @@ func checkChosenCaps(caps []string) error {
 	if len(caps) == 0 {
 		return errors.New("choose at least one permission")
 	}
-	if slices.Contains(caps, capMRCreate) && !slices.Contains(caps, capCIRun) {
-		return fmt.Errorf("%s needs %s", capMRCreate, capCIRun)
+	if slices.Contains(caps, core.CapMRCreate) && !slices.Contains(caps, core.CapCIRun) {
+		return fmt.Errorf("%s needs %s", core.CapMRCreate, core.CapCIRun)
 	}
 	return nil
 }
@@ -83,7 +83,7 @@ func firstRunPolicy(found []preset, chosen, caps []string) *Policy {
 			p.Network.Allow = append(p.Network.Allow, pr.Hosts...)
 		}
 	}
-	for _, c := range append(slices.Clone(defaultCaps), capCIRun, capMRCreate) {
+	for _, c := range append(slices.Clone(defaultCaps), core.CapCIRun, core.CapMRCreate) {
 		if slices.Contains(caps, c) {
 			p.Capabilities = append(p.Capabilities, c)
 		}

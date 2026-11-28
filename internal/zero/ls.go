@@ -27,7 +27,7 @@ type wsRow struct {
 type overview struct {
 	c          *Config
 	rows       []wsRow
-	tokens     map[string][]Token
+	tokens     map[string][]core.Token
 	liveTokens map[string]bool
 	sandboxes  map[string][]string
 	dirs       []string
@@ -46,7 +46,7 @@ func loadOverview() (*overview, error) {
 	sort.Strings(names)
 
 	// Forges in use: recorded in a state dir, or the remote of a directory.
-	forges := map[string]Forge{}
+	forges := map[string]core.ForgeHost{}
 	dirs, _ := filepath.Glob(filepath.Join(core.StateRoot(), "zero-*"))
 	for _, d := range dirs {
 		if f := forgeOf(d); f != nil {
@@ -60,7 +60,7 @@ func loadOverview() (*overview, error) {
 	}
 	// The forges are asked while the gateways are: they take the longest.
 	type listed struct {
-		toks []Token
+		toks []core.Token
 		err  error
 	}
 	asked := map[string]chan listed{}
@@ -93,7 +93,7 @@ func loadOverview() (*overview, error) {
 		})
 	}
 
-	tokens := map[string][]Token{}
+	tokens := map[string][]core.Token{}
 	for _, k := range slices.Sorted(mapKeys(asked)) {
 		l := <-asked[k]
 		if l.err != nil {

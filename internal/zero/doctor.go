@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
 
@@ -89,8 +90,8 @@ func Doctor(out io.Writer) error {
 	if top := gitTop(); top != "" {
 		remote, _ := core.Sh("git", "-C", top, "remote", "get-url", "origin")
 		f, path := forgeFor(remote)
-		if g, ok := f.(gitlab); ok && g.LoggedIn() == nil && g.PlaintextLogin() {
-			fmt.Fprintf(out, "warn  glab login for %s is stored in plain text: glab auth login --hostname %s --use-keyring\n", g.host, g.host)
+		if g, ok := f.(gitlab.Forge); ok && g.LoggedIn() == nil && g.PlaintextLogin() {
+			fmt.Fprintf(out, "warn  glab login for %s is stored in plain text: glab auth login --hostname %s --use-keyring\n", g.HostName, g.HostName)
 		}
 		if f == nil {
 			fmt.Fprintf(out, "na    forge: %s\n", noForgeHere(remote))
@@ -118,7 +119,7 @@ func noForgeHere(remote string) string {
 	if remote == "" {
 		return "this repository has no origin; a sandbox for it cannot push"
 	}
-	host, _, ok := parseRemote(remote)
+	host, _, ok := gitlab.ParseRemote(remote)
 	if !ok || slices.Contains(notGitlab, host) {
 		return "origin " + remote + " is not on GitLab; a sandbox for it cannot push"
 	}

@@ -9,14 +9,9 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/forge/gitlab"
 	"github.com/Breee/z3r0/internal/sandbox/openshell"
 )
-
-// Token is an active forge token as listed by the forge.
-type Token struct {
-	ID, Name string
-	Expires  time.Time
-}
 
 // renewBefore is how long before expiry zero up re-mints the token.
 const renewBefore = 12 * time.Hour
@@ -28,75 +23,32 @@ func tokenLabel(sandbox string) string {
 	return sandbox + "@" + h
 }
 
-// Forge is a git hosting strategy (D20). zero owns the lifecycle — profile
-// import, OpenShell provider, sandbox remote, state — and a Forge only knows
-// its host and how to mint and revoke a project-scoped token. Add a forge by
-// implementing this interface and registering it in forges.
-type Forge interface {
-	// Name is the short id used for the profile (zero-<name>), provider
-	// (<sandbox>-<name>) and state.
-	Name() string
-	// Host is the https host the token is valid for, e.g. gitlab.com.
-	Host() string
-	// ProfileID and Profile are the OpenShell provider profile of the token.
-	ProfileID() string
-	Profile() []byte
-	// Egress is what the sandbox may reach on the forge host for the
-	// projects at paths; anything not allowed is refused.
-	Egress(paths []string) (allow, deny []core.EgressRule, err error)
-	// LoggedIn is nil when the host session can mint tokens; the error says
-	// how to log in.
-	LoggedIn() error
-	// TokenEnv is the env var the sandbox sees the placeholder in.
-	TokenEnv() string
-	// GitUser is the https username git sends with the token.
-	GitUser() string
-	// Permissions maps policy capabilities and MCP tools to token
-	// permissions; an unknown capability or tool is an error.
-	Permissions(caps, tools []string) ([]string, error)
-	// Mint creates a short-lived token scoped to paths; id is used to revoke.
-	Mint(label string, paths []string, perms []string) (token, id string, err error)
-	// Revoke revokes a token by id; an expired or revoked token is not an error.
-	Revoke(id string) error
-	// Tokens lists the user's active tokens.
-	Tokens() ([]Token, error)
-	// Env is extra non-secret sandbox env the forge's tools need.
-	Env() []string
-	// DefinitionChanged names a pipeline definition file that commit sha
-	// changes against the default branch of the project at path, or "".
-	// token is the sandbox's token. An error means: not known.
-	DefinitionChanged(token, path, sha string) (file string, err error)
-	// Guardrails lists missing DevOps protections on the project (ADR 0024):
-	// default branch push-protected, merge only with green pipeline.
-	Guardrails(path string) (missing []string, err error)
-}
-
 // forgeFor picks the forge of an origin URL: gitlab.com, or any other host
 // glab is logged in to. Other hosts have no forge.
-func forgeFor(remote string) (Forge, string) {
-	host, path, ok := parseRemote(strings.TrimSpace(remote))
+func forgeFor(remote string) (core.ForgeHost, string) {
+	host, path, ok := gitlab.ParseRemote(strings.TrimSpace(remote))
 	if !ok {
 		return nil, ""
 	}
-	if g := (gitlab{host}); host == gitlabCom || g.LoggedIn() == nil {
+	if g := (gitlab.Forge{HostName: host}); host == gitlab.Com || g.LoggedIn() == nil {
 		return g, path
 	}
 	return nil, ""
 }
 
 // forgeOf is the forge recorded in a sandbox's state dir.
-func forgeOf(dir string) Forge {
+func forgeOf(dir string) core.ForgeHost {
 	if readState(dir, "forge") != "gitlab" {
 		return nil
 	}
 	host := readState(dir, "forge.host")
 	if host == "" {
-		host = gitlabCom
+		host = gitlab.Com
 	}
-	return gitlab{host}
+	return gitlab.Forge{HostName: host}
 }
 
-func (s *Sandbox) forge() Forge { return forgeOf(s.State) }
+func (s *Sandbox) forge() core.ForgeHost { return forgeOf(s.State) }
 
 // forgePaths are the project paths the token covers (state forge.path, one
 // per line).
@@ -104,8 +56,8 @@ func (s *Sandbox) forgePaths() []string { return strings.Fields(s.read("forge.pa
 
 // folderForge finds the forge and the project path of every directory; a directory
 // on no forge has path "". One workspace has one forge host.
-func (s *Sandbox) folderForge() (Forge, map[string]string, error) {
-	var forge Forge
+func (s *Sandbox) folderForge() (core.ForgeHost, map[string]string, error) {
+	var forge core.ForgeHost
 	paths := map[string]string{}
 	for _, top := range s.Folders {
 		origin, _ := core.Sh("git", "-C", top, "remote", "get-url", "origin")
@@ -193,9 +145,9 @@ func mcpTools(list []string) ([]string, error) {
 	for _, t := range list {
 		names := []string{t}
 		if t == "default" {
-			names = gitlabDefaultTools
-		} else if gitlabTools[t] == nil {
-			return nil, fmt.Errorf("unknown tool %q (default or one of: %s)", t, strings.Join(gitlabDefaultTools, ", "))
+			names = gitlab.DefaultTools
+		} else if gitlab.Tools[t] == nil {
+			return nil, fmt.Errorf("unknown tool %q (default or one of: %s)", t, strings.Join(gitlab.DefaultTools, ", "))
 		}
 		for _, n := range names {
 			if !slices.Contains(out, n) {
@@ -223,7 +175,7 @@ func (s *Sandbox) syncTools() (bool, error) {
 // forgeSynced marks the token as minted for the recorded paths and tools.
 func (s *Sandbox) forgeSynced() { os.Remove(s.path("forge.stale")) }
 
-func (s *Sandbox) forgeProvider(f Forge) string { return s.Name + "-" + f.Name() }
+func (s *Sandbox) forgeProvider(f core.ForgeHost) string { return s.Name + "-" + f.Name() }
 
 // setupForge mints a token for origin's forge and stores it as an OpenShell
 // provider. It returns the provider name, or "" when origin is on no known forge.
@@ -309,7 +261,7 @@ func (s *Sandbox) syncForgeRule() error {
 	return nil
 }
 
-func importProfile(f Forge) error {
+func importProfile(f core.ForgeHost) error {
 	if err := rt.ImportCredentialType(f.ProfileID(), f.Profile()); err != nil {
 		return fmt.Errorf("import %s profile: %w", f.Name(), err)
 	}
@@ -340,7 +292,7 @@ func (s *Sandbox) revokeForge() error {
 
 // mint creates the token. The marker forge.minting stays until its id is
 // recorded, so a token of a mint that stopped half way is found by its label.
-func (s *Sandbox) mint(f Forge, paths, perms []string) (tok, id string, err error) {
+func (s *Sandbox) mint(f core.ForgeHost, paths, perms []string) (tok, id string, err error) {
 	if err := s.write("forge.minting", "", 0o600); err != nil {
 		return "", "", err
 	}
@@ -356,7 +308,7 @@ func (s *Sandbox) recordToken(id string) error {
 
 // revokeUnrecorded revokes tokens with this sandbox's label after a mint whose
 // id was not written (state marker forge.minting).
-func (s *Sandbox) revokeUnrecorded(f Forge) error {
+func (s *Sandbox) revokeUnrecorded(f core.ForgeHost) error {
 	if !core.FileExists(s.path("forge.minting")) {
 		return nil
 	}
@@ -479,7 +431,7 @@ func (s *Sandbox) renewForge(caps []string, force bool) error {
 
 // revokeOrphans revokes this machine's zero tokens that no live sandbox owns,
 // e.g. left behind by a crash or a sandbox deleted outside zero.
-func revokeOrphans(f Forge) error {
+func revokeOrphans(f core.ForgeHost) error {
 	toks, err := f.Tokens()
 	if err != nil {
 		return err

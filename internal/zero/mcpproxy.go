@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Breee/z3r0/internal/core"
+	"github.com/Breee/z3r0/internal/forge/gitlab"
 )
 
 // Tool path through the model proxy (ADR 0055, PoC 27): a workspace with
@@ -105,7 +106,7 @@ func (s *Sandbox) syncMCP() error {
 			}
 		}
 	}
-	perms, err := gitlabToolPermissions(s.Tools)
+	perms, err := gitlab.ToolPermissions(s.Tools)
 	if err != nil {
 		return err
 	}

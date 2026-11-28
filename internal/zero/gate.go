@@ -301,7 +301,7 @@ func gateLookup(key string) *gateSession {
 		}
 		caps := strings.Fields(read("caps"))
 		return &gateSession{filepath.Base(dir), dir, "https://" + f.Host(), repos,
-			slices.Contains(caps, capCIRun), slices.Contains(caps, capMRCreate)}
+			slices.Contains(caps, core.CapCIRun), slices.Contains(caps, core.CapMRCreate)}
 	}
 	return nil
 }

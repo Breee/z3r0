@@ -73,7 +73,7 @@ func readState(dir, name string) string {
 // sandbox owns. A sandbox another zero command holds the lock on is skipped.
 func upkeep() {
 	ids, _ := filepath.Glob(filepath.Join(core.StateRoot(), "*", "forge.id"))
-	used := map[string]Forge{}
+	used := map[string]core.ForgeHost{}
 	// A sandbox whose token could not be revoked has no forge.id left; its
 	// forge is still swept for orphans.
 	marks, _ := filepath.Glob(filepath.Join(core.StateRoot(), "*", "forge"))
